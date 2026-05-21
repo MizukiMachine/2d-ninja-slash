@@ -1,0 +1,6 @@
+dist/assets/1024
+dist/assets/pixel_256_16
+
+node_modules/
+.vite/
+npm-debug.log*
