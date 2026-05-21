@@ -40,7 +40,8 @@ interface MovementInput {
 }
 
 const BACKGROUND_KEY = 'background.darkCathedralCourtyardBalancedPixel';
-const BACKGROUND_URL = '/backgrounds/dark-cathedral-courtyard-balanced-pixel.png';
+const BACKGROUND_URL = '/assets/backgrounds/dark-cathedral-courtyard-balanced-pixel.png';
+const MAIN_NINJA_ASSET_URL = '/assets/actors/main-ninja';
 const NINJA_FRAME_SIZE = 512;
 const NINJA_SCALE = 0.58;
 const NINJA_SPEED = 260;
@@ -54,13 +55,16 @@ const NINJA_BODY = {
   offsetY: 324
 } as const;
 
+const getMainNinjaSpritesheetUrl = (action: NinjaAction, direction: FacingDirection): string =>
+  `${MAIN_NINJA_ASSET_URL}/${action}-${direction}.png`;
+
 const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
   {
     action: 'idle',
     direction: 'left',
     textureKey: 'character.mainNinja.left.idle.spritesheet',
     animationKey: 'anim.mainNinja.left.idle',
-    url: '/actors/main-ninja/animations/left/idle/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('idle', 'left'),
     frameCount: 16,
     frameRate: 8,
     repeat: -1
@@ -70,7 +74,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'right',
     textureKey: 'character.mainNinja.right.idle.spritesheet',
     animationKey: 'anim.mainNinja.right.idle',
-    url: '/actors/main-ninja/animations/right/idle/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('idle', 'right'),
     frameCount: 16,
     frameRate: 8,
     repeat: -1
@@ -80,7 +84,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'left',
     textureKey: 'character.mainNinja.left.walk.spritesheet',
     animationKey: 'anim.mainNinja.left.walk',
-    url: '/actors/main-ninja/animations/left/walk/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('walk', 'left'),
     frameCount: 16,
     frameRate: 12,
     repeat: -1
@@ -90,7 +94,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'right',
     textureKey: 'character.mainNinja.right.walk.spritesheet',
     animationKey: 'anim.mainNinja.right.walk',
-    url: '/actors/main-ninja/animations/right/walk/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('walk', 'right'),
     frameCount: 16,
     frameRate: 12,
     repeat: -1
@@ -100,7 +104,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'left',
     textureKey: 'character.mainNinja.left.slash.spritesheet',
     animationKey: 'anim.mainNinja.left.slash',
-    url: '/actors/main-ninja/animations/left/slash/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('slash', 'left'),
     frameCount: 16,
     frameRate: 12,
     repeat: 0
@@ -110,7 +114,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'right',
     textureKey: 'character.mainNinja.right.slash.spritesheet',
     animationKey: 'anim.mainNinja.right.slash',
-    url: '/actors/main-ninja/animations/right/slash/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('slash', 'right'),
     frameCount: 16,
     frameRate: 12,
     repeat: 0
@@ -120,7 +124,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'left',
     textureKey: 'character.mainNinja.left.impact.spritesheet',
     animationKey: 'anim.mainNinja.left.impact',
-    url: '/actors/main-ninja/animations/left/impact/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('impact', 'left'),
     frameCount: 32,
     frameRate: 16,
     repeat: 0
@@ -130,7 +134,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     direction: 'right',
     textureKey: 'character.mainNinja.right.impact.spritesheet',
     animationKey: 'anim.mainNinja.right.impact',
-    url: '/actors/main-ninja/animations/right/impact/spritesheet.png',
+    url: getMainNinjaSpritesheetUrl('impact', 'right'),
     frameCount: 32,
     frameRate: 16,
     repeat: 0
