@@ -1,0 +1,468 @@
+:root {
+  color-scheme: dark;
+
+  --bg: #0a0e15;
+  --bg-deep: #05080d;
+  --surface: #101722;
+  --surface-hi: #162235;
+  --surface-lo: #0c121d;
+  --ink: #f3f7fb;
+  --ink-dim: #b6c5d7;
+  --muted: #8395aa;
+  --wire: #26364d;
+  --wire-hi: #3c5674;
+  --accent: #64b5ff;
+  --accent-strong: #35d08f;
+  --warn: #f2c45b;
+  --danger: #e56b6f;
+  --shadow-wire: 2px 2px 0 #03050a;
+
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(18, 28, 42, 0.94), rgba(5, 8, 13, 1)),
+    var(--bg);
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  height: 100vh;
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.app-shell__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 9px 12px;
+  border: 1px solid var(--wire);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.app-shell__brand {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-shell__brand .eyebrow,
+.app-shell__brand .subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.app-shell__brand .eyebrow {
+  color: var(--accent-strong);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.app-shell__brand h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.app-shell__header-action {
+  display: flex;
+  justify-content: center;
+}
+
+.app-shell__status {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell-button,
+.status-chip {
+  min-height: 32px;
+  border: 1px solid var(--wire-hi);
+  border-radius: 6px;
+  background: var(--surface-hi);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.shell-button {
+  padding: 0 13px;
+  cursor: pointer;
+}
+
+.shell-button:hover,
+.status-chip:hover {
+  border-color: var(--accent);
+}
+
+.shell-button:active {
+  transform: translateY(1px);
+}
+
+.shell-button[data-variant="primary"] {
+  background: #14304a;
+  border-color: #4278a8;
+  color: #eaf6ff;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.status-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--accent-strong);
+}
+
+.status-chip[data-tone="muted"]::before {
+  background: var(--muted);
+}
+
+.app-shell__workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell[data-profile="portrait"]:not(.is-play-mode) .app-shell__workspace {
+  grid-template-columns: minmax(320px, 430px) 330px;
+  justify-content: center;
+}
+
+.game-host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.game-host__bezel-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--wire);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: var(--surface-hi);
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.game-host__bezel-label .dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.game-host__bezel-label .dots i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--wire-hi);
+}
+
+.game-host__bezel-label .dots i:first-child {
+  background: var(--danger);
+}
+
+.game-host__bezel-label .dots i:nth-child(2) {
+  background: var(--warn);
+}
+
+.game-host__bezel-label .dots i:nth-child(3) {
+  background: var(--accent-strong);
+}
+
+.game-root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--wire);
+  border-radius: 0 0 8px 8px;
+  background: var(--bg-deep);
+  box-shadow: inset 0 0 0 1px #02050a;
+}
+
+.game-root:focus {
+  outline: none;
+}
+
+.game-root canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--wire);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.debug-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--wire);
+  background: var(--surface-hi);
+}
+
+.debug-panel__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.debug-panel__body {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+
+.debug-panel.is-collapsed .debug-panel__body {
+  display: none;
+}
+
+.debug-panel__controls {
+  display: grid;
+  gap: 12px;
+}
+
+.panel-group {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--wire);
+  border-radius: 6px;
+  background: var(--surface-lo);
+}
+
+.panel-group__title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 28px;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.metrics {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--wire);
+  border-radius: 6px;
+  background: var(--bg-deep);
+}
+
+.metrics__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metrics__row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.metrics__row strong {
+  color: var(--accent);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.play-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 90;
+  padding: 9px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(5, 8, 13, 0.92);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(10px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.play-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.app-shell.is-play-mode {
+  gap: 0;
+  padding: 0;
+  background: var(--bg-deep);
+}
+
+.app-shell.is-play-mode .app-shell__header,
+.app-shell.is-play-mode .debug-panel {
+  display: none;
+}
+
+.app-shell.is-play-mode .app-shell__workspace {
+  display: block;
+  min-height: 100vh;
+}
+
+.app-shell.is-play-mode .game-host {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+
+.app-shell.is-play-mode .game-host__bezel-label {
+  display: none;
+}
+
+.app-shell.is-play-mode .game-root {
+  height: 100vh;
+  min-height: 100vh;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 960px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100svh;
+    padding: 10px;
+    overflow: visible;
+  }
+
+  .app-shell__header {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .app-shell__header-action,
+  .app-shell__status {
+    justify-content: flex-start;
+  }
+
+  .app-shell__workspace,
+  .app-shell[data-profile="portrait"]:not(.is-play-mode) .app-shell__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .game-host {
+    min-height: 58svh;
+  }
+
+  .app-shell.is-play-mode {
+    height: 100svh;
+    min-height: 100svh;
+    overflow: hidden;
+  }
+}
