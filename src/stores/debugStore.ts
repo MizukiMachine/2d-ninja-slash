@@ -1,5 +1,9 @@
 import { createStore, type WritableStore } from './store';
 
+export type DebugSpriteSheetSet = 'current' | 'legacy';
+
+export const DEFAULT_DEBUG_SPRITE_SHEET_SET: DebugSpriteSheetSet = 'current';
+
 export interface DebugPointerState {
   readonly x: number;
   readonly y: number;
@@ -20,6 +24,8 @@ export interface DebugState {
   readonly activeScene: string;
   readonly paused: boolean;
   readonly showWorldBounds: boolean;
+  readonly enemyChaseEnabled: boolean;
+  readonly spriteSheetSet: DebugSpriteSheetSet;
   readonly pointer: DebugPointerState;
   readonly input: DebugInputState;
 }
@@ -30,6 +36,9 @@ export interface DebugStore extends WritableStore<DebugState> {
   togglePaused(): void;
   setShowWorldBounds(showWorldBounds: boolean): void;
   toggleWorldBounds(): void;
+  setEnemyChaseEnabled(enemyChaseEnabled: boolean): void;
+  toggleEnemyChase(): void;
+  setSpriteSheetSet(spriteSheetSet: DebugSpriteSheetSet): void;
   setPointer(pointer: Partial<DebugPointerState>): void;
   setInput(input: Partial<DebugInputState>): void;
   resetRuntime(): void;
@@ -40,6 +49,8 @@ function createInitialDebugState(): DebugState {
     activeScene: 'Boot',
     paused: false,
     showWorldBounds: false,
+    enemyChaseEnabled: true,
+    spriteSheetSet: DEFAULT_DEBUG_SPRITE_SHEET_SET,
     pointer: {
       x: 0,
       y: 0,
@@ -77,6 +88,15 @@ export function createDebugStore(): DebugStore {
     toggleWorldBounds: () => {
       store.update((state) => ({ ...state, showWorldBounds: !state.showWorldBounds }));
     },
+    setEnemyChaseEnabled: (enemyChaseEnabled) => {
+      store.update((state) => ({ ...state, enemyChaseEnabled }));
+    },
+    toggleEnemyChase: () => {
+      store.update((state) => ({ ...state, enemyChaseEnabled: !state.enemyChaseEnabled }));
+    },
+    setSpriteSheetSet: (spriteSheetSet) => {
+      store.update((state) => ({ ...state, spriteSheetSet }));
+    },
     setPointer: (pointer) => {
       store.update((state) => ({ ...state, pointer: { ...state.pointer, ...pointer } }));
     },
@@ -89,7 +109,9 @@ export function createDebugStore(): DebugStore {
       store.set({
         ...initial,
         paused: current.paused,
-        showWorldBounds: current.showWorldBounds
+        showWorldBounds: current.showWorldBounds,
+        enemyChaseEnabled: current.enemyChaseEnabled,
+        spriteSheetSet: current.spriteSheetSet
       });
     }
   };

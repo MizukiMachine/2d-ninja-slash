@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
+import type { DebugSpriteSheetSet } from '../../stores/debugStore';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'slash2' | 'slash3' | 'impact';
@@ -29,9 +30,6 @@ interface MoveKeys {
 interface NinjaAnimationConfig<TAction extends string> {
   readonly action: TAction;
   readonly direction: FacingDirection;
-  readonly textureKey: string;
-  readonly animationKey: string;
-  readonly url: string;
   readonly frameCount: number;
   readonly frameRate: number;
   readonly repeat: number;
@@ -46,13 +44,32 @@ interface MovementInput {
   readonly y: number;
 }
 
-const MAIN_NINJA_ASSET_URL = '/assets/actors/main-ninja';
-const ENEMY_NINJA_ASSET_URL = '/assets/actors/enemy-ninja';
-const NINJA_FRAME_SIZE = 216;
+interface NinjaBodyConfig {
+  readonly width: number;
+  readonly height: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+}
+
+interface NinjaSpriteSheetSet {
+  readonly id: DebugSpriteSheetSet;
+  readonly actorRootUrl: string;
+  readonly backgroundRootUrl: string;
+  readonly backgroundFileName: string;
+  readonly frameSize: number;
+  readonly frameCount: number;
+  readonly scale: number;
+  readonly enemyScale: number;
+  readonly body: NinjaBodyConfig;
+}
+
+const LEGACY_NINJA_FRAME_SIZE = 216;
+const CURRENT_NINJA_FRAME_SIZE = 512;
 const NINJA_FRAME_COUNT = 32;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
-const NINJA_SCALE = 1.38;
-const ENEMY_NINJA_SCALE = NINJA_SCALE * 1.14;
+const NINJA_DISPLAY_SCALE_MULTIPLIER = 2.2;
+const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
+const ENEMY_NINJA_SCALE_MULTIPLIER = 1.14;
 const NINJA_SPEED = 260;
 const ENEMY_NINJA_SPEED = NINJA_SPEED;
 const ENEMY_ATTACK_RANGE = 112;
@@ -66,20 +83,86 @@ const ATTACK_HIT_RADIUS: Record<PlayerAttackAction, number> = {
 };
 const ATTACK_HIT_FORWARD_OFFSET = 88;
 const ATTACK_HIT_Y_OFFSET = -82;
-const NINJA_BODY = {
-  width: 56,
-  height: 62,
-  offsetX: 80,
-  offsetY: 137
-} as const;
 
-const getMainNinjaSpritesheetUrl = (action: MainNinjaAction, direction: FacingDirection): string =>
-  `${MAIN_NINJA_ASSET_URL}/${action}-${direction}.png`;
+const NINJA_SPRITE_SHEET_SETS = {
+  current: {
+    id: 'current',
+    actorRootUrl: '/assets/current/actors',
+    backgroundRootUrl: '/assets/current/backgrounds',
+    backgroundFileName: 'three-lane-hq-rain-village.png',
+    frameSize: CURRENT_NINJA_FRAME_SIZE,
+    frameCount: NINJA_FRAME_COUNT,
+    scale: NINJA_TARGET_SCALE * (LEGACY_NINJA_FRAME_SIZE / CURRENT_NINJA_FRAME_SIZE),
+    enemyScale:
+      NINJA_TARGET_SCALE *
+      (LEGACY_NINJA_FRAME_SIZE / CURRENT_NINJA_FRAME_SIZE) *
+      ENEMY_NINJA_SCALE_MULTIPLIER,
+    body: {
+      width: 133,
+      height: 147,
+      offsetX: 190,
+      offsetY: 325
+    }
+  },
+  legacy: {
+    id: 'legacy',
+    actorRootUrl: '/assets/legacy/actors',
+    backgroundRootUrl: '/assets/legacy/backgrounds',
+    backgroundFileName: 'three-lane-rough-rain-village.png',
+    frameSize: LEGACY_NINJA_FRAME_SIZE,
+    frameCount: NINJA_FRAME_COUNT,
+    scale: NINJA_TARGET_SCALE,
+    enemyScale: NINJA_TARGET_SCALE * ENEMY_NINJA_SCALE_MULTIPLIER,
+    body: {
+      width: 56,
+      height: 62,
+      offsetX: 80,
+      offsetY: 137
+    }
+  }
+} as const satisfies Record<DebugSpriteSheetSet, NinjaSpriteSheetSet>;
 
-const getEnemyNinjaSpritesheetUrl = (
+const getMainNinjaTextureKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  action: MainNinjaAction,
+  direction: FacingDirection
+): string => `character.${spriteSheetSetId}.mainNinja.${direction}.${action}.spritesheet`;
+
+const getBackgroundTextureKey = (spriteSheetSetId: DebugSpriteSheetSet): string =>
+  `background.${spriteSheetSetId}.sandbox`;
+
+const getBackgroundUrl = (spriteSheetSet: NinjaSpriteSheetSet): string =>
+  `${spriteSheetSet.backgroundRootUrl}/${spriteSheetSet.backgroundFileName}`;
+
+const getMainNinjaAnimationKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  action: MainNinjaAction,
+  direction: FacingDirection
+): string => `anim.${spriteSheetSetId}.mainNinja.${direction}.${action}`;
+
+const getMainNinjaSpriteSheetSetUrl = (
+  spriteSheetSet: NinjaSpriteSheetSet,
+  action: MainNinjaAction,
+  direction: FacingDirection
+): string => `${spriteSheetSet.actorRootUrl}/main-ninja/${action}-${direction}.png`;
+
+const getEnemyNinjaTextureKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
   action: EnemyNinjaAction,
   direction: FacingDirection
-): string => `${ENEMY_NINJA_ASSET_URL}/${action}-${direction}.png`;
+): string => `character.${spriteSheetSetId}.enemyNinja.${direction}.${action}.spritesheet`;
+
+const getEnemyNinjaAnimationKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  action: EnemyNinjaAction,
+  direction: FacingDirection
+): string => `anim.${spriteSheetSetId}.enemyNinja.${direction}.${action}`;
+
+const getEnemyNinjaSpriteSheetSetUrl = (
+  spriteSheetSet: NinjaSpriteSheetSet,
+  action: EnemyNinjaAction,
+  direction: FacingDirection
+): string => `${spriteSheetSet.actorRootUrl}/enemy-ninja/${action}-${direction}.png`;
 
 const isPlayerAttackAction = (action: PlayerAction): action is PlayerAttackAction =>
   action === 'slash' || action === 'slash2' || action === 'slash3';
@@ -88,9 +171,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'idle',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.idle.spritesheet',
-    animationKey: 'anim.mainNinja.left.idle',
-    url: getMainNinjaSpritesheetUrl('idle', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -98,9 +178,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'idle',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.idle.spritesheet',
-    animationKey: 'anim.mainNinja.right.idle',
-    url: getMainNinjaSpritesheetUrl('idle', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -108,9 +185,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'run',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.run.spritesheet',
-    animationKey: 'anim.mainNinja.left.run',
-    url: getMainNinjaSpritesheetUrl('run', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -118,9 +192,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'run',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.run.spritesheet',
-    animationKey: 'anim.mainNinja.right.run',
-    url: getMainNinjaSpritesheetUrl('run', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -128,9 +199,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'jump',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.jump.spritesheet',
-    animationKey: 'anim.mainNinja.left.jump',
-    url: getMainNinjaSpritesheetUrl('jump', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -138,9 +206,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'jump',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.jump.spritesheet',
-    animationKey: 'anim.mainNinja.right.jump',
-    url: getMainNinjaSpritesheetUrl('jump', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -148,9 +213,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'slash',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.slash.spritesheet',
-    animationKey: 'anim.mainNinja.left.slash',
-    url: getMainNinjaSpritesheetUrl('slash', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -158,9 +220,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'slash',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.slash.spritesheet',
-    animationKey: 'anim.mainNinja.right.slash',
-    url: getMainNinjaSpritesheetUrl('slash', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -168,9 +227,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'slash2',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.slash2.spritesheet',
-    animationKey: 'anim.mainNinja.left.slash2',
-    url: getMainNinjaSpritesheetUrl('slash2', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -178,9 +234,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'slash2',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.slash2.spritesheet',
-    animationKey: 'anim.mainNinja.right.slash2',
-    url: getMainNinjaSpritesheetUrl('slash2', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -188,9 +241,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'slash3',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.slash3.spritesheet',
-    animationKey: 'anim.mainNinja.left.slash3',
-    url: getMainNinjaSpritesheetUrl('slash3', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -198,9 +248,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'slash3',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.slash3.spritesheet',
-    animationKey: 'anim.mainNinja.right.slash3',
-    url: getMainNinjaSpritesheetUrl('slash3', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -208,9 +255,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'impact',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.impact.spritesheet',
-    animationKey: 'anim.mainNinja.left.impact',
-    url: getMainNinjaSpritesheetUrl('impact', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -218,9 +262,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'impact',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.impact.spritesheet',
-    animationKey: 'anim.mainNinja.right.impact',
-    url: getMainNinjaSpritesheetUrl('impact', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -231,9 +272,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
   {
     action: 'idle',
     direction: 'left',
-    textureKey: 'character.enemyNinja.left.idle.spritesheet',
-    animationKey: 'anim.enemyNinja.left.idle',
-    url: getEnemyNinjaSpritesheetUrl('idle', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -241,9 +279,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
   {
     action: 'idle',
     direction: 'right',
-    textureKey: 'character.enemyNinja.right.idle.spritesheet',
-    animationKey: 'anim.enemyNinja.right.idle',
-    url: getEnemyNinjaSpritesheetUrl('idle', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -251,9 +286,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
   {
     action: 'run',
     direction: 'left',
-    textureKey: 'character.enemyNinja.left.run.spritesheet',
-    animationKey: 'anim.enemyNinja.left.run',
-    url: getEnemyNinjaSpritesheetUrl('run', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -261,9 +293,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
   {
     action: 'run',
     direction: 'right',
-    textureKey: 'character.enemyNinja.right.run.spritesheet',
-    animationKey: 'anim.enemyNinja.right.run',
-    url: getEnemyNinjaSpritesheetUrl('run', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
@@ -271,9 +300,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
   {
     action: 'slash',
     direction: 'left',
-    textureKey: 'character.enemyNinja.left.slash.spritesheet',
-    animationKey: 'anim.enemyNinja.left.slash',
-    url: getEnemyNinjaSpritesheetUrl('slash', 'left'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -281,9 +307,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
   {
     action: 'slash',
     direction: 'right',
-    textureKey: 'character.enemyNinja.right.slash.spritesheet',
-    animationKey: 'anim.enemyNinja.right.slash',
-    url: getEnemyNinjaSpritesheetUrl('slash', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
@@ -294,9 +317,13 @@ export class SandboxScene extends BaseScene {
   private player: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
   private enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
   private moveKeys: MoveKeys | null = null;
+  private background: Phaser.GameObjects.Image | null = null;
   private boundsGraphic: Phaser.GameObjects.Graphics | null = null;
   private attackGraphic: Phaser.GameObjects.Graphics | null = null;
   private pauseLabel: Phaser.GameObjects.Text | null = null;
+  private activeSpriteSheetSetId: DebugSpriteSheetSet = 'current';
+  private loadingSpriteSheetSetId: DebugSpriteSheetSet | null = null;
+  private pendingSpriteSheetSetId: DebugSpriteSheetSet | null = null;
   private facingDirection: FacingDirection = 'right';
   private enemyFacingDirection: FacingDirection = 'left';
   private currentAction: PlayerAction = 'idle';
@@ -311,59 +338,49 @@ export class SandboxScene extends BaseScene {
   }
 
   preload(): void {
-    for (const animation of [...NINJA_ANIMATIONS, ...ENEMY_NINJA_ANIMATIONS]) {
-      if (this.textures.exists(animation.textureKey)) {
-        continue;
-      }
-
-      this.load.spritesheet(animation.textureKey, animation.url, {
-        frameWidth: NINJA_FRAME_SIZE,
-        frameHeight: NINJA_FRAME_SIZE,
-        margin: 0,
-        spacing: 0,
-        startFrame: 0,
-        endFrame: animation.frameCount - 1
-      });
-    }
+    this.queueSpriteSheetSet(NINJA_SPRITE_SHEET_SETS[this.debug.get().spriteSheetSet]);
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor('#101722');
-    this.createAnimations();
+    this.activeSpriteSheetSetId = this.debug.get().spriteSheetSet;
+    const spriteSheetSet = this.getActiveSpriteSheetSet();
+
+    this.createAnimationsForSpriteSheetSet(spriteSheetSet);
     this.createBackground();
     this.physics.world.setBounds(0, 0, this.profile.width, this.profile.height);
 
     this.player = this.physics.add.sprite(
       this.centerX,
       this.centerY + 108,
-      'character.mainNinja.right.idle.spritesheet',
+      getMainNinjaTextureKey(this.activeSpriteSheetSetId, 'idle', 'right'),
       0
     );
     this.player
       .setOrigin(0.5, 1)
-      .setScale(NINJA_SCALE)
+      .setScale(spriteSheetSet.scale)
       .setCollideWorldBounds(true)
-      .setBodySize(NINJA_BODY.width, NINJA_BODY.height, false)
-      .setOffset(NINJA_BODY.offsetX, NINJA_BODY.offsetY)
+      .setBodySize(spriteSheetSet.body.width, spriteSheetSet.body.height, false)
+      .setOffset(spriteSheetSet.body.offsetX, spriteSheetSet.body.offsetY)
       .setDepth(10)
-      .play('anim.mainNinja.right.idle');
+      .play(getMainNinjaAnimationKey(this.activeSpriteSheetSetId, 'idle', 'right'));
 
     const enemyX = Phaser.Math.Clamp(this.centerX + 320, 120, this.profile.width - 120);
 
     this.enemy = this.physics.add.sprite(
       enemyX,
       this.centerY + 108,
-      'character.enemyNinja.left.idle.spritesheet',
+      getEnemyNinjaTextureKey(this.activeSpriteSheetSetId, 'idle', 'left'),
       0
     );
     this.enemy
       .setOrigin(0.5, 1)
-      .setScale(ENEMY_NINJA_SCALE)
+      .setScale(spriteSheetSet.enemyScale)
       .setCollideWorldBounds(true)
-      .setBodySize(NINJA_BODY.width, NINJA_BODY.height, false)
-      .setOffset(NINJA_BODY.offsetX, NINJA_BODY.offsetY)
+      .setBodySize(spriteSheetSet.body.width, spriteSheetSet.body.height, false)
+      .setOffset(spriteSheetSet.body.offsetX, spriteSheetSet.body.offsetY)
       .setDepth(9)
-      .play('anim.enemyNinja.left.idle');
+      .play(getEnemyNinjaAnimationKey(this.activeSpriteSheetSetId, 'idle', 'left'));
 
     this.physics.add.collider(this.player, this.enemy);
 
@@ -384,6 +401,7 @@ export class SandboxScene extends BaseScene {
     this.registerEnemyAnimationEvents();
     this.registerPointerDebug();
     this.onStore(this.debug, (state) => {
+      this.applySpriteSheetSet(state.spriteSheetSet);
       this.renderWorldBounds(state.showWorldBounds);
       this.pauseLabel?.setVisible(state.paused);
       this.player?.setAlpha(state.paused ? 0.55 : 1);
@@ -437,46 +455,317 @@ export class SandboxScene extends BaseScene {
 
   private createBackground(): void {
     const { width, height } = this.profile;
-    const background = this.add.graphics().setDepth(-10);
-
-    background.fillStyle(0x071018, 1);
-    background.fillRect(0, 0, width, height);
-    background.fillStyle(0x0d1d2a, 1);
-    background.fillRect(0, height * 0.55, width, height * 0.45);
-    background.fillStyle(0x10283a, 1);
-    background.fillRect(0, height * 0.53, width, 14);
-    background.fillStyle(0x142336, 0.85);
-
-    for (let x = -24; x < width; x += 118) {
-      background.fillRect(x, height * 0.14, 42, height * 0.42);
-    }
-
-    background.fillStyle(0x1b7c85, 0.18);
-    background.fillCircle(width * 0.78, height * 0.18, 86);
-    background.fillStyle(0x172337, 0.9);
-    background.fillRect(0, height * 0.74, width, height * 0.26);
-    background.lineStyle(2, 0x1f5b67, 0.35);
-
-    for (let x = -80; x < width; x += 96) {
-      background.lineBetween(x, height, x + 170, height * 0.74);
-    }
+    this.background = this.add
+      .image(width / 2, height / 2, getBackgroundTextureKey(this.activeSpriteSheetSetId))
+      .setDepth(-10);
+    this.fitBackground();
   }
 
-  private createAnimations(): void {
-    for (const animation of [...NINJA_ANIMATIONS, ...ENEMY_NINJA_ANIMATIONS]) {
-      if (this.anims.exists(animation.animationKey)) {
+  private fitBackground(): void {
+    if (this.background === null) {
+      return;
+    }
+
+    const { width, height } = this.profile;
+    const backgroundFrame = this.background.frame;
+    const scale = Math.max(width / backgroundFrame.width, height / backgroundFrame.height);
+
+    this.background.setScale(scale);
+  }
+
+  private getActiveSpriteSheetSet(): NinjaSpriteSheetSet {
+    return NINJA_SPRITE_SHEET_SETS[this.activeSpriteSheetSetId];
+  }
+
+  private queueSpriteSheetSet(spriteSheetSet: NinjaSpriteSheetSet): boolean {
+    let queued = false;
+    const backgroundTextureKey = getBackgroundTextureKey(spriteSheetSet.id);
+
+    if (!this.textures.exists(backgroundTextureKey)) {
+      this.load.image(backgroundTextureKey, getBackgroundUrl(spriteSheetSet));
+      queued = true;
+    }
+
+    for (const animation of NINJA_ANIMATIONS) {
+      const textureKey = getMainNinjaTextureKey(
+        spriteSheetSet.id,
+        animation.action,
+        animation.direction
+      );
+
+      if (this.textures.exists(textureKey)) {
+        continue;
+      }
+
+      this.load.spritesheet(
+        textureKey,
+        getMainNinjaSpriteSheetSetUrl(spriteSheetSet, animation.action, animation.direction),
+        {
+          frameWidth: spriteSheetSet.frameSize,
+          frameHeight: spriteSheetSet.frameSize,
+          margin: 0,
+          spacing: 0,
+          startFrame: 0,
+          endFrame: Math.min(animation.frameCount, spriteSheetSet.frameCount) - 1
+        }
+      );
+      queued = true;
+    }
+
+    for (const animation of ENEMY_NINJA_ANIMATIONS) {
+      const textureKey = getEnemyNinjaTextureKey(
+        spriteSheetSet.id,
+        animation.action,
+        animation.direction
+      );
+
+      if (this.textures.exists(textureKey)) {
+        continue;
+      }
+
+      this.load.spritesheet(
+        textureKey,
+        getEnemyNinjaSpriteSheetSetUrl(spriteSheetSet, animation.action, animation.direction),
+        {
+          frameWidth: spriteSheetSet.frameSize,
+          frameHeight: spriteSheetSet.frameSize,
+          margin: 0,
+          spacing: 0,
+          startFrame: 0,
+          endFrame: Math.min(animation.frameCount, spriteSheetSet.frameCount) - 1
+        }
+      );
+      queued = true;
+    }
+
+    return queued;
+  }
+
+  private createAnimationsForSpriteSheetSet(spriteSheetSet: NinjaSpriteSheetSet): void {
+    for (const animation of NINJA_ANIMATIONS) {
+      const animationKey = getMainNinjaAnimationKey(
+        spriteSheetSet.id,
+        animation.action,
+        animation.direction
+      );
+
+      if (this.anims.exists(animationKey)) {
         continue;
       }
 
       this.anims.create({
-        key: animation.animationKey,
-        frames: this.anims.generateFrameNumbers(animation.textureKey, {
-          start: 0,
-          end: animation.frameCount - 1
-        }),
+        key: animationKey,
+        frames: this.anims.generateFrameNumbers(
+          getMainNinjaTextureKey(spriteSheetSet.id, animation.action, animation.direction),
+          {
+            start: 0,
+            end: Math.min(animation.frameCount, spriteSheetSet.frameCount) - 1
+          }
+        ),
         frameRate: animation.frameRate,
         repeat: animation.repeat
       });
+    }
+
+    for (const animation of ENEMY_NINJA_ANIMATIONS) {
+      const animationKey = getEnemyNinjaAnimationKey(
+        spriteSheetSet.id,
+        animation.action,
+        animation.direction
+      );
+
+      if (this.anims.exists(animationKey)) {
+        continue;
+      }
+
+      this.anims.create({
+        key: animationKey,
+        frames: this.anims.generateFrameNumbers(
+          getEnemyNinjaTextureKey(spriteSheetSet.id, animation.action, animation.direction),
+          {
+            start: 0,
+            end: Math.min(animation.frameCount, spriteSheetSet.frameCount) - 1
+          }
+        ),
+        frameRate: animation.frameRate,
+        repeat: animation.repeat
+      });
+    }
+  }
+
+  private isSpriteSheetSetLoaded(spriteSheetSet: NinjaSpriteSheetSet): boolean {
+    return (
+      this.textures.exists(getBackgroundTextureKey(spriteSheetSet.id)) &&
+      NINJA_ANIMATIONS.every((animation) =>
+        this.textures.exists(
+          getMainNinjaTextureKey(spriteSheetSet.id, animation.action, animation.direction)
+        )
+      ) &&
+      ENEMY_NINJA_ANIMATIONS.every((animation) =>
+        this.textures.exists(
+          getEnemyNinjaTextureKey(spriteSheetSet.id, animation.action, animation.direction)
+        )
+      )
+    );
+  }
+
+  private applyNinjaSpriteMetrics(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    scale: number,
+    spriteSheetSet: NinjaSpriteSheetSet
+  ): void {
+    sprite
+      .setScale(scale)
+      .setBodySize(spriteSheetSet.body.width, spriteSheetSet.body.height, false)
+      .setOffset(spriteSheetSet.body.offsetX, spriteSheetSet.body.offsetY);
+  }
+
+  private applySpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
+    if (this.activeSpriteSheetSetId === spriteSheetSetId) {
+      return;
+    }
+
+    const spriteSheetSet = NINJA_SPRITE_SHEET_SETS[spriteSheetSetId];
+
+    if (!this.isSpriteSheetSetLoaded(spriteSheetSet)) {
+      this.loadSpriteSheetSet(spriteSheetSetId);
+      return;
+    }
+
+    this.activateSpriteSheetSet(spriteSheetSetId);
+  }
+
+  private loadSpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
+    if (this.loadingSpriteSheetSetId !== null) {
+      this.pendingSpriteSheetSetId = spriteSheetSetId;
+      return;
+    }
+
+    const spriteSheetSet = NINJA_SPRITE_SHEET_SETS[spriteSheetSetId];
+    const queued = this.queueSpriteSheetSet(spriteSheetSet);
+
+    if (!queued) {
+      this.createAnimationsForSpriteSheetSet(spriteSheetSet);
+      this.activateSpriteSheetSet(spriteSheetSetId);
+      return;
+    }
+
+    this.loadingSpriteSheetSetId = spriteSheetSetId;
+    this.load.once('complete', () => {
+      this.loadingSpriteSheetSetId = null;
+      this.createAnimationsForSpriteSheetSet(spriteSheetSet);
+
+      if (this.debug.get().spriteSheetSet === spriteSheetSetId) {
+        this.activateSpriteSheetSet(spriteSheetSetId);
+      } else {
+        this.unloadSpriteSheetSet(spriteSheetSetId);
+      }
+
+      const pendingSpriteSheetSetId = this.pendingSpriteSheetSetId;
+      this.pendingSpriteSheetSetId = null;
+
+      if (
+        pendingSpriteSheetSetId !== null &&
+        pendingSpriteSheetSetId !== spriteSheetSetId &&
+        pendingSpriteSheetSetId !== this.activeSpriteSheetSetId
+      ) {
+        this.applySpriteSheetSet(pendingSpriteSheetSetId);
+      }
+    });
+    this.load.start();
+  }
+
+  private activateSpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
+    const previousSpriteSheetSetId = this.activeSpriteSheetSetId;
+    this.activeSpriteSheetSetId = spriteSheetSetId;
+    const spriteSheetSet = this.getActiveSpriteSheetSet();
+    this.background?.setTexture(getBackgroundTextureKey(spriteSheetSetId));
+    this.fitBackground();
+
+    if (this.player !== null) {
+      const playerProgress = this.player.anims.getProgress();
+      this.applyNinjaSpriteMetrics(this.player, spriteSheetSet.scale, spriteSheetSet);
+      const playerAnimationAction = this.currentAction === 'hurt' ? 'impact' : this.currentAction;
+      this.player.play(
+        getMainNinjaAnimationKey(
+          this.activeSpriteSheetSetId,
+          playerAnimationAction,
+          this.facingDirection
+        ),
+        false
+      );
+      this.player.anims.setProgress(playerProgress);
+    }
+
+    if (this.enemy !== null) {
+      const enemyProgress = this.enemy.anims.getProgress();
+      this.applyNinjaSpriteMetrics(this.enemy, spriteSheetSet.enemyScale, spriteSheetSet);
+      const enemyAnimationAction = this.enemyAction === 'recover' ? 'idle' : this.enemyAction;
+      this.enemy.play(
+        getEnemyNinjaAnimationKey(
+          this.activeSpriteSheetSetId,
+          enemyAnimationAction,
+          this.enemyFacingDirection
+        ),
+        false
+      );
+      this.enemy.anims.setProgress(enemyProgress);
+    }
+
+    this.unloadSpriteSheetSet(previousSpriteSheetSetId);
+  }
+
+  private unloadSpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
+    if (spriteSheetSetId === this.activeSpriteSheetSetId) {
+      return;
+    }
+
+    const backgroundTextureKey = getBackgroundTextureKey(spriteSheetSetId);
+
+    if (this.textures.exists(backgroundTextureKey)) {
+      this.textures.remove(backgroundTextureKey);
+    }
+
+    for (const animation of NINJA_ANIMATIONS) {
+      const animationKey = getMainNinjaAnimationKey(
+        spriteSheetSetId,
+        animation.action,
+        animation.direction
+      );
+      const textureKey = getMainNinjaTextureKey(
+        spriteSheetSetId,
+        animation.action,
+        animation.direction
+      );
+
+      if (this.anims.exists(animationKey)) {
+        this.anims.remove(animationKey);
+      }
+
+      if (this.textures.exists(textureKey)) {
+        this.textures.remove(textureKey);
+      }
+    }
+
+    for (const animation of ENEMY_NINJA_ANIMATIONS) {
+      const animationKey = getEnemyNinjaAnimationKey(
+        spriteSheetSetId,
+        animation.action,
+        animation.direction
+      );
+      const textureKey = getEnemyNinjaTextureKey(
+        spriteSheetSetId,
+        animation.action,
+        animation.direction
+      );
+
+      if (this.anims.exists(animationKey)) {
+        this.anims.remove(animationKey);
+      }
+
+      if (this.textures.exists(textureKey)) {
+        this.textures.remove(textureKey);
+      }
     }
   }
 
@@ -733,6 +1022,12 @@ export class SandboxScene extends BaseScene {
       }
     }
 
+    if (!this.debug.get().enemyChaseEnabled) {
+      this.enemy.setVelocity(0, 0);
+      this.playEnemyAnimation('idle');
+      return;
+    }
+
     const toPlayer = new Phaser.Math.Vector2(
       this.player.x - this.enemy.x,
       this.player.y - this.enemy.y
@@ -809,7 +1104,10 @@ export class SandboxScene extends BaseScene {
       knockbackDirection.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
       knockbackDirection.y * PLAYER_DAMAGE_KNOCKBACK_SPEED
     );
-    this.player.play(`anim.mainNinja.${this.facingDirection}.impact`, false);
+    this.player.play(
+      getMainNinjaAnimationKey(this.activeSpriteSheetSetId, 'impact', this.facingDirection),
+      false
+    );
   }
 
   private updateFacingFromVector(vector: Phaser.Math.Vector2): void {
@@ -828,7 +1126,11 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const animationKey = `anim.mainNinja.${this.facingDirection}.${action}`;
+    const animationKey = getMainNinjaAnimationKey(
+      this.activeSpriteSheetSetId,
+      action,
+      this.facingDirection
+    );
 
     if (!restart && this.player.anims.currentAnim?.key === animationKey) {
       return;
@@ -854,7 +1156,11 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const animationKey = `anim.enemyNinja.${this.enemyFacingDirection}.${action}`;
+    const animationKey = getEnemyNinjaAnimationKey(
+      this.activeSpriteSheetSetId,
+      action,
+      this.enemyFacingDirection
+    );
 
     if (!restart && this.enemy.anims.currentAnim?.key === animationKey) {
       return;

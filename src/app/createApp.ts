@@ -9,6 +9,7 @@ import { SceneKeys } from '../game/sceneKeys';
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
 import type { AppContext } from './context';
+import type { DebugSpriteSheetSet } from '../stores/debugStore';
 import type { Unsubscribe } from '../stores/store';
 
 function requireElement<T extends Element>(
@@ -33,6 +34,10 @@ function requestAnimationFrameOnce(callback: () => void): void {
 
 function formatProfileLabel(profileId: ProfileId): string {
   return GAME_PROFILES[profileId].id === 'landscape' ? 'Landscape' : 'Portrait';
+}
+
+function isDebugSpriteSheetSet(value: string): value is DebugSpriteSheetSet {
+  return value === 'current' || value === 'legacy';
 }
 
 export function createApp(root: HTMLDivElement | null): void {
@@ -107,6 +112,14 @@ export function createApp(root: HTMLDivElement | null): void {
       <p class="panel-group__title">Runtime</p>
       <button id="pause-toggle" class="shell-button" data-variant="primary" type="button">Pause</button>
       <label class="toggle-row"><input id="show-world" type="checkbox" /> World bounds</label>
+      <label class="toggle-row"><input id="enemy-chase" type="checkbox" /> Enemy chase</label>
+      <label class="select-row" for="sprite-sheet-set">
+        <span>Sprite set</span>
+        <select id="sprite-sheet-set">
+          <option value="current">Current 512px</option>
+          <option value="legacy">Legacy 216px</option>
+        </select>
+      </label>
     </div>
     <div class="metrics">
       <div class="metrics__row"><span>Scene</span><strong id="scene-readout">Boot</strong></div>
@@ -117,6 +130,8 @@ export function createApp(root: HTMLDivElement | null): void {
 
   const pauseToggle = requireElement(debugControls, '#pause-toggle', HTMLButtonElement);
   const showWorldToggle = requireElement(debugControls, '#show-world', HTMLInputElement);
+  const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
+  const spriteSheetSetSelect = requireElement(debugControls, '#sprite-sheet-set', HTMLSelectElement);
   const sceneReadout = requireElement(debugControls, '#scene-readout', HTMLElement);
   const pointerReadout = requireElement(debugControls, '#pointer-readout', HTMLElement);
   const inputReadout = requireElement(debugControls, '#input-readout', HTMLElement);
@@ -212,6 +227,8 @@ export function createApp(root: HTMLDivElement | null): void {
     sceneReadout.textContent = state.activeScene;
     pauseToggle.textContent = state.paused ? 'Resume' : 'Pause';
     showWorldToggle.checked = state.showWorldBounds;
+    enemyChaseToggle.checked = state.enemyChaseEnabled;
+    spriteSheetSetSelect.value = state.spriteSheetSet;
     pointerReadout.textContent = `${state.pointer.x}, ${state.pointer.y} / ${state.pointer.worldX}, ${state.pointer.worldY} ${
       state.pointer.down ? 'down' : 'up'
     }`;
@@ -251,6 +268,16 @@ export function createApp(root: HTMLDivElement | null): void {
 
   showWorldToggle.addEventListener('change', () => {
     debugStore.setShowWorldBounds(showWorldToggle.checked);
+  });
+
+  enemyChaseToggle.addEventListener('change', () => {
+    debugStore.setEnemyChaseEnabled(enemyChaseToggle.checked);
+  });
+
+  spriteSheetSetSelect.addEventListener('change', () => {
+    if (isDebugSpriteSheetSet(spriteSheetSetSelect.value)) {
+      debugStore.setSpriteSheetSet(spriteSheetSetSelect.value);
+    }
   });
 
   debugCollapse.addEventListener('click', () => {

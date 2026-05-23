@@ -65,6 +65,8 @@ describe('debugStore', () => {
     store.setActiveScene('Sandbox');
     store.setPaused(true);
     store.setShowWorldBounds(true);
+    store.setEnemyChaseEnabled(false);
+    store.setSpriteSheetSet('legacy');
     store.setPointer({ x: 12, y: 24, worldX: 120, worldY: 240, down: true });
     store.setInput({ left: true, lastKey: 'KeyA' });
 
@@ -72,6 +74,8 @@ describe('debugStore', () => {
       activeScene: 'Sandbox',
       paused: true,
       showWorldBounds: true,
+      enemyChaseEnabled: false,
+      spriteSheetSet: 'legacy',
       pointer: {
         x: 12,
         y: 24,
