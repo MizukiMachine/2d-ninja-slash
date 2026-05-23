@@ -3,9 +3,12 @@ import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
 
 type FacingDirection = 'left' | 'right';
-type NinjaAction = 'idle' | 'run' | 'slash' | 'impact';
-type PlayerAction = NinjaAction | 'hurt';
-type EnemyAction = 'idle' | 'run' | 'slash' | 'recover';
+type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'slash2' | 'slash3' | 'impact';
+type ControlledMainNinjaAction = Exclude<MainNinjaAction, 'impact'>;
+type PlayerAttackAction = 'slash' | 'slash2' | 'slash3';
+type PlayerAction = ControlledMainNinjaAction | 'hurt';
+type EnemyNinjaAction = 'idle' | 'run' | 'slash';
+type EnemyAction = EnemyNinjaAction | 'recover';
 
 interface MoveKeys {
   readonly w: Phaser.Input.Keyboard.Key;
@@ -18,11 +21,13 @@ interface MoveKeys {
   readonly right: Phaser.Input.Keyboard.Key;
   readonly z: Phaser.Input.Keyboard.Key;
   readonly shift: Phaser.Input.Keyboard.Key;
+  readonly ctrl: Phaser.Input.Keyboard.Key;
+  readonly space: Phaser.Input.Keyboard.Key;
   readonly esc: Phaser.Input.Keyboard.Key;
 }
 
-interface NinjaAnimationConfig {
-  readonly action: NinjaAction;
+interface NinjaAnimationConfig<TAction extends string> {
+  readonly action: TAction;
   readonly direction: FacingDirection;
   readonly textureKey: string;
   readonly animationKey: string;
@@ -53,9 +58,14 @@ const ENEMY_NINJA_SPEED = NINJA_SPEED;
 const ENEMY_ATTACK_RANGE = 112;
 const ENEMY_ATTACK_RECOVERY_MS = 900;
 const PLAYER_DAMAGE_KNOCKBACK_SPEED = 360;
-const IMPACT_ADVANCE_SPEED = 210;
-const IMPACT_HIT_RADIUS = 168;
-const IMPACT_HIT_Y_OFFSET = -82;
+const ATTACK3_FORWARD_SPEED = 90;
+const ATTACK_HIT_RADIUS: Record<PlayerAttackAction, number> = {
+  slash: 104,
+  slash2: 136,
+  slash3: 168
+};
+const ATTACK_HIT_FORWARD_OFFSET = 88;
+const ATTACK_HIT_Y_OFFSET = -82;
 const NINJA_BODY = {
   width: 56,
   height: 62,
@@ -63,15 +73,18 @@ const NINJA_BODY = {
   offsetY: 137
 } as const;
 
-const getMainNinjaSpritesheetUrl = (action: NinjaAction, direction: FacingDirection): string =>
+const getMainNinjaSpritesheetUrl = (action: MainNinjaAction, direction: FacingDirection): string =>
   `${MAIN_NINJA_ASSET_URL}/${action}-${direction}.png`;
 
 const getEnemyNinjaSpritesheetUrl = (
-  action: Exclude<NinjaAction, 'impact'>,
+  action: EnemyNinjaAction,
   direction: FacingDirection
 ): string => `${ENEMY_NINJA_ASSET_URL}/${action}-${direction}.png`;
 
-const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
+const isPlayerAttackAction = (action: PlayerAction): action is PlayerAttackAction =>
+  action === 'slash' || action === 'slash2' || action === 'slash3';
+
+const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
     action: 'idle',
     direction: 'left',
@@ -113,6 +126,26 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     repeat: -1
   },
   {
+    action: 'jump',
+    direction: 'left',
+    textureKey: 'character.mainNinja.left.jump.spritesheet',
+    animationKey: 'anim.mainNinja.left.jump',
+    url: getMainNinjaSpritesheetUrl('jump', 'left'),
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'jump',
+    direction: 'right',
+    textureKey: 'character.mainNinja.right.jump.spritesheet',
+    animationKey: 'anim.mainNinja.right.jump',
+    url: getMainNinjaSpritesheetUrl('jump', 'right'),
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
     action: 'slash',
     direction: 'left',
     textureKey: 'character.mainNinja.left.slash.spritesheet',
@@ -130,6 +163,46 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     url: getMainNinjaSpritesheetUrl('slash', 'right'),
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'slash2',
+    direction: 'left',
+    textureKey: 'character.mainNinja.left.slash2.spritesheet',
+    animationKey: 'anim.mainNinja.left.slash2',
+    url: getMainNinjaSpritesheetUrl('slash2', 'left'),
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'slash2',
+    direction: 'right',
+    textureKey: 'character.mainNinja.right.slash2.spritesheet',
+    animationKey: 'anim.mainNinja.right.slash2',
+    url: getMainNinjaSpritesheetUrl('slash2', 'right'),
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'slash3',
+    direction: 'left',
+    textureKey: 'character.mainNinja.left.slash3.spritesheet',
+    animationKey: 'anim.mainNinja.left.slash3',
+    url: getMainNinjaSpritesheetUrl('slash3', 'left'),
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'slash3',
+    direction: 'right',
+    textureKey: 'character.mainNinja.right.slash3.spritesheet',
+    animationKey: 'anim.mainNinja.right.slash3',
+    url: getMainNinjaSpritesheetUrl('slash3', 'right'),
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
   },
   {
@@ -154,7 +227,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
   }
 ] as const;
 
-const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
+const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] = [
   {
     action: 'idle',
     direction: 'left',
@@ -231,7 +304,7 @@ export class SandboxScene extends BaseScene {
   private enemyRecoveryUntil = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
-  private impactHitArea = new Phaser.Geom.Circle(0, 0, IMPACT_HIT_RADIUS);
+  private attackHitArea = new Phaser.Geom.Circle(0, 0, ATTACK_HIT_RADIUS.slash);
 
   constructor() {
     super(SceneKeys.Sandbox);
@@ -340,11 +413,6 @@ export class SandboxScene extends BaseScene {
 
     this.updateEnemy(time);
 
-    if (this.currentAction === 'slash') {
-      this.player.setVelocity(0, 0);
-      return;
-    }
-
     if (this.currentAction === 'hurt') {
       this.player.setVelocity(
         this.damageKnockbackVector.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
@@ -353,12 +421,14 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    if (this.currentAction === 'impact') {
-      this.player.setVelocity(
-        this.forwardVector.x * IMPACT_ADVANCE_SPEED,
-        this.forwardVector.y * IMPACT_ADVANCE_SPEED
-      );
-      this.updateImpactHitArea();
+    if (isPlayerAttackAction(this.currentAction)) {
+      this.player.setVelocity(this.getAttackForwardVelocityX(this.currentAction), 0);
+      this.updateAttackHitArea(this.currentAction);
+      return;
+    }
+
+    if (this.currentAction === 'jump') {
+      this.player.setVelocity(0, 0);
       return;
     }
 
@@ -428,6 +498,8 @@ export class SandboxScene extends BaseScene {
       right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
       z: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
       shift: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
+      ctrl: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL),
+      space: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       esc: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     };
 
@@ -440,17 +512,22 @@ export class SandboxScene extends BaseScene {
       this.goTo(SceneKeys.MainMenu);
     };
     const startAttack = (): void => {
-      this.startAttack(this.moveKeys?.shift.isDown === true ? 'impact' : 'slash');
+      this.startAttack(this.resolveAttackAction());
+    };
+    const startJump = (): void => {
+      this.startJump();
     };
 
     keyboard.on('keydown', syncLastKey);
     escKey.on('down', goBackToMenu);
     this.moveKeys.z.on('down', startAttack);
+    this.moveKeys.space.on('down', startJump);
 
     this.trackCleanup(() => {
       keyboard.off('keydown', syncLastKey);
       escKey.off('down', goBackToMenu);
       this.moveKeys?.z.off('down', startAttack);
+      this.moveKeys?.space.off('down', startJump);
     });
   }
 
@@ -465,8 +542,18 @@ export class SandboxScene extends BaseScene {
         return;
       }
 
-      if (animation.key.endsWith('.slash') || animation.key.endsWith('.impact')) {
-        this.finishAttack();
+      if (animation.key.endsWith('.jump') && this.currentAction === 'jump') {
+        this.finishPlayerAction();
+        return;
+      }
+
+      if (
+        isPlayerAttackAction(this.currentAction) &&
+        (animation.key.endsWith('.slash') ||
+          animation.key.endsWith('.slash2') ||
+          animation.key.endsWith('.slash3'))
+      ) {
+        this.finishPlayerAction();
       }
     };
 
@@ -539,39 +626,71 @@ export class SandboxScene extends BaseScene {
     this.playNinjaAnimation('run');
   }
 
-  private startAttack(action: 'slash' | 'impact'): void {
-    if (
-      this.player === null ||
-      this.currentAction === 'slash' ||
-      this.currentAction === 'impact' ||
-      this.currentAction === 'hurt'
-    ) {
-      return;
+  private resolveAttackAction(): PlayerAttackAction {
+    if (this.moveKeys?.ctrl.isDown === true) {
+      return 'slash3';
     }
 
-    const movement = this.readMovementInput();
-
-    if (movement.x !== 0 || movement.y !== 0) {
-      this.forwardVector.set(movement.x, movement.y).normalize();
-      this.updateFacingFromVector(this.forwardVector);
+    if (this.moveKeys?.shift.isDown === true) {
+      return 'slash2';
     }
 
-    this.currentAction = action;
-    this.player.setVelocity(
-      action === 'impact' ? this.forwardVector.x * IMPACT_ADVANCE_SPEED : 0,
-      action === 'impact' ? this.forwardVector.y * IMPACT_ADVANCE_SPEED : 0
-    );
-    this.playNinjaAnimation(action, true);
-
-    if (action === 'impact') {
-      this.updateImpactHitArea();
-      return;
-    }
-
-    this.clearAttackHitArea();
+    return 'slash';
   }
 
-  private finishAttack(): void {
+  private isPlayerBusy(): boolean {
+    return (
+      this.currentAction === 'jump' ||
+      this.currentAction === 'hurt' ||
+      isPlayerAttackAction(this.currentAction)
+    );
+  }
+
+  private updateForwardVectorFromInput(): void {
+    const movement = this.readMovementInput();
+
+    if (movement.x === 0 && movement.y === 0) {
+      return;
+    }
+
+    this.forwardVector.set(movement.x, movement.y).normalize();
+    this.updateFacingFromVector(this.forwardVector);
+  }
+
+  private startAttack(action: PlayerAttackAction): void {
+    if (this.player === null || this.isPlayerBusy()) {
+      return;
+    }
+
+    this.updateForwardVectorFromInput();
+    this.currentAction = action;
+    this.clearAttackHitArea();
+    this.player.setVelocity(this.getAttackForwardVelocityX(action), 0);
+    this.playNinjaAnimation(action, true);
+    this.updateAttackHitArea(action);
+  }
+
+  private getAttackForwardVelocityX(action: PlayerAttackAction): number {
+    if (action !== 'slash3') {
+      return 0;
+    }
+
+    return this.facingDirection === 'left' ? -ATTACK3_FORWARD_SPEED : ATTACK3_FORWARD_SPEED;
+  }
+
+  private startJump(): void {
+    if (this.player === null || this.isPlayerBusy()) {
+      return;
+    }
+
+    this.updateForwardVectorFromInput();
+    this.currentAction = 'jump';
+    this.clearAttackHitArea();
+    this.player.setVelocity(0, 0);
+    this.playNinjaAnimation('jump', true);
+  }
+
+  private finishPlayerAction(): void {
     if (this.player === null) {
       return;
     }
@@ -704,7 +823,7 @@ export class SandboxScene extends BaseScene {
     }
   }
 
-  private playNinjaAnimation(action: NinjaAction, restart = false): void {
+  private playNinjaAnimation(action: ControlledMainNinjaAction, restart = false): void {
     if (this.player === null) {
       return;
     }
@@ -730,7 +849,7 @@ export class SandboxScene extends BaseScene {
     }
   }
 
-  private playEnemyAnimation(action: Exclude<NinjaAction, 'impact'>, restart = false): void {
+  private playEnemyAnimation(action: EnemyNinjaAction, restart = false): void {
     if (this.enemy === null) {
       return;
     }
@@ -748,17 +867,18 @@ export class SandboxScene extends BaseScene {
     this.enemy.play(animationKey, !restart);
   }
 
-  private updateImpactHitArea(): void {
+  private updateAttackHitArea(action: PlayerAttackAction): void {
     if (this.player === null) {
       return;
     }
 
-    const centerX = this.player.x;
-    const centerY = this.player.y + IMPACT_HIT_Y_OFFSET;
-    this.impactHitArea.setTo(centerX, centerY, IMPACT_HIT_RADIUS);
+    const radius = ATTACK_HIT_RADIUS[action];
+    const centerX = this.player.x + this.forwardVector.x * ATTACK_HIT_FORWARD_OFFSET;
+    const centerY = this.player.y + ATTACK_HIT_Y_OFFSET + this.forwardVector.y * ATTACK_HIT_FORWARD_OFFSET;
+    this.attackHitArea.setTo(centerX, centerY, radius);
 
     const bodies: readonly (Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody)[] =
-      this.physics.overlapCirc(centerX, centerY, IMPACT_HIT_RADIUS);
+      this.physics.overlapCirc(centerX, centerY, radius);
     const hitCount = bodies.filter((body) => body.gameObject !== this.player).length;
 
     this.renderAttackHitArea(hitCount);
@@ -772,8 +892,8 @@ export class SandboxScene extends BaseScene {
     this.attackGraphic.clear();
     this.attackGraphic.fillStyle(hitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.12);
     this.attackGraphic.lineStyle(3, hitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.72);
-    this.attackGraphic.fillCircleShape(this.impactHitArea);
-    this.attackGraphic.strokeCircleShape(this.impactHitArea);
+    this.attackGraphic.fillCircleShape(this.attackHitArea);
+    this.attackGraphic.strokeCircleShape(this.attackHitArea);
   }
 
   private clearAttackHitArea(): void {
