@@ -3,7 +3,7 @@ import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
 
 type FacingDirection = 'left' | 'right';
-type NinjaAction = 'idle' | 'walk' | 'slash' | 'impact';
+type NinjaAction = 'idle' | 'run' | 'slash' | 'impact';
 
 interface MoveKeys {
   readonly w: Phaser.Input.Keyboard.Key;
@@ -39,20 +39,19 @@ interface MovementInput {
   readonly y: number;
 }
 
-const BACKGROUND_KEY = 'background.darkCathedralCourtyardBalancedPixel';
-const BACKGROUND_URL = '/assets/backgrounds/dark-cathedral-courtyard-balanced-pixel.png';
 const MAIN_NINJA_ASSET_URL = '/assets/actors/main-ninja';
-const NINJA_FRAME_SIZE = 512;
-const NINJA_SCALE = 0.58;
+const NINJA_FRAME_SIZE = 216;
+const NINJA_FRAME_COUNT = 32;
+const NINJA_SCALE = 1.38;
 const NINJA_SPEED = 260;
 const IMPACT_ADVANCE_SPEED = 210;
 const IMPACT_HIT_RADIUS = 168;
 const IMPACT_HIT_Y_OFFSET = -82;
 const NINJA_BODY = {
-  width: 132,
-  height: 148,
-  offsetX: 190,
-  offsetY: 324
+  width: 56,
+  height: 62,
+  offsetX: 80,
+  offsetY: 137
 } as const;
 
 const getMainNinjaSpritesheetUrl = (action: NinjaAction, direction: FacingDirection): string =>
@@ -65,7 +64,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     textureKey: 'character.mainNinja.left.idle.spritesheet',
     animationKey: 'anim.mainNinja.left.idle',
     url: getMainNinjaSpritesheetUrl('idle', 'left'),
-    frameCount: 16,
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 8,
     repeat: -1
   },
@@ -75,27 +74,27 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     textureKey: 'character.mainNinja.right.idle.spritesheet',
     animationKey: 'anim.mainNinja.right.idle',
     url: getMainNinjaSpritesheetUrl('idle', 'right'),
-    frameCount: 16,
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 8,
     repeat: -1
   },
   {
-    action: 'walk',
+    action: 'run',
     direction: 'left',
-    textureKey: 'character.mainNinja.left.walk.spritesheet',
-    animationKey: 'anim.mainNinja.left.walk',
-    url: getMainNinjaSpritesheetUrl('walk', 'left'),
-    frameCount: 16,
+    textureKey: 'character.mainNinja.left.run.spritesheet',
+    animationKey: 'anim.mainNinja.left.run',
+    url: getMainNinjaSpritesheetUrl('run', 'left'),
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 12,
     repeat: -1
   },
   {
-    action: 'walk',
+    action: 'run',
     direction: 'right',
-    textureKey: 'character.mainNinja.right.walk.spritesheet',
-    animationKey: 'anim.mainNinja.right.walk',
-    url: getMainNinjaSpritesheetUrl('walk', 'right'),
-    frameCount: 16,
+    textureKey: 'character.mainNinja.right.run.spritesheet',
+    animationKey: 'anim.mainNinja.right.run',
+    url: getMainNinjaSpritesheetUrl('run', 'right'),
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 12,
     repeat: -1
   },
@@ -105,7 +104,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     textureKey: 'character.mainNinja.left.slash.spritesheet',
     animationKey: 'anim.mainNinja.left.slash',
     url: getMainNinjaSpritesheetUrl('slash', 'left'),
-    frameCount: 16,
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 12,
     repeat: 0
   },
@@ -115,7 +114,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     textureKey: 'character.mainNinja.right.slash.spritesheet',
     animationKey: 'anim.mainNinja.right.slash',
     url: getMainNinjaSpritesheetUrl('slash', 'right'),
-    frameCount: 16,
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 12,
     repeat: 0
   },
@@ -125,7 +124,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     textureKey: 'character.mainNinja.left.impact.spritesheet',
     animationKey: 'anim.mainNinja.left.impact',
     url: getMainNinjaSpritesheetUrl('impact', 'left'),
-    frameCount: 32,
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 16,
     repeat: 0
   },
@@ -135,7 +134,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     textureKey: 'character.mainNinja.right.impact.spritesheet',
     animationKey: 'anim.mainNinja.right.impact',
     url: getMainNinjaSpritesheetUrl('impact', 'right'),
-    frameCount: 32,
+    frameCount: NINJA_FRAME_COUNT,
     frameRate: 16,
     repeat: 0
   }
@@ -157,10 +156,6 @@ export class SandboxScene extends BaseScene {
   }
 
   preload(): void {
-    if (!this.textures.exists(BACKGROUND_KEY)) {
-      this.load.image(BACKGROUND_KEY, BACKGROUND_URL);
-    }
-
     for (const animation of NINJA_ANIMATIONS) {
       if (this.textures.exists(animation.textureKey)) {
         continue;
@@ -257,10 +252,30 @@ export class SandboxScene extends BaseScene {
   }
 
   private createBackground(): void {
-    const background = this.add.image(this.centerX, this.centerY, BACKGROUND_KEY).setOrigin(0.5);
-    const scale = Math.max(this.profile.width / background.width, this.profile.height / background.height);
+    const { width, height } = this.profile;
+    const background = this.add.graphics().setDepth(-10);
 
-    background.setScale(scale).setDepth(-10);
+    background.fillStyle(0x071018, 1);
+    background.fillRect(0, 0, width, height);
+    background.fillStyle(0x0d1d2a, 1);
+    background.fillRect(0, height * 0.55, width, height * 0.45);
+    background.fillStyle(0x10283a, 1);
+    background.fillRect(0, height * 0.53, width, 14);
+    background.fillStyle(0x142336, 0.85);
+
+    for (let x = -24; x < width; x += 118) {
+      background.fillRect(x, height * 0.14, 42, height * 0.42);
+    }
+
+    background.fillStyle(0x1b7c85, 0.18);
+    background.fillCircle(width * 0.78, height * 0.18, 86);
+    background.fillStyle(0x172337, 0.9);
+    background.fillRect(0, height * 0.74, width, height * 0.26);
+    background.lineStyle(2, 0x1f5b67, 0.35);
+
+    for (let x = -80; x < width; x += 96) {
+      background.lineBetween(x, height, x + 170, height * 0.74);
+    }
   }
 
   private createAnimations(): void {
@@ -385,7 +400,7 @@ export class SandboxScene extends BaseScene {
     this.forwardVector.copy(direction);
     this.updateFacingFromVector(direction);
     this.player.setVelocity(direction.x * NINJA_SPEED, direction.y * NINJA_SPEED);
-    this.playNinjaAnimation('walk');
+    this.playNinjaAnimation('run');
   }
 
   private startAttack(action: 'slash' | 'impact'): void {
