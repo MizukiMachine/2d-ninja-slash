@@ -15,17 +15,17 @@ interface SpriteSheetSetExpectation {
 const SPRITE_SHEET_SETS: readonly SpriteSheetSetExpectation[] = [
   {
     id: 'current',
-    backgroundFileName: 'three-lane-hq-rain-village.png',
-    backgroundWidth: 1672,
-    backgroundHeight: 941,
+    backgroundFileName: 'bamboo-ravine-lanes-tight.png',
+    backgroundWidth: 1536,
+    backgroundHeight: 864,
     width: 4096,
     height: 2048
   },
   {
     id: 'legacy',
-    backgroundFileName: 'three-lane-rough-rain-village.png',
-    backgroundWidth: 1280,
-    backgroundHeight: 720,
+    backgroundFileName: 'bamboo-ravine-lanes-tight.png',
+    backgroundWidth: 1536,
+    backgroundHeight: 864,
     width: 1728,
     height: 864
   }
