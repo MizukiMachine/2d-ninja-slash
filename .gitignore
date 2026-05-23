@@ -1,5 +1,10 @@
-dist/assets/1024
-dist/assets/pixel_256_16
+/old/
+public/assets/*
+!public/assets/
+!public/assets/actors/
+!public/assets/actors/**
+!public/assets/backgrounds/
+!public/assets/backgrounds/**
 
 node_modules/
 .vite/
