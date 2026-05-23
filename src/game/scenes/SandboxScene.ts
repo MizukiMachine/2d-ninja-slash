@@ -42,6 +42,7 @@ interface MovementInput {
 const MAIN_NINJA_ASSET_URL = '/assets/actors/main-ninja';
 const NINJA_FRAME_SIZE = 216;
 const NINJA_FRAME_COUNT = 32;
+const NINJA_ANIMATION_PLAYBACK_RATE = 3;
 const NINJA_SCALE = 1.38;
 const NINJA_SPEED = 260;
 const IMPACT_ADVANCE_SPEED = 210;
@@ -65,7 +66,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.left.idle',
     url: getMainNinjaSpritesheetUrl('idle', 'left'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 8,
+    frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
   },
   {
@@ -75,7 +76,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.right.idle',
     url: getMainNinjaSpritesheetUrl('idle', 'right'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 8,
+    frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
   },
   {
@@ -85,7 +86,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.left.run',
     url: getMainNinjaSpritesheetUrl('run', 'left'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 12,
+    frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
   },
   {
@@ -95,7 +96,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.right.run',
     url: getMainNinjaSpritesheetUrl('run', 'right'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 12,
+    frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
   },
   {
@@ -105,7 +106,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.left.slash',
     url: getMainNinjaSpritesheetUrl('slash', 'left'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 12,
+    frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
   },
   {
@@ -115,7 +116,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.right.slash',
     url: getMainNinjaSpritesheetUrl('slash', 'right'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 12,
+    frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
   },
   {
@@ -125,7 +126,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.left.impact',
     url: getMainNinjaSpritesheetUrl('impact', 'left'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 16,
+    frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
   },
   {
@@ -135,7 +136,7 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig[] = [
     animationKey: 'anim.mainNinja.right.impact',
     url: getMainNinjaSpritesheetUrl('impact', 'right'),
     frameCount: NINJA_FRAME_COUNT,
-    frameRate: 16,
+    frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
   }
 ] as const;
