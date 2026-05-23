@@ -318,20 +318,23 @@ export class SandboxScene extends BaseScene {
   private enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
   private moveKeys: MoveKeys | null = null;
   private background: Phaser.GameObjects.Image | null = null;
-  private boundsGraphic: Phaser.GameObjects.Graphics | null = null;
-  private attackGraphic: Phaser.GameObjects.Graphics | null = null;
+  private debugOverlayGraphic: Phaser.GameObjects.Graphics | null = null;
   private pauseLabel: Phaser.GameObjects.Text | null = null;
   private activeSpriteSheetSetId: DebugSpriteSheetSet = 'current';
   private loadingSpriteSheetSetId: DebugSpriteSheetSet | null = null;
   private pendingSpriteSheetSetId: DebugSpriteSheetSet | null = null;
+  private lastActorResetRequestId = 0;
+  private lastDebugTelemetryAt = Number.NEGATIVE_INFINITY;
   private facingDirection: FacingDirection = 'right';
   private enemyFacingDirection: FacingDirection = 'left';
   private currentAction: PlayerAction = 'idle';
   private enemyAction: EnemyAction = 'idle';
   private enemyRecoveryUntil = 0;
+  private attackHitCount = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
   private attackHitArea = new Phaser.Geom.Circle(0, 0, ATTACK_HIT_RADIUS.slash);
+  private visualBoundsRect = new Phaser.Geom.Rectangle();
 
   constructor() {
     super(SceneKeys.Sandbox);
@@ -365,10 +368,8 @@ export class SandboxScene extends BaseScene {
       .setDepth(10)
       .play(getMainNinjaAnimationKey(this.activeSpriteSheetSetId, 'idle', 'right'));
 
-    const enemyX = Phaser.Math.Clamp(this.centerX + 320, 120, this.profile.width - 120);
-
     this.enemy = this.physics.add.sprite(
-      enemyX,
+      this.getDefaultEnemyX(),
       this.centerY + 108,
       getEnemyNinjaTextureKey(this.activeSpriteSheetSetId, 'idle', 'left'),
       0
@@ -384,8 +385,8 @@ export class SandboxScene extends BaseScene {
 
     this.physics.add.collider(this.player, this.enemy);
 
-    this.boundsGraphic = this.add.graphics();
-    this.attackGraphic = this.add.graphics().setDepth(9);
+    this.debugOverlayGraphic = this.add.graphics().setDepth(100);
+    this.lastActorResetRequestId = this.debug.get().actorResetRequestId;
     this.pauseLabel = this.add
       .text(this.centerX, 58, 'Paused', {
         fontFamily: 'Arial, Helvetica, sans-serif',
@@ -402,7 +403,7 @@ export class SandboxScene extends BaseScene {
     this.registerPointerDebug();
     this.onStore(this.debug, (state) => {
       this.applySpriteSheetSet(state.spriteSheetSet);
-      this.renderWorldBounds(state.showWorldBounds);
+      this.handleActorResetRequest(state.actorResetRequestId);
       this.pauseLabel?.setVisible(state.paused);
       this.player?.setAlpha(state.paused ? 0.55 : 1);
       this.enemy?.setAlpha(state.paused ? 0.55 : 1);
@@ -416,16 +417,12 @@ export class SandboxScene extends BaseScene {
 
     const movement = this.readMovementInput();
 
-    this.debug.setInput({
-      left: movement.left,
-      right: movement.right,
-      up: movement.up,
-      down: movement.down
-    });
+    this.publishMovementInput(movement);
 
     if (this.debug.get().paused) {
       this.player.setVelocity(0, 0);
       this.enemy?.setVelocity(0, 0);
+      this.finishDebugFrame(time);
       return;
     }
 
@@ -436,21 +433,25 @@ export class SandboxScene extends BaseScene {
         this.damageKnockbackVector.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
         this.damageKnockbackVector.y * PLAYER_DAMAGE_KNOCKBACK_SPEED
       );
+      this.finishDebugFrame(time);
       return;
     }
 
     if (isPlayerAttackAction(this.currentAction)) {
       this.player.setVelocity(this.getAttackForwardVelocityX(this.currentAction), 0);
       this.updateAttackHitArea(this.currentAction);
+      this.finishDebugFrame(time);
       return;
     }
 
     if (this.currentAction === 'jump') {
       this.player.setVelocity(0, 0);
+      this.finishDebugFrame(time);
       return;
     }
 
     this.movePlayer(movement);
+    this.finishDebugFrame(time);
   }
 
   private createBackground(): void {
@@ -896,6 +897,26 @@ export class SandboxScene extends BaseScene {
     };
   }
 
+  private publishMovementInput(movement: MovementInput): void {
+    const input = this.debug.get().input;
+
+    if (
+      input.left === movement.left &&
+      input.right === movement.right &&
+      input.up === movement.up &&
+      input.down === movement.down
+    ) {
+      return;
+    }
+
+    this.debug.setInput({
+      left: movement.left,
+      right: movement.right,
+      up: movement.up,
+      down: movement.down
+    });
+  }
+
   private movePlayer(movement: MovementInput): void {
     if (this.player === null) {
       return;
@@ -1185,25 +1206,13 @@ export class SandboxScene extends BaseScene {
 
     const bodies: readonly (Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody)[] =
       this.physics.overlapCirc(centerX, centerY, radius);
-    const hitCount = bodies.filter((body) => body.gameObject !== this.player).length;
-
-    this.renderAttackHitArea(hitCount);
-  }
-
-  private renderAttackHitArea(hitCount: number): void {
-    if (this.attackGraphic === null) {
-      return;
-    }
-
-    this.attackGraphic.clear();
-    this.attackGraphic.fillStyle(hitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.12);
-    this.attackGraphic.lineStyle(3, hitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.72);
-    this.attackGraphic.fillCircleShape(this.attackHitArea);
-    this.attackGraphic.strokeCircleShape(this.attackHitArea);
+    this.attackHitCount = bodies.filter((body) => body.gameObject !== this.player).length;
   }
 
   private clearAttackHitArea(): void {
-    this.attackGraphic?.clear();
+    this.attackHitCount = 0;
+    this.attackHitArea.setTo(0, 0, 0);
+    this.renderDebugOverlays();
   }
 
   private registerPointerDebug(): void {
@@ -1230,18 +1239,213 @@ export class SandboxScene extends BaseScene {
     });
   }
 
-  private renderWorldBounds(visible: boolean): void {
-    if (this.boundsGraphic === null) {
+  private getDefaultEnemyX(): number {
+    return Phaser.Math.Clamp(this.centerX + 320, 120, this.profile.width - 120);
+  }
+
+  private handleActorResetRequest(actorResetRequestId: number): void {
+    if (actorResetRequestId === this.lastActorResetRequestId) {
       return;
     }
 
-    this.boundsGraphic.clear();
+    this.lastActorResetRequestId = actorResetRequestId;
+    this.resetActors();
+  }
 
-    if (!visible) {
+  private resetActors(): void {
+    if (this.player === null || this.enemy === null) {
       return;
     }
 
-    this.boundsGraphic.lineStyle(4, 0xf6c961, 0.95);
-    this.boundsGraphic.strokeRect(2, 2, this.profile.width - 4, this.profile.height - 4);
+    this.facingDirection = 'right';
+    this.enemyFacingDirection = 'left';
+    this.forwardVector.set(1, 0);
+    this.damageKnockbackVector.set(0, 0);
+    this.currentAction = 'idle';
+    this.enemyAction = 'idle';
+    this.enemyRecoveryUntil = 0;
+    this.clearAttackHitArea();
+
+    this.player
+      .setPosition(this.centerX, this.centerY + 108)
+      .setVelocity(0, 0)
+      .play(getMainNinjaAnimationKey(this.activeSpriteSheetSetId, 'idle', 'right'), false);
+
+    this.enemy
+      .setPosition(this.getDefaultEnemyX(), this.centerY + 108)
+      .setVelocity(0, 0)
+      .play(getEnemyNinjaAnimationKey(this.activeSpriteSheetSetId, 'idle', 'left'), false);
+
+    this.finishDebugFrame(this.time.now, true);
+  }
+
+  private finishDebugFrame(time: number, forceTelemetry = false): void {
+    this.publishDebugTelemetry(time, forceTelemetry);
+    this.renderDebugOverlays();
+  }
+
+  private publishDebugTelemetry(time: number, force = false): void {
+    if (!force && time - this.lastDebugTelemetryAt < 100) {
+      return;
+    }
+
+    this.lastDebugTelemetryAt = time;
+    const attackActive = isPlayerAttackAction(this.currentAction);
+
+    this.debug.update((state) => ({
+      ...state,
+      player: this.createActorDebugState(this.player, this.currentAction),
+      enemy: this.createActorDebugState(this.enemy, this.enemyAction),
+      attack: {
+        active: attackActive,
+        action: attackActive ? this.currentAction : 'none',
+        x: attackActive ? Math.round(this.attackHitArea.x) : 0,
+        y: attackActive ? Math.round(this.attackHitArea.y) : 0,
+        radius: attackActive ? Math.round(this.attackHitArea.radius) : 0,
+        hitCount: attackActive ? this.attackHitCount : 0
+      },
+      performance: {
+        fps: this.game.loop.actualFps,
+        physicsBodies: this.physics.world.bodies.size + this.physics.world.staticBodies.size
+      }
+    }));
+  }
+
+  private createActorDebugState(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    action: string
+  ) {
+    if (sprite === null) {
+      return {
+        action: 'none',
+        animation: 'none',
+        frame: 0,
+        x: 0,
+        y: 0,
+        velocityX: 0,
+        velocityY: 0,
+        bodyX: 0,
+        bodyY: 0,
+        bodyWidth: 0,
+        bodyHeight: 0
+      };
+    }
+
+    const body = sprite.body;
+
+    return {
+      action,
+      animation: sprite.anims.currentAnim?.key ?? 'none',
+      frame: sprite.anims.currentFrame?.index ?? 0,
+      x: Math.round(sprite.x),
+      y: Math.round(sprite.y),
+      velocityX: Math.round(body.velocity.x),
+      velocityY: Math.round(body.velocity.y),
+      bodyX: Math.round(body.x),
+      bodyY: Math.round(body.y),
+      bodyWidth: Math.round(body.width),
+      bodyHeight: Math.round(body.height)
+    };
+  }
+
+  private renderDebugOverlays(): void {
+    const graphic = this.debugOverlayGraphic;
+
+    if (graphic === null) {
+      return;
+    }
+
+    const state = this.debug.get();
+    graphic.clear();
+
+    if (state.showWorldBounds) {
+      graphic.lineStyle(4, 0xf6c961, 0.95);
+      graphic.strokeRect(2, 2, this.profile.width - 4, this.profile.height - 4);
+    }
+
+    if (state.showEnemyRanges && this.enemy !== null) {
+      graphic.lineStyle(2, 0xff8a65, 0.64);
+      graphic.strokeCircle(this.enemy.x, this.enemy.y, ENEMY_ATTACK_RANGE);
+    }
+
+    if (state.showVisualBounds) {
+      this.renderVisualBounds(this.player, 0x8fffad);
+      this.renderVisualBounds(this.enemy, 0xff91d0);
+    }
+
+    if (state.showHitBoxes) {
+      this.renderPhysicsBody(this.player, 0x35d08f);
+      this.renderPhysicsBody(this.enemy, 0xe56b6f);
+    }
+
+    if (state.showAttackBoxes && isPlayerAttackAction(this.currentAction)) {
+      graphic.fillStyle(this.attackHitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.12);
+      graphic.lineStyle(3, this.attackHitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.72);
+      graphic.fillCircleShape(this.attackHitArea);
+      graphic.strokeCircleShape(this.attackHitArea);
+    }
+
+    if (state.showOrigins) {
+      this.renderOrigin(this.player, 0x8fffad);
+      this.renderOrigin(this.enemy, 0xff91d0);
+    }
+
+    if (state.showPointerProbe) {
+      this.renderCrosshair(state.pointer.worldX, state.pointer.worldY, 12, 0xffffff, 0.85);
+    }
+  }
+
+  private renderVisualBounds(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    color: number
+  ): void {
+    if (sprite === null || this.debugOverlayGraphic === null) {
+      return;
+    }
+
+    const bounds = sprite.getBounds(this.visualBoundsRect);
+    this.debugOverlayGraphic.lineStyle(2, color, 0.78);
+    this.debugOverlayGraphic.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+
+  private renderPhysicsBody(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    color: number
+  ): void {
+    if (sprite === null || this.debugOverlayGraphic === null) {
+      return;
+    }
+
+    const body = sprite.body;
+    this.debugOverlayGraphic.lineStyle(2, color, 0.92);
+    this.debugOverlayGraphic.strokeRect(body.x, body.y, body.width, body.height);
+  }
+
+  private renderOrigin(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    color: number
+  ): void {
+    if (sprite === null) {
+      return;
+    }
+
+    this.renderCrosshair(sprite.x, sprite.y, 10, color, 0.95);
+  }
+
+  private renderCrosshair(
+    x: number,
+    y: number,
+    size: number,
+    color: number,
+    alpha: number
+  ): void {
+    if (this.debugOverlayGraphic === null) {
+      return;
+    }
+
+    this.debugOverlayGraphic.lineStyle(2, color, alpha);
+    this.debugOverlayGraphic.lineBetween(x - size, y, x + size, y);
+    this.debugOverlayGraphic.lineBetween(x, y - size, x, y + size);
+    this.debugOverlayGraphic.strokeCircle(x, y, 3);
   }
 }

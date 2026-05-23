@@ -140,6 +140,13 @@ input {
   border-color: var(--accent);
 }
 
+.shell-button:disabled {
+  border-color: var(--wire);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 .shell-button:active {
   transform: translateY(1px);
 }
