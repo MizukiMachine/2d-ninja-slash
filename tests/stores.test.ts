@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_DEBUG_BACKGROUND_FILE_NAMES } from '../src/game/assets/ninjaAssetCatalog';
 import { createDebugStore } from '../src/stores/debugStore';
 import { createSettingsStore, DEFAULT_SETTINGS } from '../src/stores/settingsStore';
 
@@ -73,12 +74,21 @@ describe('debugStore', () => {
     store.setShowEnemyRanges(true);
     store.setEnemyChaseEnabled(false);
     store.setSpriteSheetSet('legacy');
+    store.setBackgroundFileName('legacy', 'three-lane-rough-snow-dojo.png');
     store.requestActorReset();
     store.setPointer({ x: 12, y: 24, worldX: 120, worldY: 240, down: true });
     store.setInput({ left: true, lastKey: 'KeyA' });
     store.setPlayer({ action: 'run', x: 100, y: 200, velocityX: 260 });
     store.setEnemy({ action: 'slash', x: 300, y: 220, velocityX: -260 });
-    store.setAttack({ active: true, action: 'slash2', x: 180, y: 130, radius: 136, hitCount: 1 });
+    store.setAttack({
+      active: true,
+      action: 'slash2',
+      x: 180,
+      y: 130,
+      width: 132,
+      height: 34,
+      hitCount: 1
+    });
     store.setPerformance({ fps: 59.8, physicsBodies: 2 });
 
     expect(store.get()).toMatchObject({
@@ -93,6 +103,10 @@ describe('debugStore', () => {
       showEnemyRanges: true,
       enemyChaseEnabled: false,
       spriteSheetSet: 'legacy',
+      backgroundFileNames: {
+        ...DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
+        legacy: 'three-lane-rough-snow-dojo.png'
+      },
       actorResetRequestId: 1,
       pointer: {
         x: 12,
@@ -122,7 +136,8 @@ describe('debugStore', () => {
         action: 'slash2',
         x: 180,
         y: 130,
-        radius: 136,
+        width: 132,
+        height: 34,
         hitCount: 1
       },
       performance: {
@@ -145,6 +160,7 @@ describe('debugStore', () => {
     store.setShowEnemyRanges(true);
     store.setEnemyChaseEnabled(false);
     store.setSpriteSheetSet('legacy');
+    store.setBackgroundFileName('legacy', 'three-lane-rough-snow-dojo.png');
     store.requestActorReset();
     store.setPlayer({ action: 'run', x: 100 });
     store.setPerformance({ fps: 60, physicsBodies: 2 });
@@ -162,6 +178,10 @@ describe('debugStore', () => {
       showEnemyRanges: true,
       enemyChaseEnabled: false,
       spriteSheetSet: 'legacy',
+      backgroundFileNames: {
+        ...DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
+        legacy: 'three-lane-rough-snow-dojo.png'
+      },
       actorResetRequestId: 1,
       player: {
         action: 'none',

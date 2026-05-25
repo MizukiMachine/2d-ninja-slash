@@ -6,10 +6,16 @@ import {
   type ProfileId
 } from '../game/profiles';
 import { SceneKeys } from '../game/sceneKeys';
+import {
+  BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
+  DEBUG_SPRITE_SHEET_SET_OPTIONS,
+  isDebugBackgroundFileName,
+  isDebugSpriteSheetSet,
+  type DebugSpriteSheetSet
+} from '../game/assets/ninjaAssetCatalog';
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
 import type { AppContext } from './context';
-import type { DebugSpriteSheetSet } from '../stores/debugStore';
 import type { Unsubscribe } from '../stores/store';
 
 function requireElement<T extends Element>(
@@ -36,16 +42,22 @@ function formatProfileLabel(profileId: ProfileId): string {
   return GAME_PROFILES[profileId].id === 'landscape' ? 'Landscape' : 'Portrait';
 }
 
-function isDebugSpriteSheetSet(value: string): value is DebugSpriteSheetSet {
-  return value === 'current' || value === 'legacy';
-}
-
 function formatNumber(value: number): string {
   return String(Math.round(value));
 }
 
 function formatVector(x: number, y: number): string {
   return `${formatNumber(x)}, ${formatNumber(y)}`;
+}
+
+function createSpriteSheetSetOptionsHtml(): string {
+  return DEBUG_SPRITE_SHEET_SET_OPTIONS.map(
+    (option) => `<option value="${option.id}">${option.label}</option>`
+  ).join('');
+}
+
+function formatBackgroundLabel(fileName: string): string {
+  return fileName.replace(/\.png$/u, '').replaceAll('-', ' ');
 }
 
 export function createApp(root: HTMLDivElement | null): void {
@@ -125,9 +137,12 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="select-row" for="sprite-sheet-set">
         <span>Sprite set</span>
         <select id="sprite-sheet-set">
-          <option value="current">Current 512px</option>
-          <option value="legacy">Legacy 216px</option>
+          ${createSpriteSheetSetOptionsHtml()}
         </select>
+      </label>
+      <label class="select-row" for="background-file">
+        <span>Background</span>
+        <select id="background-file"></select>
       </label>
     </div>
     <div class="panel-group">
@@ -177,6 +192,7 @@ export function createApp(root: HTMLDivElement | null): void {
   );
   const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
   const spriteSheetSetSelect = requireElement(debugControls, '#sprite-sheet-set', HTMLSelectElement);
+  const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
   const sceneReadout = requireElement(debugControls, '#scene-readout', HTMLElement);
   const fpsReadout = requireElement(debugControls, '#fps-readout', HTMLElement);
   const pointerReadout = requireElement(debugControls, '#pointer-readout', HTMLElement);
@@ -195,6 +211,18 @@ export function createApp(root: HTMLDivElement | null): void {
     requestAnimationFrameOnce(() => {
       gameMount.focus({ preventScroll: true });
     });
+  };
+
+  const renderBackgroundFileOptions = (spriteSheetSet: DebugSpriteSheetSet): void => {
+    backgroundFileSelect.replaceChildren(
+      ...BACKGROUND_FILE_NAMES_BY_SPRITE_SET[spriteSheetSet].map((fileName) => {
+        const option = document.createElement('option');
+        option.value = fileName;
+        option.textContent = formatBackgroundLabel(fileName);
+        return option;
+      })
+    );
+    backgroundFileSelect.dataset.spriteSheetSet = spriteSheetSet;
   };
 
   const mountGame = (): void => {
@@ -287,6 +315,10 @@ export function createApp(root: HTMLDivElement | null): void {
     showEnemyRangesToggle.checked = state.showEnemyRanges;
     enemyChaseToggle.checked = state.enemyChaseEnabled;
     spriteSheetSetSelect.value = state.spriteSheetSet;
+    if (backgroundFileSelect.dataset.spriteSheetSet !== state.spriteSheetSet) {
+      renderBackgroundFileOptions(state.spriteSheetSet);
+    }
+    backgroundFileSelect.value = state.backgroundFileNames[state.spriteSheetSet];
     fpsReadout.textContent = `${state.performance.fps.toFixed(1)} / ${state.performance.physicsBodies} bodies`;
     pointerReadout.textContent = `${state.pointer.x}, ${state.pointer.y} / ${state.pointer.worldX}, ${state.pointer.worldY} ${
       state.pointer.down ? 'down' : 'up'
@@ -302,7 +334,9 @@ export function createApp(root: HTMLDivElement | null): void {
       state.enemy.y
     )} v ${formatVector(state.enemy.velocityX, state.enemy.velocityY)} f${state.enemy.frame}`;
     attackReadout.textContent = state.attack.active
-      ? `${state.attack.action} r${formatNumber(state.attack.radius)} @ ${formatVector(
+      ? `${state.attack.action} ${formatNumber(state.attack.width)}x${formatNumber(
+          state.attack.height
+        )} @ ${formatVector(
           state.attack.x,
           state.attack.y
         )} hits ${state.attack.hitCount}`
@@ -382,6 +416,14 @@ export function createApp(root: HTMLDivElement | null): void {
   spriteSheetSetSelect.addEventListener('change', () => {
     if (isDebugSpriteSheetSet(spriteSheetSetSelect.value)) {
       debugStore.setSpriteSheetSet(spriteSheetSetSelect.value);
+    }
+  });
+
+  backgroundFileSelect.addEventListener('change', () => {
+    const spriteSheetSet = debugStore.get().spriteSheetSet;
+
+    if (isDebugBackgroundFileName(spriteSheetSet, backgroundFileSelect.value)) {
+      debugStore.setBackgroundFileName(spriteSheetSet, backgroundFileSelect.value);
     }
   });
 

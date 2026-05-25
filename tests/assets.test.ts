@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-
-type SpriteSheetSetId = 'current' | 'legacy';
+import {
+  BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
+  DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
+  type DebugSpriteSheetSet
+} from '../src/game/assets/ninjaAssetCatalog';
 
 interface SpriteSheetSetExpectation {
-  readonly id: SpriteSheetSetId;
-  readonly backgroundFileName: string;
-  readonly backgroundWidth: number;
-  readonly backgroundHeight: number;
+  readonly id: DebugSpriteSheetSet;
   readonly width: number;
   readonly height: number;
 }
@@ -15,31 +15,20 @@ interface SpriteSheetSetExpectation {
 const SPRITE_SHEET_SETS: readonly SpriteSheetSetExpectation[] = [
   {
     id: 'current',
-    backgroundFileName: 'bamboo-ravine-lanes-tight.png',
-    backgroundWidth: 1536,
-    backgroundHeight: 864,
     width: 4096,
     height: 2048
   },
   {
     id: 'legacy',
-    backgroundFileName: 'bamboo-ravine-lanes-tight.png',
-    backgroundWidth: 1536,
-    backgroundHeight: 864,
     width: 1728,
     height: 864
   }
 ];
 
-const MAIN_NINJA_ACTIONS = [
-  'idle',
-  'run',
-  'jump',
-  'slash',
-  'slash2',
-  'slash3',
-  'impact'
-] as const;
+const MAIN_NINJA_ACTIONS_BY_SPRITE_SET = {
+  current: ['idle', 'run', 'jump', 'slash', 'slash2', 'slash3', 'impact'],
+  legacy: ['idle', 'run', 'jump', 'slash', 'slash2', 'impact']
+} as const satisfies Record<DebugSpriteSheetSet, readonly string[]>;
 const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash'] as const;
 const DIRECTIONS = ['left', 'right'] as const;
 
@@ -56,7 +45,7 @@ function getPngSize(filePath: URL): { width: number; height: number } {
 
 describe('ninja sprite sheet assets', () => {
   it.each(SPRITE_SHEET_SETS)('has complete $id sprite sheets with expected dimensions', (set) => {
-    for (const action of MAIN_NINJA_ACTIONS) {
+    for (const action of MAIN_NINJA_ACTIONS_BY_SPRITE_SET[set.id]) {
       for (const direction of DIRECTIONS) {
         const filePath = new URL(
           `../public/assets/${set.id}/actors/main-ninja/${action}-${direction}.png`,
@@ -79,15 +68,22 @@ describe('ninja sprite sheet assets', () => {
     }
   });
 
-  it.each(SPRITE_SHEET_SETS)('has a $id background with expected dimensions', (set) => {
-    const filePath = new URL(
-      `../public/assets/${set.id}/backgrounds/${set.backgroundFileName}`,
-      import.meta.url
-    );
+  it.each(SPRITE_SHEET_SETS)('has selectable $id backgrounds', (set) => {
+    for (const backgroundFileName of BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]) {
+      const filePath = new URL(
+        `../public/assets/${set.id}/backgrounds/${backgroundFileName}`,
+        import.meta.url
+      );
 
-    expect(getPngSize(filePath)).toEqual({
-      width: set.backgroundWidth,
-      height: set.backgroundHeight
-    });
+      const size = getPngSize(filePath);
+      expect(size.width).toBeGreaterThanOrEqual(1280);
+      expect(size.height).toBeGreaterThanOrEqual(720);
+    }
+  });
+
+  it.each(SPRITE_SHEET_SETS)('uses a valid default $id background', (set) => {
+    expect(BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]).toContain(
+      DEFAULT_DEBUG_BACKGROUND_FILE_NAMES[set.id]
+    );
   });
 });

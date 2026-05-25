@@ -1,7 +1,12 @@
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
-import type { DebugSpriteSheetSet } from '../../stores/debugStore';
+import {
+  BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
+  DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
+  type DebugBackgroundFileName,
+  type DebugSpriteSheetSet
+} from '../assets/ninjaAssetCatalog';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'slash2' | 'slash3' | 'impact';
@@ -51,16 +56,28 @@ interface NinjaBodyConfig {
   readonly offsetY: number;
 }
 
+interface AttackHitBoxConfig {
+  readonly width: number;
+  readonly height: number;
+  readonly frontOffset: number;
+  readonly yOffset: number;
+}
+
 interface NinjaSpriteSheetSet {
   readonly id: DebugSpriteSheetSet;
   readonly actorRootUrl: string;
   readonly backgroundRootUrl: string;
-  readonly backgroundFileName: string;
   readonly frameSize: number;
   readonly frameCount: number;
   readonly scale: number;
   readonly enemyScale: number;
   readonly body: NinjaBodyConfig;
+  readonly unsupportedMainActions?: readonly MainNinjaAction[];
+}
+
+interface SpriteSheetSetSelection {
+  readonly spriteSheetSetId: DebugSpriteSheetSet;
+  readonly backgroundFileName: DebugBackgroundFileName;
 }
 
 const LEGACY_NINJA_FRAME_SIZE = 216;
@@ -76,20 +93,41 @@ const ENEMY_ATTACK_RANGE = 112;
 const ENEMY_ATTACK_RECOVERY_MS = 900;
 const PLAYER_DAMAGE_KNOCKBACK_SPEED = 360;
 const ATTACK3_FORWARD_SPEED = 90;
-const ATTACK_HIT_RADIUS: Record<PlayerAttackAction, number> = {
-  slash: 104,
-  slash2: 136,
-  slash3: 168
+const PLAYER_ATTACK_HIT_BOXES: Record<PlayerAttackAction, AttackHitBoxConfig> = {
+  slash: {
+    width: 108,
+    height: 34,
+    frontOffset: 48,
+    yOffset: -148
+  },
+  slash2: {
+    width: 132,
+    height: 36,
+    frontOffset: 48,
+    yOffset: -150
+  },
+  slash3: {
+    width: 156,
+    height: 38,
+    frontOffset: 50,
+    yOffset: -150
+  }
 };
-const ATTACK_HIT_FORWARD_OFFSET = 88;
-const ATTACK_HIT_Y_OFFSET = -82;
+const ENEMY_ATTACK_HIT_BOX: AttackHitBoxConfig = {
+  width: 112,
+  height: 34,
+  frontOffset: 46,
+  yOffset: -144
+};
+// Phaser AnimationFrame.index is 1-based.
+const MAIN_NINJA_ATTACK_REACH_FRAMES = [14, 15] as const;
+const ENEMY_NINJA_ATTACK_REACH_FRAMES = [16, 17] as const;
 
 const NINJA_SPRITE_SHEET_SETS = {
   current: {
     id: 'current',
     actorRootUrl: '/assets/current/actors',
     backgroundRootUrl: '/assets/current/backgrounds',
-    backgroundFileName: 'bamboo-ravine-lanes-tight.png',
     frameSize: CURRENT_NINJA_FRAME_SIZE,
     frameCount: NINJA_FRAME_COUNT,
     scale: NINJA_TARGET_SCALE * (LEGACY_NINJA_FRAME_SIZE / CURRENT_NINJA_FRAME_SIZE),
@@ -108,7 +146,6 @@ const NINJA_SPRITE_SHEET_SETS = {
     id: 'legacy',
     actorRootUrl: '/assets/legacy/actors',
     backgroundRootUrl: '/assets/legacy/backgrounds',
-    backgroundFileName: 'bamboo-ravine-lanes-tight.png',
     frameSize: LEGACY_NINJA_FRAME_SIZE,
     frameCount: NINJA_FRAME_COUNT,
     scale: NINJA_TARGET_SCALE,
@@ -118,7 +155,8 @@ const NINJA_SPRITE_SHEET_SETS = {
       height: 62,
       offsetX: 80,
       offsetY: 137
-    }
+    },
+    unsupportedMainActions: ['slash3']
   }
 } as const satisfies Record<DebugSpriteSheetSet, NinjaSpriteSheetSet>;
 
@@ -128,11 +166,15 @@ const getMainNinjaTextureKey = (
   direction: FacingDirection
 ): string => `character.${spriteSheetSetId}.mainNinja.${direction}.${action}.spritesheet`;
 
-const getBackgroundTextureKey = (spriteSheetSetId: DebugSpriteSheetSet): string =>
-  `background.${spriteSheetSetId}.sandbox`;
+const getBackgroundTextureKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  backgroundFileName: DebugBackgroundFileName
+): string => `background.${spriteSheetSetId}.${backgroundFileName}`;
 
-const getBackgroundUrl = (spriteSheetSet: NinjaSpriteSheetSet): string =>
-  `${spriteSheetSet.backgroundRootUrl}/${spriteSheetSet.backgroundFileName}`;
+const getBackgroundUrl = (
+  spriteSheetSet: NinjaSpriteSheetSet,
+  backgroundFileName: DebugBackgroundFileName
+): string => `${spriteSheetSet.backgroundRootUrl}/${backgroundFileName}`;
 
 const getMainNinjaAnimationKey = (
   spriteSheetSetId: DebugSpriteSheetSet,
@@ -166,6 +208,25 @@ const getEnemyNinjaSpriteSheetSetUrl = (
 
 const isPlayerAttackAction = (action: PlayerAction): action is PlayerAttackAction =>
   action === 'slash' || action === 'slash2' || action === 'slash3';
+
+const getAvailableMainNinjaAnimations = (
+  spriteSheetSet: NinjaSpriteSheetSet
+): readonly NinjaAnimationConfig<MainNinjaAction>[] =>
+  NINJA_ANIMATIONS.filter(
+    (animation) => !spriteSheetSet.unsupportedMainActions?.includes(animation.action)
+  );
+
+const getPlayableMainNinjaAction = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  action: MainNinjaAction
+): MainNinjaAction => {
+  const spriteSheetSet: NinjaSpriteSheetSet = NINJA_SPRITE_SHEET_SETS[spriteSheetSetId];
+  if (!spriteSheetSet.unsupportedMainActions?.includes(action)) {
+    return action;
+  }
+
+  return 'slash2';
+};
 
 const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
@@ -321,8 +382,10 @@ export class SandboxScene extends BaseScene {
   private debugOverlayGraphic: Phaser.GameObjects.Graphics | null = null;
   private pauseLabel: Phaser.GameObjects.Text | null = null;
   private activeSpriteSheetSetId: DebugSpriteSheetSet = 'current';
+  private activeBackgroundFileName: DebugBackgroundFileName =
+    DEFAULT_DEBUG_BACKGROUND_FILE_NAMES.current;
   private loadingSpriteSheetSetId: DebugSpriteSheetSet | null = null;
-  private pendingSpriteSheetSetId: DebugSpriteSheetSet | null = null;
+  private pendingSpriteSheetSetSelection: SpriteSheetSetSelection | null = null;
   private lastActorResetRequestId = 0;
   private lastDebugTelemetryAt = Number.NEGATIVE_INFINITY;
   private facingDirection: FacingDirection = 'right';
@@ -330,10 +393,13 @@ export class SandboxScene extends BaseScene {
   private currentAction: PlayerAction = 'idle';
   private enemyAction: EnemyAction = 'idle';
   private enemyRecoveryUntil = 0;
+  private enemyAttackDamageDealt = false;
   private attackHitCount = 0;
+  private enemyAttackHitCount = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
-  private attackHitArea = new Phaser.Geom.Circle(0, 0, ATTACK_HIT_RADIUS.slash);
+  private attackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
+  private enemyAttackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private visualBoundsRect = new Phaser.Geom.Rectangle();
 
   constructor() {
@@ -341,12 +407,18 @@ export class SandboxScene extends BaseScene {
   }
 
   preload(): void {
-    this.queueSpriteSheetSet(NINJA_SPRITE_SHEET_SETS[this.debug.get().spriteSheetSet]);
+    const state = this.debug.get();
+    this.queueSpriteSheetSet(
+      NINJA_SPRITE_SHEET_SETS[state.spriteSheetSet],
+      state.backgroundFileNames[state.spriteSheetSet]
+    );
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor('#101722');
-    this.activeSpriteSheetSetId = this.debug.get().spriteSheetSet;
+    const state = this.debug.get();
+    this.activeSpriteSheetSetId = state.spriteSheetSet;
+    this.activeBackgroundFileName = state.backgroundFileNames[state.spriteSheetSet];
     const spriteSheetSet = this.getActiveSpriteSheetSet();
 
     this.createAnimationsForSpriteSheetSet(spriteSheetSet);
@@ -402,7 +474,10 @@ export class SandboxScene extends BaseScene {
     this.registerEnemyAnimationEvents();
     this.registerPointerDebug();
     this.onStore(this.debug, (state) => {
-      this.applySpriteSheetSet(state.spriteSheetSet);
+      this.applySpriteSheetSet(
+        state.spriteSheetSet,
+        state.backgroundFileNames[state.spriteSheetSet]
+      );
       this.handleActorResetRequest(state.actorResetRequestId);
       this.pauseLabel?.setVisible(state.paused);
       this.player?.setAlpha(state.paused ? 0.55 : 1);
@@ -457,7 +532,11 @@ export class SandboxScene extends BaseScene {
   private createBackground(): void {
     const { width, height } = this.profile;
     this.background = this.add
-      .image(width / 2, height / 2, getBackgroundTextureKey(this.activeSpriteSheetSetId))
+      .image(
+        width / 2,
+        height / 2,
+        getBackgroundTextureKey(this.activeSpriteSheetSetId, this.activeBackgroundFileName)
+      )
       .setDepth(-10);
     this.fitBackground();
   }
@@ -478,16 +557,19 @@ export class SandboxScene extends BaseScene {
     return NINJA_SPRITE_SHEET_SETS[this.activeSpriteSheetSetId];
   }
 
-  private queueSpriteSheetSet(spriteSheetSet: NinjaSpriteSheetSet): boolean {
+  private queueSpriteSheetSet(
+    spriteSheetSet: NinjaSpriteSheetSet,
+    backgroundFileName: DebugBackgroundFileName
+  ): boolean {
     let queued = false;
-    const backgroundTextureKey = getBackgroundTextureKey(spriteSheetSet.id);
+    const backgroundTextureKey = getBackgroundTextureKey(spriteSheetSet.id, backgroundFileName);
 
     if (!this.textures.exists(backgroundTextureKey)) {
-      this.load.image(backgroundTextureKey, getBackgroundUrl(spriteSheetSet));
+      this.load.image(backgroundTextureKey, getBackgroundUrl(spriteSheetSet, backgroundFileName));
       queued = true;
     }
 
-    for (const animation of NINJA_ANIMATIONS) {
+    for (const animation of getAvailableMainNinjaAnimations(spriteSheetSet)) {
       const textureKey = getMainNinjaTextureKey(
         spriteSheetSet.id,
         animation.action,
@@ -543,7 +625,7 @@ export class SandboxScene extends BaseScene {
   }
 
   private createAnimationsForSpriteSheetSet(spriteSheetSet: NinjaSpriteSheetSet): void {
-    for (const animation of NINJA_ANIMATIONS) {
+    for (const animation of getAvailableMainNinjaAnimations(spriteSheetSet)) {
       const animationKey = getMainNinjaAnimationKey(
         spriteSheetSet.id,
         animation.action,
@@ -594,10 +676,13 @@ export class SandboxScene extends BaseScene {
     }
   }
 
-  private isSpriteSheetSetLoaded(spriteSheetSet: NinjaSpriteSheetSet): boolean {
+  private isSpriteSheetSetLoaded(
+    spriteSheetSet: NinjaSpriteSheetSet,
+    backgroundFileName: DebugBackgroundFileName
+  ): boolean {
     return (
-      this.textures.exists(getBackgroundTextureKey(spriteSheetSet.id)) &&
-      NINJA_ANIMATIONS.every((animation) =>
+      this.textures.exists(getBackgroundTextureKey(spriteSheetSet.id, backgroundFileName)) &&
+      getAvailableMainNinjaAnimations(spriteSheetSet).every((animation) =>
         this.textures.exists(
           getMainNinjaTextureKey(spriteSheetSet.id, animation.action, animation.direction)
         )
@@ -621,33 +706,42 @@ export class SandboxScene extends BaseScene {
       .setOffset(spriteSheetSet.body.offsetX, spriteSheetSet.body.offsetY);
   }
 
-  private applySpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
-    if (this.activeSpriteSheetSetId === spriteSheetSetId) {
+  private applySpriteSheetSet(
+    spriteSheetSetId: DebugSpriteSheetSet,
+    backgroundFileName: DebugBackgroundFileName
+  ): void {
+    if (
+      this.activeSpriteSheetSetId === spriteSheetSetId &&
+      this.activeBackgroundFileName === backgroundFileName
+    ) {
       return;
     }
 
     const spriteSheetSet = NINJA_SPRITE_SHEET_SETS[spriteSheetSetId];
 
-    if (!this.isSpriteSheetSetLoaded(spriteSheetSet)) {
-      this.loadSpriteSheetSet(spriteSheetSetId);
+    if (!this.isSpriteSheetSetLoaded(spriteSheetSet, backgroundFileName)) {
+      this.loadSpriteSheetSet(spriteSheetSetId, backgroundFileName);
       return;
     }
 
-    this.activateSpriteSheetSet(spriteSheetSetId);
+    this.activateSpriteSheetSet(spriteSheetSetId, backgroundFileName);
   }
 
-  private loadSpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
+  private loadSpriteSheetSet(
+    spriteSheetSetId: DebugSpriteSheetSet,
+    backgroundFileName: DebugBackgroundFileName
+  ): void {
     if (this.loadingSpriteSheetSetId !== null) {
-      this.pendingSpriteSheetSetId = spriteSheetSetId;
+      this.pendingSpriteSheetSetSelection = { spriteSheetSetId, backgroundFileName };
       return;
     }
 
     const spriteSheetSet = NINJA_SPRITE_SHEET_SETS[spriteSheetSetId];
-    const queued = this.queueSpriteSheetSet(spriteSheetSet);
+    const queued = this.queueSpriteSheetSet(spriteSheetSet, backgroundFileName);
 
     if (!queued) {
       this.createAnimationsForSpriteSheetSet(spriteSheetSet);
-      this.activateSpriteSheetSet(spriteSheetSetId);
+      this.activateSpriteSheetSet(spriteSheetSetId, backgroundFileName);
       return;
     }
 
@@ -655,38 +749,63 @@ export class SandboxScene extends BaseScene {
     this.load.once('complete', () => {
       this.loadingSpriteSheetSetId = null;
       this.createAnimationsForSpriteSheetSet(spriteSheetSet);
+      const state = this.debug.get();
+      const selectedBackgroundFileName = state.backgroundFileNames[state.spriteSheetSet];
 
-      if (this.debug.get().spriteSheetSet === spriteSheetSetId) {
-        this.activateSpriteSheetSet(spriteSheetSetId);
+      if (
+        state.spriteSheetSet === spriteSheetSetId &&
+        selectedBackgroundFileName === backgroundFileName
+      ) {
+        this.activateSpriteSheetSet(spriteSheetSetId, backgroundFileName);
       } else {
         this.unloadSpriteSheetSet(spriteSheetSetId);
       }
 
-      const pendingSpriteSheetSetId = this.pendingSpriteSheetSetId;
-      this.pendingSpriteSheetSetId = null;
+      const pendingSpriteSheetSetSelection = this.pendingSpriteSheetSetSelection;
+      this.pendingSpriteSheetSetSelection = null;
 
       if (
-        pendingSpriteSheetSetId !== null &&
-        pendingSpriteSheetSetId !== spriteSheetSetId &&
-        pendingSpriteSheetSetId !== this.activeSpriteSheetSetId
+        pendingSpriteSheetSetSelection !== null &&
+        (pendingSpriteSheetSetSelection.spriteSheetSetId !== this.activeSpriteSheetSetId ||
+          pendingSpriteSheetSetSelection.backgroundFileName !== this.activeBackgroundFileName)
       ) {
-        this.applySpriteSheetSet(pendingSpriteSheetSetId);
+        this.applySpriteSheetSet(
+          pendingSpriteSheetSetSelection.spriteSheetSetId,
+          pendingSpriteSheetSetSelection.backgroundFileName
+        );
       }
     });
     this.load.start();
   }
 
-  private activateSpriteSheetSet(spriteSheetSetId: DebugSpriteSheetSet): void {
+  private activateSpriteSheetSet(
+    spriteSheetSetId: DebugSpriteSheetSet,
+    backgroundFileName: DebugBackgroundFileName
+  ): void {
     const previousSpriteSheetSetId = this.activeSpriteSheetSetId;
+    const spriteSheetSetChanged = previousSpriteSheetSetId !== spriteSheetSetId;
     this.activeSpriteSheetSetId = spriteSheetSetId;
+    this.activeBackgroundFileName = backgroundFileName;
     const spriteSheetSet = this.getActiveSpriteSheetSet();
-    this.background?.setTexture(getBackgroundTextureKey(spriteSheetSetId));
+    this.background?.setTexture(getBackgroundTextureKey(spriteSheetSetId, backgroundFileName));
     this.fitBackground();
+
+    if (!spriteSheetSetChanged) {
+      return;
+    }
 
     if (this.player !== null) {
       const playerProgress = this.player.anims.getProgress();
       this.applyNinjaSpriteMetrics(this.player, spriteSheetSet.scale, spriteSheetSet);
-      const playerAnimationAction = this.currentAction === 'hurt' ? 'impact' : this.currentAction;
+      let playerAnimationAction: MainNinjaAction = 'impact';
+      if (this.currentAction !== 'hurt') {
+        const playableAction = getPlayableMainNinjaAction(
+          spriteSheetSetId,
+          this.currentAction
+        ) as ControlledMainNinjaAction;
+        this.currentAction = playableAction;
+        playerAnimationAction = playableAction;
+      }
       this.player.play(
         getMainNinjaAnimationKey(
           this.activeSpriteSheetSetId,
@@ -721,10 +840,12 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const backgroundTextureKey = getBackgroundTextureKey(spriteSheetSetId);
+    for (const backgroundFileName of BACKGROUND_FILE_NAMES_BY_SPRITE_SET[spriteSheetSetId]) {
+      const backgroundTextureKey = getBackgroundTextureKey(spriteSheetSetId, backgroundFileName);
 
-    if (this.textures.exists(backgroundTextureKey)) {
-      this.textures.remove(backgroundTextureKey);
+      if (this.textures.exists(backgroundTextureKey)) {
+        this.textures.remove(backgroundTextureKey);
+      }
     }
 
     for (const animation of NINJA_ANIMATIONS) {
@@ -938,6 +1059,10 @@ export class SandboxScene extends BaseScene {
 
   private resolveAttackAction(): PlayerAttackAction {
     if (this.moveKeys?.ctrl.isDown === true) {
+      if (this.activeSpriteSheetSetId === 'legacy') {
+        return 'slash2';
+      }
+
       return 'slash3';
     }
 
@@ -977,7 +1102,6 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
     this.player.setVelocity(this.getAttackForwardVelocityX(action), 0);
     this.playNinjaAnimation(action, true);
-    this.updateAttackHitArea(action);
   }
 
   private getAttackForwardVelocityX(action: PlayerAttackAction): number {
@@ -1029,6 +1153,7 @@ export class SandboxScene extends BaseScene {
 
     if (this.enemyAction === 'slash') {
       this.enemy.setVelocity(0, 0);
+      this.updateEnemyAttackDamage();
       return;
     }
 
@@ -1078,12 +1203,13 @@ export class SandboxScene extends BaseScene {
     }
 
     this.enemyAction = 'slash';
+    this.enemyAttackDamageDealt = false;
+    this.clearEnemyAttackHitArea();
     this.enemy.setVelocity(0, 0);
     this.updateEnemyFacingFromVector(
       new Phaser.Math.Vector2(this.player.x - this.enemy.x, this.player.y - this.enemy.y)
     );
     this.playEnemyAnimation('slash', true);
-    this.damagePlayerFromEnemy();
   }
 
   private startEnemyRecovery(): void {
@@ -1093,8 +1219,26 @@ export class SandboxScene extends BaseScene {
 
     this.enemyAction = 'recover';
     this.enemyRecoveryUntil = this.time.now + ENEMY_ATTACK_RECOVERY_MS;
+    this.enemyAttackDamageDealt = false;
+    this.clearEnemyAttackHitArea();
     this.enemy.setVelocity(0, 0);
     this.playEnemyAnimation('idle', true);
+  }
+
+  private updateEnemyAttackDamage(): void {
+    if (!this.isEnemyAttackReachFrame()) {
+      this.clearEnemyAttackHitArea();
+      return;
+    }
+
+    this.updateEnemyAttackHitArea();
+
+    if (this.enemyAttackDamageDealt || this.enemyAttackHitCount === 0) {
+      return;
+    }
+
+    this.enemyAttackDamageDealt = true;
+    this.damagePlayerFromEnemy();
   }
 
   private damagePlayerFromEnemy(): void {
@@ -1147,9 +1291,13 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
+    const playableAction = getPlayableMainNinjaAction(
+      this.activeSpriteSheetSetId,
+      action
+    ) as ControlledMainNinjaAction;
     const animationKey = getMainNinjaAnimationKey(
       this.activeSpriteSheetSetId,
-      action,
+      playableAction,
       this.facingDirection
     );
 
@@ -1157,7 +1305,7 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    this.currentAction = action;
+    this.currentAction = playableAction;
     this.player.play(animationKey, !restart);
   }
 
@@ -1199,20 +1347,93 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const radius = ATTACK_HIT_RADIUS[action];
-    const centerX = this.player.x + this.forwardVector.x * ATTACK_HIT_FORWARD_OFFSET;
-    const centerY = this.player.y + ATTACK_HIT_Y_OFFSET + this.forwardVector.y * ATTACK_HIT_FORWARD_OFFSET;
-    this.attackHitArea.setTo(centerX, centerY, radius);
+    if (!this.isPlayerAttackReachFrame()) {
+      this.clearAttackHitArea();
+      return;
+    }
 
+    this.setAttackHitArea(
+      this.attackHitArea,
+      this.player,
+      this.facingDirection,
+      PLAYER_ATTACK_HIT_BOXES[action]
+    );
+    this.attackHitCount = this.getHitCountInArea(this.attackHitArea, this.player);
+  }
+
+  private updateEnemyAttackHitArea(): void {
+    if (this.enemy === null) {
+      return;
+    }
+
+    this.setAttackHitArea(
+      this.enemyAttackHitArea,
+      this.enemy,
+      this.enemyFacingDirection,
+      ENEMY_ATTACK_HIT_BOX
+    );
+    this.enemyAttackHitCount = this.getHitCountInArea(this.enemyAttackHitArea, this.enemy);
+  }
+
+  private setAttackHitArea(
+    hitArea: Phaser.Geom.Rectangle,
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    facingDirection: FacingDirection,
+    config: AttackHitBoxConfig
+  ): void {
+    const direction = facingDirection === 'left' ? -1 : 1;
+    const x =
+      direction > 0
+        ? actor.x + config.frontOffset
+        : actor.x - config.frontOffset - config.width;
+    const y = actor.y + config.yOffset - config.height / 2;
+
+    hitArea.setTo(x, y, config.width, config.height);
+  }
+
+  private getHitCountInArea(
+    hitArea: Phaser.Geom.Rectangle,
+    owner: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+  ): number {
     const bodies: readonly (Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody)[] =
-      this.physics.overlapCirc(centerX, centerY, radius);
-    this.attackHitCount = bodies.filter((body) => body.gameObject !== this.player).length;
+      this.physics.overlapRect(hitArea.x, hitArea.y, hitArea.width, hitArea.height);
+
+    return bodies.filter((body) => body.gameObject !== owner).length;
   }
 
   private clearAttackHitArea(): void {
     this.attackHitCount = 0;
-    this.attackHitArea.setTo(0, 0, 0);
+    this.attackHitArea.setTo(0, 0, 0, 0);
     this.renderDebugOverlays();
+  }
+
+  private clearEnemyAttackHitArea(): void {
+    this.enemyAttackHitCount = 0;
+    this.enemyAttackHitArea.setTo(0, 0, 0, 0);
+  }
+
+  private getAnimationFrameIndex(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
+  ): number {
+    return sprite?.anims.currentFrame?.index ?? 0;
+  }
+
+  private isPlayerAttackReachFrame(): boolean {
+    return (
+      isPlayerAttackAction(this.currentAction) &&
+      MAIN_NINJA_ATTACK_REACH_FRAMES.some(
+        (frameIndex) => frameIndex === this.getAnimationFrameIndex(this.player)
+      )
+    );
+  }
+
+  private isEnemyAttackReachFrame(): boolean {
+    return (
+      this.enemyAction === 'slash' &&
+      ENEMY_NINJA_ATTACK_REACH_FRAMES.some(
+        (frameIndex) => frameIndex === this.getAnimationFrameIndex(this.enemy)
+      )
+    );
   }
 
   private registerPointerDebug(): void {
@@ -1264,7 +1485,9 @@ export class SandboxScene extends BaseScene {
     this.currentAction = 'idle';
     this.enemyAction = 'idle';
     this.enemyRecoveryUntil = 0;
+    this.enemyAttackDamageDealt = false;
     this.clearAttackHitArea();
+    this.clearEnemyAttackHitArea();
 
     this.player
       .setPosition(this.centerX, this.centerY + 108)
@@ -1290,7 +1513,7 @@ export class SandboxScene extends BaseScene {
     }
 
     this.lastDebugTelemetryAt = time;
-    const attackActive = isPlayerAttackAction(this.currentAction);
+    const attackActive = this.isPlayerAttackReachFrame();
 
     this.debug.update((state) => ({
       ...state,
@@ -1299,9 +1522,14 @@ export class SandboxScene extends BaseScene {
       attack: {
         active: attackActive,
         action: attackActive ? this.currentAction : 'none',
-        x: attackActive ? Math.round(this.attackHitArea.x) : 0,
-        y: attackActive ? Math.round(this.attackHitArea.y) : 0,
-        radius: attackActive ? Math.round(this.attackHitArea.radius) : 0,
+        x: attackActive
+          ? Math.round(this.attackHitArea.x + this.attackHitArea.width / 2)
+          : 0,
+        y: attackActive
+          ? Math.round(this.attackHitArea.y + this.attackHitArea.height / 2)
+          : 0,
+        width: attackActive ? Math.round(this.attackHitArea.width) : 0,
+        height: attackActive ? Math.round(this.attackHitArea.height) : 0,
         hitCount: attackActive ? this.attackHitCount : 0
       },
       performance: {
@@ -1378,11 +1606,19 @@ export class SandboxScene extends BaseScene {
       this.renderPhysicsBody(this.enemy, 0xe56b6f);
     }
 
-    if (state.showAttackBoxes && isPlayerAttackAction(this.currentAction)) {
-      graphic.fillStyle(this.attackHitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.12);
-      graphic.lineStyle(3, this.attackHitCount > 0 ? 0xffc857 : 0x7ed7ff, 0.72);
-      graphic.fillCircleShape(this.attackHitArea);
-      graphic.strokeCircleShape(this.attackHitArea);
+    if (state.showAttackBoxes) {
+      if (this.isPlayerAttackReachFrame()) {
+        this.renderAttackHitBox(this.attackHitArea, this.attackHitCount, 0x7ed7ff, 0xffc857);
+      }
+
+      if (this.isEnemyAttackReachFrame()) {
+        this.renderAttackHitBox(
+          this.enemyAttackHitArea,
+          this.enemyAttackHitCount,
+          0xff91d0,
+          0xffc857
+        );
+      }
     }
 
     if (state.showOrigins) {
@@ -1406,6 +1642,23 @@ export class SandboxScene extends BaseScene {
     const bounds = sprite.getBounds(this.visualBoundsRect);
     this.debugOverlayGraphic.lineStyle(2, color, 0.78);
     this.debugOverlayGraphic.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+
+  private renderAttackHitBox(
+    hitArea: Phaser.Geom.Rectangle,
+    hitCount: number,
+    idleColor: number,
+    hitColor: number
+  ): void {
+    if (this.debugOverlayGraphic === null || hitArea.width <= 0 || hitArea.height <= 0) {
+      return;
+    }
+
+    const color = hitCount > 0 ? hitColor : idleColor;
+    this.debugOverlayGraphic.fillStyle(color, 0.14);
+    this.debugOverlayGraphic.lineStyle(3, color, 0.78);
+    this.debugOverlayGraphic.fillRectShape(hitArea);
+    this.debugOverlayGraphic.strokeRectShape(hitArea);
   }
 
   private renderPhysicsBody(
