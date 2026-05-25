@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
+  BACKGROUND_URLS_BY_SPRITE_SET,
   DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
   type DebugSpriteSheetSet
 } from '../src/game/assets/ninjaAssetCatalog';
@@ -45,6 +46,16 @@ function getPngSize(filePath: URL): { width: number; height: number } {
   };
 }
 
+function getPublicFilePath(publicUrl: string): URL {
+  return new URL(`../public/${publicUrl.replace(/^\//u, '')}`, import.meta.url);
+}
+
+function getBackgroundFileNamesFromDirectory(directory: URL): readonly string[] {
+  return readdirSync(directory)
+    .filter((fileName) => fileName.toLowerCase().endsWith('.png'))
+    .sort((a, b) => a.localeCompare(b));
+}
+
 describe('ninja sprite sheet assets', () => {
   it.each(SPRITE_SHEET_SETS)('has complete $id sprite sheets with expected dimensions', (set) => {
     for (const action of MAIN_NINJA_ACTIONS_BY_SPRITE_SET[set.id]) {
@@ -85,15 +96,24 @@ describe('ninja sprite sheet assets', () => {
 
   it.each(SPRITE_SHEET_SETS)('has selectable $id backgrounds', (set) => {
     for (const backgroundFileName of BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]) {
-      const filePath = new URL(
-        `../public/assets/${set.id}/backgrounds/${backgroundFileName}`,
-        import.meta.url
-      );
+      const backgroundUrl = BACKGROUND_URLS_BY_SPRITE_SET[set.id][backgroundFileName];
 
-      const size = getPngSize(filePath);
+      expect(backgroundUrl).toBeDefined();
+
+      const size = getPngSize(getPublicFilePath(backgroundUrl));
       expect(size.width).toBeGreaterThanOrEqual(1280);
       expect(size.height).toBeGreaterThanOrEqual(720);
     }
+  });
+
+  it.each(SPRITE_SHEET_SETS)('selects every $id background from the asset directory', (set) => {
+    const backgroundDirectory = new URL(
+      `../public/assets/${set.id}/backgrounds/`,
+      import.meta.url
+    );
+    const expectedFileNames = getBackgroundFileNamesFromDirectory(backgroundDirectory);
+
+    expect(BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]).toEqual(expectedFileNames);
   });
 
   it.each(SPRITE_SHEET_SETS)('uses a valid default $id background', (set) => {

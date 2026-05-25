@@ -4,6 +4,7 @@ import { SceneKeys } from '../sceneKeys';
 import {
   BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
   DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
+  getDebugBackgroundUrl,
   type DebugBackgroundFileName,
   type DebugSpriteSheetSet
 } from '../assets/ninjaAssetCatalog';
@@ -66,7 +67,6 @@ interface AttackHitBoxConfig {
 interface NinjaSpriteSheetSet {
   readonly id: DebugSpriteSheetSet;
   readonly actorRootUrl: string;
-  readonly backgroundRootUrl: string;
   readonly frameSize: number;
   readonly frameCount: number;
   readonly scale: number;
@@ -85,7 +85,7 @@ const CURRENT_NINJA_FRAME_SIZE = 512;
 const NINJA_FRAME_COUNT = 32;
 const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
-const NINJA_DISPLAY_SCALE_MULTIPLIER = 2.2;
+const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
 const ENEMY_NINJA_SCALE_MULTIPLIER = 1.14;
 const NINJA_SPEED = 260;
@@ -128,7 +128,6 @@ const NINJA_SPRITE_SHEET_SETS = {
   current: {
     id: 'current',
     actorRootUrl: '/assets/current/actors',
-    backgroundRootUrl: '/assets/current/backgrounds',
     frameSize: CURRENT_NINJA_FRAME_SIZE,
     frameCount: NINJA_FRAME_COUNT,
     scale: NINJA_TARGET_SCALE * (LEGACY_NINJA_FRAME_SIZE / CURRENT_NINJA_FRAME_SIZE),
@@ -146,7 +145,6 @@ const NINJA_SPRITE_SHEET_SETS = {
   legacy: {
     id: 'legacy',
     actorRootUrl: '/assets/legacy/actors',
-    backgroundRootUrl: '/assets/legacy/backgrounds',
     frameSize: LEGACY_NINJA_FRAME_SIZE,
     frameCount: NINJA_FRAME_COUNT,
     scale: NINJA_TARGET_SCALE,
@@ -180,7 +178,15 @@ const getBackgroundTextureKey = (
 const getBackgroundUrl = (
   spriteSheetSet: NinjaSpriteSheetSet,
   backgroundFileName: DebugBackgroundFileName
-): string => `${spriteSheetSet.backgroundRootUrl}/${backgroundFileName}`;
+): string => {
+  const backgroundUrl = getDebugBackgroundUrl(spriteSheetSet.id, backgroundFileName);
+
+  if (backgroundUrl === undefined) {
+    throw new Error(`Unknown ${spriteSheetSet.id} background: ${backgroundFileName}`);
+  }
+
+  return backgroundUrl;
+};
 
 const getMainNinjaAnimationKey = (
   spriteSheetSetId: DebugSpriteSheetSet,
