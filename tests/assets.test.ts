@@ -31,6 +31,8 @@ const MAIN_NINJA_ACTIONS_BY_SPRITE_SET = {
 } as const satisfies Record<DebugSpriteSheetSet, readonly string[]>;
 const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash'] as const;
 const DIRECTIONS = ['left', 'right'] as const;
+const ACTORS = ['main-ninja', 'enemy-ninja'] as const;
+const STANDALONE_ANCHOR_FILES = ['anchor-left-native.png', 'anchor-right-native.png'] as const;
 
 function getPngSize(filePath: URL): { width: number; height: number } {
   const png = readFileSync(filePath);
@@ -64,6 +66,19 @@ describe('ninja sprite sheet assets', () => {
         );
 
         expect(getPngSize(filePath)).toEqual({ width: set.width, height: set.height });
+      }
+    }
+  });
+
+  it.each(SPRITE_SHEET_SETS)('derives $id actor anchors from idle sprite sheets', (set) => {
+    for (const actor of ACTORS) {
+      for (const fileName of STANDALONE_ANCHOR_FILES) {
+        const filePath = new URL(
+          `../public/assets/${set.id}/actors/${actor}/${fileName}`,
+          import.meta.url
+        );
+
+        expect(() => readFileSync(filePath)).toThrow();
       }
     }
   });

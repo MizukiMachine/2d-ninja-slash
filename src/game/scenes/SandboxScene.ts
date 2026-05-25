@@ -83,6 +83,7 @@ interface SpriteSheetSetSelection {
 const LEGACY_NINJA_FRAME_SIZE = 216;
 const CURRENT_NINJA_FRAME_SIZE = 512;
 const NINJA_FRAME_COUNT = 32;
+const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
 const NINJA_DISPLAY_SCALE_MULTIPLIER = 2.2;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
@@ -166,6 +167,11 @@ const getMainNinjaTextureKey = (
   direction: FacingDirection
 ): string => `character.${spriteSheetSetId}.mainNinja.${direction}.${action}.spritesheet`;
 
+const getMainNinjaIdleAnchorTextureKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  direction: FacingDirection
+): string => getMainNinjaTextureKey(spriteSheetSetId, 'idle', direction);
+
 const getBackgroundTextureKey = (
   spriteSheetSetId: DebugSpriteSheetSet,
   backgroundFileName: DebugBackgroundFileName
@@ -193,6 +199,11 @@ const getEnemyNinjaTextureKey = (
   action: EnemyNinjaAction,
   direction: FacingDirection
 ): string => `character.${spriteSheetSetId}.enemyNinja.${direction}.${action}.spritesheet`;
+
+const getEnemyNinjaIdleAnchorTextureKey = (
+  spriteSheetSetId: DebugSpriteSheetSet,
+  direction: FacingDirection
+): string => getEnemyNinjaTextureKey(spriteSheetSetId, 'idle', direction);
 
 const getEnemyNinjaAnimationKey = (
   spriteSheetSetId: DebugSpriteSheetSet,
@@ -428,8 +439,8 @@ export class SandboxScene extends BaseScene {
     this.player = this.physics.add.sprite(
       this.centerX,
       this.centerY + 108,
-      getMainNinjaTextureKey(this.activeSpriteSheetSetId, 'idle', 'right'),
-      0
+      getMainNinjaIdleAnchorTextureKey(this.activeSpriteSheetSetId, 'right'),
+      NINJA_IDLE_ANCHOR_FRAME
     );
     this.player
       .setOrigin(0.5, 1)
@@ -443,8 +454,8 @@ export class SandboxScene extends BaseScene {
     this.enemy = this.physics.add.sprite(
       this.getDefaultEnemyX(),
       this.centerY + 108,
-      getEnemyNinjaTextureKey(this.activeSpriteSheetSetId, 'idle', 'left'),
-      0
+      getEnemyNinjaIdleAnchorTextureKey(this.activeSpriteSheetSetId, 'left'),
+      NINJA_IDLE_ANCHOR_FRAME
     );
     this.enemy
       .setOrigin(0.5, 1)
