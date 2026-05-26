@@ -17,6 +17,8 @@ const KEYBOARD_CAPTURE_KEYS = [
   Phaser.Input.Keyboard.KeyCodes.RIGHT,
   Phaser.Input.Keyboard.KeyCodes.Z,
   Phaser.Input.Keyboard.KeyCodes.SHIFT,
+  Phaser.Input.Keyboard.KeyCodes.CTRL,
+  Phaser.Input.Keyboard.KeyCodes.SPACE,
   Phaser.Input.Keyboard.KeyCodes.ESC
 ] as const;
 

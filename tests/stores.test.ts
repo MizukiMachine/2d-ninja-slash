@@ -65,13 +65,43 @@ describe('debugStore', () => {
     store.setActiveScene('Sandbox');
     store.setPaused(true);
     store.setShowWorldBounds(true);
+    store.setShowVisualBounds(true);
+    store.setShowHitBoxes(true);
+    store.setShowAttackBoxes(true);
+    store.setShowOrigins(true);
+    store.setShowPointerProbe(true);
+    store.setShowEnemyRanges(true);
+    store.setEnemyChaseEnabled(false);
+    store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.requestActorReset();
     store.setPointer({ x: 12, y: 24, worldX: 120, worldY: 240, down: true });
     store.setInput({ left: true, lastKey: 'KeyA' });
+    store.setPlayer({ action: 'run', x: 100, y: 200, velocityX: 260 });
+    store.setEnemy({ action: 'slash', x: 300, y: 220, velocityX: -260 });
+    store.setAttack({
+      active: true,
+      action: 'slash2',
+      x: 180,
+      y: 130,
+      width: 132,
+      height: 34,
+      hitCount: 1
+    });
+    store.setPerformance({ fps: 59.8, physicsBodies: 2 });
 
     expect(store.get()).toMatchObject({
       activeScene: 'Sandbox',
       paused: true,
       showWorldBounds: true,
+      showVisualBounds: true,
+      showHitBoxes: true,
+      showAttackBoxes: true,
+      showOrigins: true,
+      showPointerProbe: true,
+      showEnemyRanges: true,
+      enemyChaseEnabled: false,
+      backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      actorResetRequestId: 1,
       pointer: {
         x: 12,
         y: 24,
@@ -82,6 +112,73 @@ describe('debugStore', () => {
       input: {
         left: true,
         lastKey: 'KeyA'
+      },
+      player: {
+        action: 'run',
+        x: 100,
+        y: 200,
+        velocityX: 260
+      },
+      enemy: {
+        action: 'slash',
+        x: 300,
+        y: 220,
+        velocityX: -260
+      },
+      attack: {
+        active: true,
+        action: 'slash2',
+        x: 180,
+        y: 130,
+        width: 132,
+        height: 34,
+        hitCount: 1
+      },
+      performance: {
+        fps: 59.8,
+        physicsBodies: 2
+      }
+    });
+  });
+
+  it('preserves debug controls while clearing runtime telemetry', () => {
+    const store = createDebugStore();
+
+    store.setPaused(true);
+    store.setShowWorldBounds(true);
+    store.setShowVisualBounds(true);
+    store.setShowHitBoxes(true);
+    store.setShowAttackBoxes(true);
+    store.setShowOrigins(true);
+    store.setShowPointerProbe(true);
+    store.setShowEnemyRanges(true);
+    store.setEnemyChaseEnabled(false);
+    store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.requestActorReset();
+    store.setPlayer({ action: 'run', x: 100 });
+    store.setPerformance({ fps: 60, physicsBodies: 2 });
+
+    store.resetRuntime();
+
+    expect(store.get()).toMatchObject({
+      paused: true,
+      showWorldBounds: true,
+      showVisualBounds: true,
+      showHitBoxes: true,
+      showAttackBoxes: true,
+      showOrigins: true,
+      showPointerProbe: true,
+      showEnemyRanges: true,
+      enemyChaseEnabled: false,
+      backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      actorResetRequestId: 1,
+      player: {
+        action: 'none',
+        x: 0
+      },
+      performance: {
+        fps: 0,
+        physicsBodies: 0
       }
     });
   });
