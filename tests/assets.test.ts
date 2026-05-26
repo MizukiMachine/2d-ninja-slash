@@ -1,35 +1,16 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
-  BACKGROUND_URLS_BY_SPRITE_SET,
-  DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
-  type DebugSpriteSheetSet
+  BACKGROUND_FILE_NAMES,
+  BACKGROUND_URLS,
+  DEFAULT_DEBUG_BACKGROUND_FILE_NAME
 } from '../src/game/assets/ninjaAssetCatalog';
 
-interface SpriteSheetSetExpectation {
-  readonly id: DebugSpriteSheetSet;
-  readonly width: number;
-  readonly height: number;
-}
-
-const SPRITE_SHEET_SETS: readonly SpriteSheetSetExpectation[] = [
-  {
-    id: 'current',
-    width: 4096,
-    height: 2048
-  },
-  {
-    id: 'legacy',
-    width: 1728,
-    height: 864
-  }
-];
-
-const MAIN_NINJA_ACTIONS_BY_SPRITE_SET = {
-  current: ['idle', 'run', 'jump', 'slash', 'slash2', 'slash3', 'impact'],
-  legacy: ['idle', 'run', 'jump', 'slash', 'slash2', 'impact']
-} as const satisfies Record<DebugSpriteSheetSet, readonly string[]>;
+const SPRITE_SHEET_SIZE = {
+  width: 2048,
+  height: 1024
+} as const;
+const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'slash2', 'slash3', 'impact'] as const;
 const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash'] as const;
 const DIRECTIONS = ['left', 'right'] as const;
 const ACTORS = ['main-ninja', 'enemy-ninja'] as const;
@@ -57,35 +38,35 @@ function getBackgroundFileNamesFromDirectory(directory: URL): readonly string[] 
 }
 
 describe('ninja sprite sheet assets', () => {
-  it.each(SPRITE_SHEET_SETS)('has complete $id sprite sheets with expected dimensions', (set) => {
-    for (const action of MAIN_NINJA_ACTIONS_BY_SPRITE_SET[set.id]) {
+  it('has complete 256px sprite sheets with expected dimensions', () => {
+    for (const action of MAIN_NINJA_ACTIONS) {
       for (const direction of DIRECTIONS) {
         const filePath = new URL(
-          `../public/assets/${set.id}/actors/main-ninja/${action}-${direction}.png`,
+          `../public/assets/actors/main-ninja/${action}-${direction}.png`,
           import.meta.url
         );
 
-        expect(getPngSize(filePath)).toEqual({ width: set.width, height: set.height });
+        expect(getPngSize(filePath)).toEqual(SPRITE_SHEET_SIZE);
       }
     }
 
     for (const action of ENEMY_NINJA_ACTIONS) {
       for (const direction of DIRECTIONS) {
         const filePath = new URL(
-          `../public/assets/${set.id}/actors/enemy-ninja/${action}-${direction}.png`,
+          `../public/assets/actors/enemy-ninja/${action}-${direction}.png`,
           import.meta.url
         );
 
-        expect(getPngSize(filePath)).toEqual({ width: set.width, height: set.height });
+        expect(getPngSize(filePath)).toEqual(SPRITE_SHEET_SIZE);
       }
     }
   });
 
-  it.each(SPRITE_SHEET_SETS)('derives $id actor anchors from idle sprite sheets', (set) => {
+  it('derives actor anchors from idle sprite sheets', () => {
     for (const actor of ACTORS) {
       for (const fileName of STANDALONE_ANCHOR_FILES) {
         const filePath = new URL(
-          `../public/assets/${set.id}/actors/${actor}/${fileName}`,
+          `../public/assets/actors/${actor}/${fileName}`,
           import.meta.url
         );
 
@@ -94,9 +75,9 @@ describe('ninja sprite sheet assets', () => {
     }
   });
 
-  it.each(SPRITE_SHEET_SETS)('has selectable $id backgrounds', (set) => {
-    for (const backgroundFileName of BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]) {
-      const backgroundUrl = BACKGROUND_URLS_BY_SPRITE_SET[set.id][backgroundFileName];
+  it('has selectable backgrounds', () => {
+    for (const backgroundFileName of BACKGROUND_FILE_NAMES) {
+      const backgroundUrl = BACKGROUND_URLS[backgroundFileName];
 
       expect(backgroundUrl).toBeDefined();
 
@@ -106,19 +87,14 @@ describe('ninja sprite sheet assets', () => {
     }
   });
 
-  it.each(SPRITE_SHEET_SETS)('selects every $id background from the asset directory', (set) => {
-    const backgroundDirectory = new URL(
-      `../public/assets/${set.id}/backgrounds/`,
-      import.meta.url
-    );
+  it('selects every background from the shared background directory', () => {
+    const backgroundDirectory = new URL('../public/assets/backgrounds/', import.meta.url);
     const expectedFileNames = getBackgroundFileNamesFromDirectory(backgroundDirectory);
 
-    expect(BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]).toEqual(expectedFileNames);
+    expect(BACKGROUND_FILE_NAMES).toEqual(expectedFileNames);
   });
 
-  it.each(SPRITE_SHEET_SETS)('uses a valid default $id background', (set) => {
-    expect(BACKGROUND_FILE_NAMES_BY_SPRITE_SET[set.id]).toContain(
-      DEFAULT_DEBUG_BACKGROUND_FILE_NAMES[set.id]
-    );
+  it('uses a valid default background', () => {
+    expect(BACKGROUND_FILE_NAMES).toContain(DEFAULT_DEBUG_BACKGROUND_FILE_NAME);
   });
 });

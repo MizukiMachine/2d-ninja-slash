@@ -7,11 +7,8 @@ import {
 } from '../game/profiles';
 import { SceneKeys } from '../game/sceneKeys';
 import {
-  BACKGROUND_FILE_NAMES_BY_SPRITE_SET,
-  DEBUG_SPRITE_SHEET_SET_OPTIONS,
-  isDebugBackgroundFileName,
-  isDebugSpriteSheetSet,
-  type DebugSpriteSheetSet
+  BACKGROUND_FILE_NAMES,
+  isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
@@ -48,12 +45,6 @@ function formatNumber(value: number): string {
 
 function formatVector(x: number, y: number): string {
   return `${formatNumber(x)}, ${formatNumber(y)}`;
-}
-
-function createSpriteSheetSetOptionsHtml(): string {
-  return DEBUG_SPRITE_SHEET_SET_OPTIONS.map(
-    (option) => `<option value="${option.id}">${option.label}</option>`
-  ).join('');
 }
 
 function formatBackgroundLabel(fileName: string): string {
@@ -134,12 +125,6 @@ export function createApp(root: HTMLDivElement | null): void {
       <button id="reset-actors" class="shell-button" type="button">Reset actors</button>
       <label class="toggle-row"><input id="show-world" type="checkbox" /> World bounds</label>
       <label class="toggle-row"><input id="enemy-chase" type="checkbox" /> Enemy chase</label>
-      <label class="select-row" for="sprite-sheet-set">
-        <span>Sprite set</span>
-        <select id="sprite-sheet-set">
-          ${createSpriteSheetSetOptionsHtml()}
-        </select>
-      </label>
       <label class="select-row" for="background-file">
         <span>Background</span>
         <select id="background-file"></select>
@@ -191,7 +176,6 @@ export function createApp(root: HTMLDivElement | null): void {
     HTMLInputElement
   );
   const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
-  const spriteSheetSetSelect = requireElement(debugControls, '#sprite-sheet-set', HTMLSelectElement);
   const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
   const sceneReadout = requireElement(debugControls, '#scene-readout', HTMLElement);
   const fpsReadout = requireElement(debugControls, '#fps-readout', HTMLElement);
@@ -213,16 +197,15 @@ export function createApp(root: HTMLDivElement | null): void {
     });
   };
 
-  const renderBackgroundFileOptions = (spriteSheetSet: DebugSpriteSheetSet): void => {
+  const renderBackgroundFileOptions = (): void => {
     backgroundFileSelect.replaceChildren(
-      ...BACKGROUND_FILE_NAMES_BY_SPRITE_SET[spriteSheetSet].map((fileName) => {
+      ...BACKGROUND_FILE_NAMES.map((fileName) => {
         const option = document.createElement('option');
         option.value = fileName;
         option.textContent = formatBackgroundLabel(fileName);
         return option;
       })
     );
-    backgroundFileSelect.dataset.spriteSheetSet = spriteSheetSet;
   };
 
   const mountGame = (): void => {
@@ -314,11 +297,7 @@ export function createApp(root: HTMLDivElement | null): void {
     showPointerProbeToggle.checked = state.showPointerProbe;
     showEnemyRangesToggle.checked = state.showEnemyRanges;
     enemyChaseToggle.checked = state.enemyChaseEnabled;
-    spriteSheetSetSelect.value = state.spriteSheetSet;
-    if (backgroundFileSelect.dataset.spriteSheetSet !== state.spriteSheetSet) {
-      renderBackgroundFileOptions(state.spriteSheetSet);
-    }
-    backgroundFileSelect.value = state.backgroundFileNames[state.spriteSheetSet];
+    backgroundFileSelect.value = state.backgroundFileName;
     fpsReadout.textContent = `${state.performance.fps.toFixed(1)} / ${state.performance.physicsBodies} bodies`;
     pointerReadout.textContent = `${state.pointer.x}, ${state.pointer.y} / ${state.pointer.worldX}, ${state.pointer.worldY} ${
       state.pointer.down ? 'down' : 'up'
@@ -342,6 +321,8 @@ export function createApp(root: HTMLDivElement | null): void {
         )} hits ${state.attack.hitCount}`
       : 'inactive';
   };
+
+  renderBackgroundFileOptions();
 
   const subscriptions: Unsubscribe[] = [
     debugStore.subscribe(renderDebug, { immediate: true })
@@ -413,17 +394,9 @@ export function createApp(root: HTMLDivElement | null): void {
     debugStore.setEnemyChaseEnabled(enemyChaseToggle.checked);
   });
 
-  spriteSheetSetSelect.addEventListener('change', () => {
-    if (isDebugSpriteSheetSet(spriteSheetSetSelect.value)) {
-      debugStore.setSpriteSheetSet(spriteSheetSetSelect.value);
-    }
-  });
-
   backgroundFileSelect.addEventListener('change', () => {
-    const spriteSheetSet = debugStore.get().spriteSheetSet;
-
-    if (isDebugBackgroundFileName(spriteSheetSet, backgroundFileSelect.value)) {
-      debugStore.setBackgroundFileName(spriteSheetSet, backgroundFileSelect.value);
+    if (isDebugBackgroundFileName(backgroundFileSelect.value)) {
+      debugStore.setBackgroundFileName(backgroundFileSelect.value);
     }
   });
 

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEBUG_BACKGROUND_FILE_NAMES } from '../src/game/assets/ninjaAssetCatalog';
 import { createDebugStore } from '../src/stores/debugStore';
 import { createSettingsStore, DEFAULT_SETTINGS } from '../src/stores/settingsStore';
 
@@ -73,8 +72,7 @@ describe('debugStore', () => {
     store.setShowPointerProbe(true);
     store.setShowEnemyRanges(true);
     store.setEnemyChaseEnabled(false);
-    store.setSpriteSheetSet('legacy');
-    store.setBackgroundFileName('legacy', 'three-lane-rough-snow-dojo.png');
+    store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
     store.requestActorReset();
     store.setPointer({ x: 12, y: 24, worldX: 120, worldY: 240, down: true });
     store.setInput({ left: true, lastKey: 'KeyA' });
@@ -102,11 +100,7 @@ describe('debugStore', () => {
       showPointerProbe: true,
       showEnemyRanges: true,
       enemyChaseEnabled: false,
-      spriteSheetSet: 'legacy',
-      backgroundFileNames: {
-        ...DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
-        legacy: 'three-lane-rough-snow-dojo.png'
-      },
+      backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
       actorResetRequestId: 1,
       pointer: {
         x: 12,
@@ -159,8 +153,7 @@ describe('debugStore', () => {
     store.setShowPointerProbe(true);
     store.setShowEnemyRanges(true);
     store.setEnemyChaseEnabled(false);
-    store.setSpriteSheetSet('legacy');
-    store.setBackgroundFileName('legacy', 'three-lane-rough-snow-dojo.png');
+    store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
     store.requestActorReset();
     store.setPlayer({ action: 'run', x: 100 });
     store.setPerformance({ fps: 60, physicsBodies: 2 });
@@ -177,11 +170,7 @@ describe('debugStore', () => {
       showPointerProbe: true,
       showEnemyRanges: true,
       enemyChaseEnabled: false,
-      spriteSheetSet: 'legacy',
-      backgroundFileNames: {
-        ...DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
-        legacy: 'three-lane-rough-snow-dojo.png'
-      },
+      backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
       actorResetRequestId: 1,
       player: {
         action: 'none',

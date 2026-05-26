@@ -2,14 +2,11 @@ import { readdirSync, statSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 
-const backgroundSpriteSheetSets = ['current', 'legacy'] as const;
 const debugBackgroundsModuleId = 'virtual:debug-backgrounds';
 const resolvedDebugBackgroundsModuleId = `\0${debugBackgroundsModuleId}`;
 
-type BackgroundSpriteSheetSet = (typeof backgroundSpriteSheetSets)[number];
-
-function getBackgroundDirectory(spriteSheetSet: BackgroundSpriteSheetSet): string {
-  return resolve(process.cwd(), 'public', 'assets', spriteSheetSet, 'backgrounds');
+function getBackgroundDirectory(): string {
+  return resolve(process.cwd(), 'public', 'assets', 'backgrounds');
 }
 
 function readPngFileNames(backgroundDirectory: string): readonly string[] {
@@ -23,68 +20,49 @@ function readPngFileNames(backgroundDirectory: string): readonly string[] {
 }
 
 function createBackgroundManifest(): {
-  readonly fileNamesBySpriteSet: Record<BackgroundSpriteSheetSet, readonly string[]>;
-  readonly urlsBySpriteSet: Record<BackgroundSpriteSheetSet, Readonly<Record<string, string>>>;
+  readonly fileNames: readonly string[];
+  readonly urls: Readonly<Record<string, string>>;
 } {
-  const fileNamesBySpriteSet = {} as Record<BackgroundSpriteSheetSet, readonly string[]>;
-  const urlsBySpriteSet = {} as Record<
-    BackgroundSpriteSheetSet,
-    Readonly<Record<string, string>>
-  >;
+  const backgroundDirectory = getBackgroundDirectory();
+  const fileNames = readPngFileNames(backgroundDirectory);
 
-  for (const spriteSheetSet of backgroundSpriteSheetSets) {
-    const backgroundUrlsByFileName: Record<string, string> = {};
-    const backgroundDirectory = getBackgroundDirectory(spriteSheetSet);
-    const fileNames = readPngFileNames(backgroundDirectory);
-
-    for (const fileName of fileNames) {
-      backgroundUrlsByFileName[fileName] = `/assets/${spriteSheetSet}/backgrounds/${fileName}`;
-    }
-
-    if (fileNames.length === 0) {
-      throw new Error(`No PNG backgrounds found in ${backgroundDirectory}`);
-    }
-
-    fileNamesBySpriteSet[spriteSheetSet] = fileNames;
-    urlsBySpriteSet[spriteSheetSet] = Object.fromEntries(
-      fileNames.map((fileName) => [fileName, backgroundUrlsByFileName[fileName]])
-    );
+  if (fileNames.length === 0) {
+    throw new Error(`No PNG backgrounds found in ${backgroundDirectory}`);
   }
 
-  return { fileNamesBySpriteSet, urlsBySpriteSet };
+  return {
+    fileNames,
+    urls: Object.fromEntries(
+      fileNames.map((fileName) => [fileName, `/assets/backgrounds/${fileName}`])
+    )
+  };
 }
 
 function createBackgroundManifestCode(): string {
   const manifest = createBackgroundManifest();
 
-  return `const backgroundFileNamesBySpriteSet = ${JSON.stringify(
-    manifest.fileNamesBySpriteSet,
+  return `const backgroundFileNames = ${JSON.stringify(
+    manifest.fileNames,
     null,
     2
   )};
-const backgroundUrlsBySpriteSet = ${JSON.stringify(manifest.urlsBySpriteSet, null, 2)};
+const backgroundUrls = ${JSON.stringify(manifest.urls, null, 2)};
 
-export const BACKGROUND_FILE_NAMES_BY_SPRITE_SET = backgroundFileNamesBySpriteSet;
-export const BACKGROUND_URLS_BY_SPRITE_SET = backgroundUrlsBySpriteSet;
+export const BACKGROUND_FILE_NAMES = backgroundFileNames;
+export const BACKGROUND_URLS = backgroundUrls;
 
-export const DEFAULT_DEBUG_BACKGROUND_FILE_NAMES = {
-  current: backgroundFileNamesBySpriteSet.current[0],
-  legacy: backgroundFileNamesBySpriteSet.legacy[0]
-};
+export const DEFAULT_DEBUG_BACKGROUND_FILE_NAME = backgroundFileNames[0];
 `;
 }
 
 function isBackgroundFilePath(filePath: string): boolean {
   const absoluteFilePath = resolve(filePath);
+  const backgroundDirectory = getBackgroundDirectory();
 
-  return backgroundSpriteSheetSets.some((spriteSheetSet) => {
-    const backgroundDirectory = getBackgroundDirectory(spriteSheetSet);
-
-    return (
-      absoluteFilePath.startsWith(`${backgroundDirectory}${sep}`) &&
-      absoluteFilePath.toLowerCase().endsWith('.png')
-    );
-  });
+  return (
+    absoluteFilePath.startsWith(`${backgroundDirectory}${sep}`) &&
+    absoluteFilePath.toLowerCase().endsWith('.png')
+  );
 }
 
 function debugBackgroundsPlugin(): Plugin {
@@ -105,7 +83,7 @@ function debugBackgroundsPlugin(): Plugin {
       return null;
     },
     configureServer(server) {
-      server.watcher.add(backgroundSpriteSheetSets.map(getBackgroundDirectory));
+      server.watcher.add(getBackgroundDirectory());
       server.watcher.on('all', (eventName, filePath) => {
         if (
           eventName !== 'add' &&

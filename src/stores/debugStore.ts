@@ -1,12 +1,8 @@
 import { createStore, type WritableStore } from './store';
 import {
-  DEFAULT_DEBUG_BACKGROUND_FILE_NAMES,
-  type DebugBackgroundFileName,
-  type DebugBackgroundFileNamesBySpriteSet,
-  type DebugSpriteSheetSet
+  DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
+  type DebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
-
-export const DEFAULT_DEBUG_SPRITE_SHEET_SET: DebugSpriteSheetSet = 'current';
 
 export interface DebugPointerState {
   readonly x: number;
@@ -64,8 +60,7 @@ export interface DebugState {
   readonly showPointerProbe: boolean;
   readonly showEnemyRanges: boolean;
   readonly enemyChaseEnabled: boolean;
-  readonly spriteSheetSet: DebugSpriteSheetSet;
-  readonly backgroundFileNames: DebugBackgroundFileNamesBySpriteSet;
+  readonly backgroundFileName: DebugBackgroundFileName;
   readonly actorResetRequestId: number;
   readonly pointer: DebugPointerState;
   readonly input: DebugInputState;
@@ -89,11 +84,7 @@ export interface DebugStore extends WritableStore<DebugState> {
   setShowEnemyRanges(showEnemyRanges: boolean): void;
   setEnemyChaseEnabled(enemyChaseEnabled: boolean): void;
   toggleEnemyChase(): void;
-  setSpriteSheetSet(spriteSheetSet: DebugSpriteSheetSet): void;
-  setBackgroundFileName(
-    spriteSheetSet: DebugSpriteSheetSet,
-    backgroundFileName: DebugBackgroundFileName
-  ): void;
+  setBackgroundFileName(backgroundFileName: DebugBackgroundFileName): void;
   requestActorReset(): void;
   setPointer(pointer: Partial<DebugPointerState>): void;
   setInput(input: Partial<DebugInputState>): void;
@@ -132,8 +123,7 @@ function createInitialDebugState(): DebugState {
     showPointerProbe: false,
     showEnemyRanges: false,
     enemyChaseEnabled: true,
-    spriteSheetSet: DEFAULT_DEBUG_SPRITE_SHEET_SET,
-    backgroundFileNames: { ...DEFAULT_DEBUG_BACKGROUND_FILE_NAMES },
+    backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
     actorResetRequestId: 0,
     pointer: {
       x: 0,
@@ -211,17 +201,8 @@ export function createDebugStore(): DebugStore {
     toggleEnemyChase: () => {
       store.update((state) => ({ ...state, enemyChaseEnabled: !state.enemyChaseEnabled }));
     },
-    setSpriteSheetSet: (spriteSheetSet) => {
-      store.update((state) => ({ ...state, spriteSheetSet }));
-    },
-    setBackgroundFileName: (spriteSheetSet, backgroundFileName) => {
-      store.update((state) => ({
-        ...state,
-        backgroundFileNames: {
-          ...state.backgroundFileNames,
-          [spriteSheetSet]: backgroundFileName
-        }
-      }));
+    setBackgroundFileName: (backgroundFileName) => {
+      store.update((state) => ({ ...state, backgroundFileName }));
     },
     requestActorReset: () => {
       store.update((state) => ({
@@ -264,8 +245,7 @@ export function createDebugStore(): DebugStore {
         showPointerProbe: current.showPointerProbe,
         showEnemyRanges: current.showEnemyRanges,
         enemyChaseEnabled: current.enemyChaseEnabled,
-        spriteSheetSet: current.spriteSheetSet,
-        backgroundFileNames: current.backgroundFileNames,
+        backgroundFileName: current.backgroundFileName,
         actorResetRequestId: current.actorResetRequestId
       });
     }

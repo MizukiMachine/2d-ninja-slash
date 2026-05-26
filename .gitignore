@@ -1,10 +1,10 @@
 /old/
 public/assets/*
 !public/assets/
-!public/assets/current/
-!public/assets/current/**
-!public/assets/legacy/
-!public/assets/legacy/**
+!public/assets/actors/
+!public/assets/actors/**
+!public/assets/backgrounds/
+!public/assets/backgrounds/**
 
 node_modules/
 .vite/
