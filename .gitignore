@@ -11,4 +11,5 @@ public/assets/*
 
 node_modules/
 .vite/
+dist/
 npm-debug.log*
