@@ -1,0 +1,2048 @@
+{
+  "version": 1,
+  "savedAt": "2026-05-26T16:48:57.965Z",
+  "boundsByActor": {
+    "mainNinja": {
+      "left": {
+        "attack": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "crouching": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "death": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 74,
+            "y": 140,
+            "width": 95,
+            "height": 41
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "idle": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "impact": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 59,
+            "height": 90
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "jump": {
+          "visual": {
+            "x": 92,
+            "y": 57,
+            "width": 63,
+            "height": 125
+          },
+          "collision": {
+            "x": 92,
+            "y": 63,
+            "width": 58,
+            "height": 118
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "run": {
+          "visual": {
+            "x": 94,
+            "y": 85,
+            "width": 68,
+            "height": 104
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 65,
+            "height": 99
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "slash": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 14,
+            "y": 106,
+            "width": 80,
+            "height": 54
+          }
+        },
+        "slash2": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 100
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 94
+          },
+          "attack": {
+            "x": 35,
+            "y": 118,
+            "width": 171,
+            "height": 24
+          }
+        },
+        "slash3": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "walk": {
+          "visual": {
+            "x": 92,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 99,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 26,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        }
+      },
+      "right": {
+        "attack": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "crouching": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "death": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 87,
+            "y": 140,
+            "width": 95,
+            "height": 41
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "idle": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "impact": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 98,
+            "y": 91,
+            "width": 59,
+            "height": 90
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "jump": {
+          "visual": {
+            "x": 101,
+            "y": 57,
+            "width": 63,
+            "height": 125
+          },
+          "collision": {
+            "x": 106,
+            "y": 63,
+            "width": 58,
+            "height": 118
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "run": {
+          "visual": {
+            "x": 94,
+            "y": 85,
+            "width": 68,
+            "height": 104
+          },
+          "collision": {
+            "x": 92,
+            "y": 91,
+            "width": 65,
+            "height": 99
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "slash": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 162,
+            "y": 109,
+            "width": 80,
+            "height": 24
+          }
+        },
+        "slash2": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 100
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 94
+          },
+          "attack": {
+            "x": 69,
+            "y": 115,
+            "width": 152,
+            "height": 27
+          }
+        },
+        "slash3": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        },
+        "walk": {
+          "visual": {
+            "x": 96,
+            "y": 87,
+            "width": 68,
+            "height": 95
+          },
+          "collision": {
+            "x": 106,
+            "y": 91,
+            "width": 51,
+            "height": 90
+          },
+          "attack": {
+            "x": 160,
+            "y": 118,
+            "width": 70,
+            "height": 24
+          }
+        }
+      }
+    },
+    "enemyNinja": {
+      "left": {
+        "crouching": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 91,
+            "y": 86,
+            "width": 67,
+            "height": 96
+          },
+          "attack": {
+            "x": 45,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        },
+        "death": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 74,
+            "y": 112,
+            "width": 119,
+            "height": 74
+          },
+          "attack": {
+            "x": 45,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        },
+        "idle": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 91,
+            "y": 86,
+            "width": 67,
+            "height": 96
+          },
+          "attack": {
+            "x": 45,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        },
+        "jump": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 92,
+            "y": 65,
+            "width": 67,
+            "height": 100
+          },
+          "attack": {
+            "x": 45,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        },
+        "run": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 91,
+            "y": 86,
+            "width": 67,
+            "height": 96
+          },
+          "attack": {
+            "x": 45,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        },
+        "slash": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 91,
+            "y": 86,
+            "width": 67,
+            "height": 96
+          },
+          "attack": {
+            "x": 15,
+            "y": 102,
+            "width": 88,
+            "height": 42
+          }
+        },
+        "walk": {
+          "visual": {
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 91,
+            "y": 86,
+            "width": 67,
+            "height": 96
+          },
+          "attack": {
+            "x": 45,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        }
+      },
+      "right": {
+        "crouching": {
+          "visual": {
+            "x": 54,
+            "y": 34,
+            "width": 150,
+            "height": 204
+          },
+          "collision": {
+            "x": 95,
+            "y": 163,
+            "width": 67,
+            "height": 74
+          },
+          "attack": {
+            "x": 154,
+            "y": 156,
+            "width": 58,
+            "height": 22
+          }
+        },
+        "death": {
+          "visual": {
+            "x": 38,
+            "y": 42,
+            "width": 180,
+            "height": 194
+          },
+          "collision": {
+            "x": 63,
+            "y": 112,
+            "width": 119,
+            "height": 74
+          },
+          "attack": {
+            "x": 154,
+            "y": 156,
+            "width": 58,
+            "height": 22
+          }
+        },
+        "idle": {
+          "visual": {
+            "x": 95,
+            "y": 86,
+            "width": 67,
+            "height": 97
+          },
+          "collision": {
+            "x": 98,
+            "y": 86,
+            "width": 67,
+            "height": 96
+          },
+          "attack": {
+            "x": 153,
+            "y": 115,
+            "width": 58,
+            "height": 19
+          }
+        },
+        "jump": {
+          "visual": {
+            "x": 54,
+            "y": 34,
+            "width": 150,
+            "height": 204
+          },
+          "collision": {
+            "x": 97,
+            "y": 65,
+            "width": 67,
+            "height": 100
+          },
+          "attack": {
+            "x": 154,
+            "y": 156,
+            "width": 58,
+            "height": 22
+          }
+        },
+        "run": {
+          "visual": {
+            "x": 54,
+            "y": 34,
+            "width": 150,
+            "height": 204
+          },
+          "collision": {
+            "x": 95,
+            "y": 163,
+            "width": 67,
+            "height": 74
+          },
+          "attack": {
+            "x": 154,
+            "y": 156,
+            "width": 58,
+            "height": 22
+          }
+        },
+        "slash": {
+          "visual": {
+            "x": 54,
+            "y": 34,
+            "width": 150,
+            "height": 204
+          },
+          "collision": {
+            "x": 95,
+            "y": 163,
+            "width": 67,
+            "height": 74
+          },
+          "attack": {
+            "x": 156,
+            "y": 92,
+            "width": 88,
+            "height": 42
+          }
+        },
+        "walk": {
+          "visual": {
+            "x": 54,
+            "y": 34,
+            "width": 150,
+            "height": 204
+          },
+          "collision": {
+            "x": 95,
+            "y": 163,
+            "width": 67,
+            "height": 74
+          },
+          "attack": {
+            "x": 154,
+            "y": 156,
+            "width": 58,
+            "height": 22
+          }
+        }
+      }
+    }
+  },
+  "hitFramesByActor": {
+    "mainNinja": {
+      "left": {
+        "attack": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "crouching": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "death": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "idle": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "impact": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "jump": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "run": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash2": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash3": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "walk": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      },
+      "right": {
+        "attack": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "crouching": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "death": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "idle": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "impact": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "jump": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "run": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash2": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash3": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "walk": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      }
+    },
+    "enemyNinja": {
+      "left": {
+        "crouching": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "death": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "idle": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "jump": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "run": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "walk": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      },
+      "right": {
+        "crouching": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "death": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "idle": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "jump": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "run": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "slash": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            true,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        "walk": {
+          "attack": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      }
+    }
+  }
+}

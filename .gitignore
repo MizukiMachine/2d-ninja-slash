@@ -6,7 +6,10 @@ public/assets/*
 !public/assets/actors/**
 !public/assets/backgrounds/
 !public/assets/backgrounds/**
+!public/assets/config/
+!public/assets/config/**
 
 node_modules/
 .vite/
+dist/
 npm-debug.log*

@@ -6,6 +6,12 @@ import {
   getDebugBackgroundUrl,
   type DebugBackgroundFileName
 } from '../assets/ninjaAssetCatalog';
+import {
+  DEFAULT_NINJA_COLLISION_RECT,
+  getNinjaAnimationBounds,
+  isNinjaHitFrameActive,
+  type NinjaRect
+} from '../ninjaBounds';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'slash2' | 'slash3' | 'impact';
@@ -48,20 +54,6 @@ interface MovementInput {
   readonly y: number;
 }
 
-interface NinjaBodyConfig {
-  readonly width: number;
-  readonly height: number;
-  readonly offsetX: number;
-  readonly offsetY: number;
-}
-
-interface AttackHitBoxConfig {
-  readonly width: number;
-  readonly height: number;
-  readonly frontOffset: number;
-  readonly yOffset: number;
-}
-
 const NINJA_ACTOR_ROOT_URL = '/assets/actors';
 const NINJA_FRAME_SIZE = 256;
 const NINJA_REFERENCE_FRAME_SIZE = 216;
@@ -70,54 +62,17 @@ const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
 const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
-const NINJA_SPEED = 260;
-const ENEMY_NINJA_SPEED = NINJA_SPEED;
-const ENEMY_ATTACK_RANGE = 112;
-const ENEMY_ATTACK_RECOVERY_MS = 900;
-const PLAYER_DAMAGE_KNOCKBACK_SPEED = 360;
-const ATTACK3_FORWARD_SPEED = 90;
 const PLAYER_DEPTH = 10;
 const ENEMY_DEPTH = 9;
 const ACTOR_SHADOW_DEPTH = 8;
-const PLAYER_ATTACK_HIT_BOXES: Record<PlayerAttackAction, AttackHitBoxConfig> = {
-  slash: {
-    width: 108,
-    height: 34,
-    frontOffset: 48,
-    yOffset: -148
-  },
-  slash2: {
-    width: 132,
-    height: 36,
-    frontOffset: 48,
-    yOffset: -150
-  },
-  slash3: {
-    width: 156,
-    height: 38,
-    frontOffset: 50,
-    yOffset: -150
-  }
-};
-const ENEMY_ATTACK_HIT_BOX: AttackHitBoxConfig = {
-  width: 112,
-  height: 34,
-  frontOffset: 46,
-  yOffset: -144
-};
-// Phaser AnimationFrame.index is 1-based.
-const MAIN_NINJA_ATTACK_REACH_FRAMES = [14, 15] as const;
-const ENEMY_NINJA_ATTACK_REACH_FRAMES = [16, 17] as const;
 
 const NINJA_SCALE = NINJA_TARGET_SCALE * (NINJA_REFERENCE_FRAME_SIZE / NINJA_FRAME_SIZE);
-const NINJA_BODY: NinjaBodyConfig = {
-  width: 67,
-  height: 74,
-  offsetX: 95,
-  offsetY: 163
-};
-const NINJA_SHADOW_WIDTH = Math.round(NINJA_BODY.width * NINJA_SCALE * 1.3);
-const NINJA_SHADOW_HEIGHT = Math.round(NINJA_BODY.height * NINJA_SCALE * 0.24);
+const NINJA_SHADOW_WIDTH = Math.round(
+  DEFAULT_NINJA_COLLISION_RECT.width * NINJA_SCALE * 1.3
+);
+const NINJA_SHADOW_HEIGHT = Math.round(
+  DEFAULT_NINJA_COLLISION_RECT.height * NINJA_SCALE * 0.24
+);
 // Idle and run frames keep transparent padding below the feet.
 const NINJA_SHADOW_SOURCE_BOTTOM_PADDING = 72;
 const NINJA_SHADOW_Y_OFFSET = -Math.round(
@@ -383,10 +338,9 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5, 1)
       .setScale(NINJA_SCALE)
       .setCollideWorldBounds(true)
-      .setBodySize(NINJA_BODY.width, NINJA_BODY.height, false)
-      .setOffset(NINJA_BODY.offsetX, NINJA_BODY.offsetY)
       .setDepth(PLAYER_DEPTH)
       .play(getMainNinjaAnimationKey('idle', 'right'));
+    this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
     this.playerShadow = this.createActorShadow();
 
@@ -400,10 +354,9 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5, 1)
       .setScale(NINJA_SCALE)
       .setCollideWorldBounds(true)
-      .setBodySize(NINJA_BODY.width, NINJA_BODY.height, false)
-      .setOffset(NINJA_BODY.offsetX, NINJA_BODY.offsetY)
       .setDepth(ENEMY_DEPTH)
       .play(getEnemyNinjaAnimationKey('idle', 'left'));
+    this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
 
     this.enemyShadow = this.createActorShadow();
     this.syncActorShadows();
@@ -456,8 +409,8 @@ export class SandboxScene extends BaseScene {
 
     if (this.currentAction === 'hurt') {
       this.player.setVelocity(
-        this.damageKnockbackVector.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
-        this.damageKnockbackVector.y * PLAYER_DAMAGE_KNOCKBACK_SPEED
+        this.damageKnockbackVector.x * this.debug.get().gameplayTuning.playerKnockbackSpeed,
+        this.damageKnockbackVector.y * this.debug.get().gameplayTuning.playerKnockbackSpeed
       );
       this.finishDebugFrame(time);
       return;
@@ -535,6 +488,49 @@ export class SandboxScene extends BaseScene {
       .setPosition(actor.x, actor.y + NINJA_SHADOW_Y_OFFSET)
       .setAlpha(actor.alpha)
       .setVisible(actor.visible);
+  }
+
+  private syncActorCollisionBounds(): void {
+    this.applyActorCollisionBounds(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
+    this.applyActorCollisionBounds(
+      this.enemy,
+      'enemyNinja',
+      this.enemyFacingDirection,
+      this.getEnemyBoundsAction()
+    );
+  }
+
+  private applyActorCollisionBounds(
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    actorId: 'mainNinja' | 'enemyNinja',
+    direction: FacingDirection,
+    action: string
+  ): void {
+    if (actor === null) {
+      return;
+    }
+
+    const bounds = getNinjaAnimationBounds(
+      this.app.getNinjaBoundsConfig(),
+      actorId,
+      direction,
+      action
+    ).collision;
+
+    actor.setBodySize(bounds.width, bounds.height, false).setOffset(bounds.x, bounds.y);
+  }
+
+  private getPlayerBoundsAction(): MainNinjaAction {
+    return this.currentAction === 'hurt' ? 'impact' : this.currentAction;
+  }
+
+  private getEnemyBoundsAction(): EnemyNinjaAction {
+    return this.enemyAction === 'slash' ? 'slash' : this.enemyAction === 'run' ? 'run' : 'idle';
   }
 
   private queueAssets(backgroundFileName: DebugBackgroundFileName): boolean {
@@ -857,7 +853,8 @@ export class SandboxScene extends BaseScene {
 
     this.forwardVector.copy(direction);
     this.updateFacingFromVector(direction);
-    this.player.setVelocity(direction.x * NINJA_SPEED, direction.y * NINJA_SPEED);
+    const playerSpeed = this.debug.get().gameplayTuning.playerSpeed;
+    this.player.setVelocity(direction.x * playerSpeed, direction.y * playerSpeed);
     this.playNinjaAnimation('run');
   }
 
@@ -909,7 +906,9 @@ export class SandboxScene extends BaseScene {
       return 0;
     }
 
-    return this.facingDirection === 'left' ? -ATTACK3_FORWARD_SPEED : ATTACK3_FORWARD_SPEED;
+    const attackSpeed = this.debug.get().gameplayTuning.attack3ForwardSpeed;
+
+    return this.facingDirection === 'left' ? -attackSpeed : attackSpeed;
   }
 
   private startJump(): void {
@@ -980,7 +979,7 @@ export class SandboxScene extends BaseScene {
     );
     const distanceToPlayer = toPlayer.length();
 
-    if (distanceToPlayer <= ENEMY_ATTACK_RANGE) {
+    if (distanceToPlayer <= this.debug.get().gameplayTuning.enemyAttackRange) {
       this.startEnemyAttack();
       return;
     }
@@ -993,7 +992,8 @@ export class SandboxScene extends BaseScene {
 
     toPlayer.normalize();
     this.updateEnemyFacingFromVector(toPlayer);
-    this.enemy.setVelocity(toPlayer.x * ENEMY_NINJA_SPEED, toPlayer.y * ENEMY_NINJA_SPEED);
+    const enemySpeed = this.debug.get().gameplayTuning.enemySpeed;
+    this.enemy.setVelocity(toPlayer.x * enemySpeed, toPlayer.y * enemySpeed);
     this.playEnemyAnimation('run');
   }
 
@@ -1018,7 +1018,7 @@ export class SandboxScene extends BaseScene {
     }
 
     this.enemyAction = 'recover';
-    this.enemyRecoveryUntil = this.time.now + ENEMY_ATTACK_RECOVERY_MS;
+    this.enemyRecoveryUntil = this.time.now + this.debug.get().gameplayTuning.enemyRecoveryMs;
     this.enemyAttackDamageDealt = false;
     this.clearEnemyAttackHitArea();
     this.enemy.setVelocity(0, 0);
@@ -1065,14 +1065,16 @@ export class SandboxScene extends BaseScene {
       this.enemy.y - this.player.y
     );
     this.updateFacingFromVector(towardEnemy);
+    const knockbackSpeed = this.debug.get().gameplayTuning.playerKnockbackSpeed;
     this.player.setVelocity(
-      knockbackDirection.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
-      knockbackDirection.y * PLAYER_DAMAGE_KNOCKBACK_SPEED
+      knockbackDirection.x * knockbackSpeed,
+      knockbackDirection.y * knockbackSpeed
     );
     this.player.play(
       getMainNinjaAnimationKey('impact', this.facingDirection),
       false
     );
+    this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'impact');
   }
 
   private updateFacingFromVector(vector: Phaser.Math.Vector2): void {
@@ -1099,6 +1101,7 @@ export class SandboxScene extends BaseScene {
 
     this.currentAction = action;
     this.player.play(animationKey, !restart);
+    this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, action);
   }
 
   private updateEnemyFacingFromVector(vector: Phaser.Math.Vector2): void {
@@ -1128,6 +1131,7 @@ export class SandboxScene extends BaseScene {
     }
 
     this.enemy.play(animationKey, !restart);
+    this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, action);
   }
 
   private updateAttackHitArea(action: PlayerAttackAction): void {
@@ -1143,8 +1147,12 @@ export class SandboxScene extends BaseScene {
     this.setAttackHitArea(
       this.attackHitArea,
       this.player,
-      this.facingDirection,
-      PLAYER_ATTACK_HIT_BOXES[action]
+      getNinjaAnimationBounds(
+        this.app.getNinjaBoundsConfig(),
+        'mainNinja',
+        this.facingDirection,
+        action
+      ).attack
     );
     this.attackHitCount = this.getHitCountInArea(this.attackHitArea, this.player);
   }
@@ -1157,8 +1165,12 @@ export class SandboxScene extends BaseScene {
     this.setAttackHitArea(
       this.enemyAttackHitArea,
       this.enemy,
-      this.enemyFacingDirection,
-      ENEMY_ATTACK_HIT_BOX
+      getNinjaAnimationBounds(
+        this.app.getNinjaBoundsConfig(),
+        'enemyNinja',
+        this.enemyFacingDirection,
+        'slash'
+      ).attack
     );
     this.enemyAttackHitCount = this.getHitCountInArea(this.enemyAttackHitArea, this.enemy);
   }
@@ -1166,17 +1178,18 @@ export class SandboxScene extends BaseScene {
   private setAttackHitArea(
     hitArea: Phaser.Geom.Rectangle,
     actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
-    facingDirection: FacingDirection,
-    config: AttackHitBoxConfig
+    rect: NinjaRect
   ): void {
-    const direction = facingDirection === 'left' ? -1 : 1;
-    const x =
-      direction > 0
-        ? actor.x + config.frontOffset
-        : actor.x - config.frontOffset - config.width;
-    const y = actor.y + config.yOffset - config.height / 2;
+    const scale = actor.scaleX;
+    const frameLeft = actor.x - (NINJA_FRAME_SIZE / 2) * scale;
+    const frameTop = actor.y - NINJA_FRAME_SIZE * scale;
 
-    hitArea.setTo(x, y, config.width, config.height);
+    hitArea.setTo(
+      frameLeft + rect.x * scale,
+      frameTop + rect.y * scale,
+      rect.width * scale,
+      rect.height * scale
+    );
   }
 
   private getHitCountInArea(
@@ -1206,11 +1219,21 @@ export class SandboxScene extends BaseScene {
     return sprite?.anims.currentFrame?.index ?? 0;
   }
 
+  private getAnimationFrameZeroIndex(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
+  ): number {
+    return Math.max(0, this.getAnimationFrameIndex(sprite) - 1);
+  }
+
   private isPlayerAttackReachFrame(): boolean {
     return (
       isPlayerAttackAction(this.currentAction) &&
-      MAIN_NINJA_ATTACK_REACH_FRAMES.some(
-        (frameIndex) => frameIndex === this.getAnimationFrameIndex(this.player)
+      isNinjaHitFrameActive(
+        this.app.getNinjaBoundsConfig(),
+        'mainNinja',
+        this.facingDirection,
+        this.currentAction,
+        this.getAnimationFrameZeroIndex(this.player)
       )
     );
   }
@@ -1218,8 +1241,12 @@ export class SandboxScene extends BaseScene {
   private isEnemyAttackReachFrame(): boolean {
     return (
       this.enemyAction === 'slash' &&
-      ENEMY_NINJA_ATTACK_REACH_FRAMES.some(
-        (frameIndex) => frameIndex === this.getAnimationFrameIndex(this.enemy)
+      isNinjaHitFrameActive(
+        this.app.getNinjaBoundsConfig(),
+        'enemyNinja',
+        this.enemyFacingDirection,
+        'slash',
+        this.getAnimationFrameZeroIndex(this.enemy)
       )
     );
   }
@@ -1281,16 +1308,19 @@ export class SandboxScene extends BaseScene {
       .setPosition(this.centerX, this.centerY + 108)
       .setVelocity(0, 0)
       .play(getMainNinjaAnimationKey('idle', 'right'), false);
+    this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
     this.enemy
       .setPosition(this.getDefaultEnemyX(), this.centerY + 108)
       .setVelocity(0, 0)
       .play(getEnemyNinjaAnimationKey('idle', 'left'), false);
+    this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
 
     this.finishDebugFrame(this.time.now, true);
   }
 
   private finishDebugFrame(time: number, forceTelemetry = false): void {
+    this.syncActorCollisionBounds();
     this.syncActorShadows();
     this.publishDebugTelemetry(time, forceTelemetry);
     this.renderDebugOverlays();
@@ -1382,12 +1412,24 @@ export class SandboxScene extends BaseScene {
 
     if (state.showEnemyRanges && this.enemy !== null) {
       graphic.lineStyle(2, 0xff8a65, 0.64);
-      graphic.strokeCircle(this.enemy.x, this.enemy.y, ENEMY_ATTACK_RANGE);
+      graphic.strokeCircle(this.enemy.x, this.enemy.y, state.gameplayTuning.enemyAttackRange);
     }
 
     if (state.showVisualBounds) {
-      this.renderVisualBounds(this.player, 0x8fffad);
-      this.renderVisualBounds(this.enemy, 0xff91d0);
+      this.renderVisualBounds(
+        this.player,
+        'mainNinja',
+        this.facingDirection,
+        this.getPlayerBoundsAction(),
+        0x8fffad
+      );
+      this.renderVisualBounds(
+        this.enemy,
+        'enemyNinja',
+        this.enemyFacingDirection,
+        this.getEnemyBoundsAction(),
+        0xff91d0
+      );
     }
 
     if (state.showHitBoxes) {
@@ -1422,15 +1464,44 @@ export class SandboxScene extends BaseScene {
 
   private renderVisualBounds(
     sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    actorId: 'mainNinja' | 'enemyNinja',
+    direction: FacingDirection,
+    action: string,
     color: number
   ): void {
     if (sprite === null || this.debugOverlayGraphic === null) {
       return;
     }
 
-    const bounds = sprite.getBounds(this.visualBoundsRect);
+    const bounds = this.getWorldRectFromFrameRect(
+      sprite,
+      getNinjaAnimationBounds(
+        this.app.getNinjaBoundsConfig(),
+        actorId,
+        direction,
+        action
+      ).visual,
+      this.visualBoundsRect
+    );
     this.debugOverlayGraphic.lineStyle(2, color, 0.78);
     this.debugOverlayGraphic.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  }
+
+  private getWorldRectFromFrameRect(
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    rect: NinjaRect,
+    out: Phaser.Geom.Rectangle
+  ): Phaser.Geom.Rectangle {
+    const scale = actor.scaleX;
+    const frameLeft = actor.x - (NINJA_FRAME_SIZE / 2) * scale;
+    const frameTop = actor.y - NINJA_FRAME_SIZE * scale;
+
+    return out.setTo(
+      frameLeft + rect.x * scale,
+      frameTop + rect.y * scale,
+      rect.width * scale,
+      rect.height * scale
+    );
   }
 
   private renderAttackHitBox(

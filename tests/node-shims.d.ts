@@ -7,10 +7,12 @@ interface TestPngBuffer {
 
 declare module 'node:fs' {
   export function readFileSync(path: URL): TestPngBuffer;
+  export function mkdirSync(path: string, options?: { recursive?: boolean }): void;
   export function readdirSync(path: string | URL): string[];
   export function statSync(path: string): {
     isFile(): boolean;
   };
+  export function writeFileSync(path: string, data: string): void;
 }
 
 declare module 'node:path' {

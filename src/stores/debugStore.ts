@@ -3,6 +3,20 @@ import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
   type DebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
+import {
+  DEFAULT_BACKGROUND_LAB_SETTINGS,
+  DEFAULT_BASELINE_LAB_SETTINGS,
+  DEFAULT_ELEMENT_EDITOR_SETTINGS,
+  DEFAULT_GAMEPLAY_TUNING,
+  DEFAULT_LEVEL_PROGRESS,
+  DEFAULT_RUNNER_SETTINGS,
+  type BackgroundLabSettings,
+  type BaselineLabSettings,
+  type ElementEditorSettings,
+  type GameplayTuning,
+  type LevelProgressState,
+  type RunnerGenerationSettings
+} from '../game/debugFeatures';
 
 export interface DebugPointerState {
   readonly x: number;
@@ -61,6 +75,12 @@ export interface DebugState {
   readonly showEnemyRanges: boolean;
   readonly enemyChaseEnabled: boolean;
   readonly backgroundFileName: DebugBackgroundFileName;
+  readonly gameplayTuning: GameplayTuning;
+  readonly levelProgress: LevelProgressState;
+  readonly runnerGeneration: RunnerGenerationSettings;
+  readonly baselineLab: BaselineLabSettings;
+  readonly backgroundLab: BackgroundLabSettings;
+  readonly elementEditor: ElementEditorSettings;
   readonly actorResetRequestId: number;
   readonly pointer: DebugPointerState;
   readonly input: DebugInputState;
@@ -85,6 +105,12 @@ export interface DebugStore extends WritableStore<DebugState> {
   setEnemyChaseEnabled(enemyChaseEnabled: boolean): void;
   toggleEnemyChase(): void;
   setBackgroundFileName(backgroundFileName: DebugBackgroundFileName): void;
+  setGameplayTuning(gameplayTuning: GameplayTuning): void;
+  setLevelProgress(levelProgress: LevelProgressState): void;
+  setRunnerGeneration(runnerGeneration: RunnerGenerationSettings): void;
+  setBaselineLab(baselineLab: BaselineLabSettings): void;
+  setBackgroundLab(backgroundLab: BackgroundLabSettings): void;
+  setElementEditor(elementEditor: ElementEditorSettings): void;
   requestActorReset(): void;
   setPointer(pointer: Partial<DebugPointerState>): void;
   setInput(input: Partial<DebugInputState>): void;
@@ -124,6 +150,12 @@ function createInitialDebugState(): DebugState {
     showEnemyRanges: false,
     enemyChaseEnabled: true,
     backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
+    gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
+    levelProgress: DEFAULT_LEVEL_PROGRESS,
+    runnerGeneration: DEFAULT_RUNNER_SETTINGS,
+    baselineLab: DEFAULT_BASELINE_LAB_SETTINGS,
+    backgroundLab: DEFAULT_BACKGROUND_LAB_SETTINGS,
+    elementEditor: DEFAULT_ELEMENT_EDITOR_SETTINGS,
     actorResetRequestId: 0,
     pointer: {
       x: 0,
@@ -204,6 +236,24 @@ export function createDebugStore(): DebugStore {
     setBackgroundFileName: (backgroundFileName) => {
       store.update((state) => ({ ...state, backgroundFileName }));
     },
+    setGameplayTuning: (gameplayTuning) => {
+      store.update((state) => ({ ...state, gameplayTuning }));
+    },
+    setLevelProgress: (levelProgress) => {
+      store.update((state) => ({ ...state, levelProgress }));
+    },
+    setRunnerGeneration: (runnerGeneration) => {
+      store.update((state) => ({ ...state, runnerGeneration }));
+    },
+    setBaselineLab: (baselineLab) => {
+      store.update((state) => ({ ...state, baselineLab }));
+    },
+    setBackgroundLab: (backgroundLab) => {
+      store.update((state) => ({ ...state, backgroundLab }));
+    },
+    setElementEditor: (elementEditor) => {
+      store.update((state) => ({ ...state, elementEditor }));
+    },
     requestActorReset: () => {
       store.update((state) => ({
         ...state,
@@ -246,6 +296,12 @@ export function createDebugStore(): DebugStore {
         showEnemyRanges: current.showEnemyRanges,
         enemyChaseEnabled: current.enemyChaseEnabled,
         backgroundFileName: current.backgroundFileName,
+        gameplayTuning: current.gameplayTuning,
+        levelProgress: current.levelProgress,
+        runnerGeneration: current.runnerGeneration,
+        baselineLab: current.baselineLab,
+        backgroundLab: current.backgroundLab,
+        elementEditor: current.elementEditor,
         actorResetRequestId: current.actorResetRequestId
       });
     }
