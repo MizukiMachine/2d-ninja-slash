@@ -76,6 +76,9 @@ const ENEMY_ATTACK_RANGE = 112;
 const ENEMY_ATTACK_RECOVERY_MS = 900;
 const PLAYER_DAMAGE_KNOCKBACK_SPEED = 360;
 const ATTACK3_FORWARD_SPEED = 90;
+const PLAYER_DEPTH = 10;
+const ENEMY_DEPTH = 9;
+const ACTOR_SHADOW_DEPTH = 8;
 const PLAYER_ATTACK_HIT_BOXES: Record<PlayerAttackAction, AttackHitBoxConfig> = {
   slash: {
     width: 108,
@@ -113,6 +116,15 @@ const NINJA_BODY: NinjaBodyConfig = {
   offsetX: 95,
   offsetY: 163
 };
+const NINJA_SHADOW_WIDTH = Math.round(NINJA_BODY.width * NINJA_SCALE * 1.3);
+const NINJA_SHADOW_HEIGHT = Math.round(NINJA_BODY.height * NINJA_SCALE * 0.24);
+// Idle and run frames keep transparent padding below the feet.
+const NINJA_SHADOW_SOURCE_BOTTOM_PADDING = 72;
+const NINJA_SHADOW_Y_OFFSET = -Math.round(
+  NINJA_SHADOW_SOURCE_BOTTOM_PADDING * NINJA_SCALE - NINJA_SHADOW_HEIGHT * 0.35
+);
+const NINJA_SHADOW_COLOR = 0x03050a;
+const NINJA_SHADOW_ALPHA = 0.32;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -317,6 +329,8 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
 export class SandboxScene extends BaseScene {
   private player: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
   private enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
+  private playerShadow: Phaser.GameObjects.Ellipse | null = null;
+  private enemyShadow: Phaser.GameObjects.Ellipse | null = null;
   private moveKeys: MoveKeys | null = null;
   private background: Phaser.GameObjects.Image | null = null;
   private debugOverlayGraphic: Phaser.GameObjects.Graphics | null = null;
@@ -371,8 +385,10 @@ export class SandboxScene extends BaseScene {
       .setCollideWorldBounds(true)
       .setBodySize(NINJA_BODY.width, NINJA_BODY.height, false)
       .setOffset(NINJA_BODY.offsetX, NINJA_BODY.offsetY)
-      .setDepth(10)
+      .setDepth(PLAYER_DEPTH)
       .play(getMainNinjaAnimationKey('idle', 'right'));
+
+    this.playerShadow = this.createActorShadow();
 
     this.enemy = this.physics.add.sprite(
       this.getDefaultEnemyX(),
@@ -386,8 +402,11 @@ export class SandboxScene extends BaseScene {
       .setCollideWorldBounds(true)
       .setBodySize(NINJA_BODY.width, NINJA_BODY.height, false)
       .setOffset(NINJA_BODY.offsetX, NINJA_BODY.offsetY)
-      .setDepth(9)
+      .setDepth(ENEMY_DEPTH)
       .play(getEnemyNinjaAnimationKey('idle', 'left'));
+
+    this.enemyShadow = this.createActorShadow();
+    this.syncActorShadows();
 
     this.physics.add.collider(this.player, this.enemy);
 
@@ -413,6 +432,7 @@ export class SandboxScene extends BaseScene {
       this.pauseLabel?.setVisible(state.paused);
       this.player?.setAlpha(state.paused ? 0.55 : 1);
       this.enemy?.setAlpha(state.paused ? 0.55 : 1);
+      this.syncActorShadows();
     });
   }
 
@@ -482,6 +502,39 @@ export class SandboxScene extends BaseScene {
     const scale = Math.max(width / backgroundFrame.width, height / backgroundFrame.height);
 
     this.background.setScale(scale);
+  }
+
+  private createActorShadow(): Phaser.GameObjects.Ellipse {
+    return this.add
+      .ellipse(
+        0,
+        0,
+        NINJA_SHADOW_WIDTH,
+        NINJA_SHADOW_HEIGHT,
+        NINJA_SHADOW_COLOR,
+        NINJA_SHADOW_ALPHA
+      )
+      .setOrigin(0.5)
+      .setDepth(ACTOR_SHADOW_DEPTH);
+  }
+
+  private syncActorShadows(): void {
+    this.syncActorShadow(this.playerShadow, this.player);
+    this.syncActorShadow(this.enemyShadow, this.enemy);
+  }
+
+  private syncActorShadow(
+    shadow: Phaser.GameObjects.Ellipse | null,
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
+  ): void {
+    if (shadow === null || actor === null) {
+      return;
+    }
+
+    shadow
+      .setPosition(actor.x, actor.y + NINJA_SHADOW_Y_OFFSET)
+      .setAlpha(actor.alpha)
+      .setVisible(actor.visible);
   }
 
   private queueAssets(backgroundFileName: DebugBackgroundFileName): boolean {
@@ -1238,6 +1291,7 @@ export class SandboxScene extends BaseScene {
   }
 
   private finishDebugFrame(time: number, forceTelemetry = false): void {
+    this.syncActorShadows();
     this.publishDebugTelemetry(time, forceTelemetry);
     this.renderDebugOverlays();
   }
