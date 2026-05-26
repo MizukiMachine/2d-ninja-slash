@@ -70,7 +70,6 @@ interface NinjaSpriteSheetSet {
   readonly frameSize: number;
   readonly frameCount: number;
   readonly scale: number;
-  readonly enemyScale: number;
   readonly body: NinjaBodyConfig;
   readonly unsupportedMainActions?: readonly MainNinjaAction[];
 }
@@ -85,9 +84,8 @@ const CURRENT_NINJA_FRAME_SIZE = 512;
 const NINJA_FRAME_COUNT = 32;
 const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
-const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5;
+const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
-const ENEMY_NINJA_SCALE_MULTIPLIER = 1.14;
 const NINJA_SPEED = 260;
 const ENEMY_NINJA_SPEED = NINJA_SPEED;
 const ENEMY_ATTACK_RANGE = 112;
@@ -131,10 +129,6 @@ const NINJA_SPRITE_SHEET_SETS = {
     frameSize: CURRENT_NINJA_FRAME_SIZE,
     frameCount: NINJA_FRAME_COUNT,
     scale: NINJA_TARGET_SCALE * (LEGACY_NINJA_FRAME_SIZE / CURRENT_NINJA_FRAME_SIZE),
-    enemyScale:
-      NINJA_TARGET_SCALE *
-      (LEGACY_NINJA_FRAME_SIZE / CURRENT_NINJA_FRAME_SIZE) *
-      ENEMY_NINJA_SCALE_MULTIPLIER,
     body: {
       width: 133,
       height: 147,
@@ -148,7 +142,6 @@ const NINJA_SPRITE_SHEET_SETS = {
     frameSize: LEGACY_NINJA_FRAME_SIZE,
     frameCount: NINJA_FRAME_COUNT,
     scale: NINJA_TARGET_SCALE,
-    enemyScale: NINJA_TARGET_SCALE * ENEMY_NINJA_SCALE_MULTIPLIER,
     body: {
       width: 56,
       height: 62,
@@ -465,7 +458,7 @@ export class SandboxScene extends BaseScene {
     );
     this.enemy
       .setOrigin(0.5, 1)
-      .setScale(spriteSheetSet.enemyScale)
+      .setScale(spriteSheetSet.scale)
       .setCollideWorldBounds(true)
       .setBodySize(spriteSheetSet.body.width, spriteSheetSet.body.height, false)
       .setOffset(spriteSheetSet.body.offsetX, spriteSheetSet.body.offsetY)
@@ -836,7 +829,7 @@ export class SandboxScene extends BaseScene {
 
     if (this.enemy !== null) {
       const enemyProgress = this.enemy.anims.getProgress();
-      this.applyNinjaSpriteMetrics(this.enemy, spriteSheetSet.enemyScale, spriteSheetSet);
+      this.applyNinjaSpriteMetrics(this.enemy, spriteSheetSet.scale, spriteSheetSet);
       const enemyAnimationAction = this.enemyAction === 'recover' ? 'idle' : this.enemyAction;
       this.enemy.play(
         getEnemyNinjaAnimationKey(
