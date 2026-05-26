@@ -62,12 +62,6 @@ const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
 const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
-const NINJA_SPEED = 260;
-const ENEMY_NINJA_SPEED = NINJA_SPEED;
-const ENEMY_ATTACK_RANGE = 112;
-const ENEMY_ATTACK_RECOVERY_MS = 900;
-const PLAYER_DAMAGE_KNOCKBACK_SPEED = 360;
-const ATTACK3_FORWARD_SPEED = 90;
 const PLAYER_DEPTH = 10;
 const ENEMY_DEPTH = 9;
 const ACTOR_SHADOW_DEPTH = 8;
@@ -415,8 +409,8 @@ export class SandboxScene extends BaseScene {
 
     if (this.currentAction === 'hurt') {
       this.player.setVelocity(
-        this.damageKnockbackVector.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
-        this.damageKnockbackVector.y * PLAYER_DAMAGE_KNOCKBACK_SPEED
+        this.damageKnockbackVector.x * this.debug.get().gameplayTuning.playerKnockbackSpeed,
+        this.damageKnockbackVector.y * this.debug.get().gameplayTuning.playerKnockbackSpeed
       );
       this.finishDebugFrame(time);
       return;
@@ -859,7 +853,8 @@ export class SandboxScene extends BaseScene {
 
     this.forwardVector.copy(direction);
     this.updateFacingFromVector(direction);
-    this.player.setVelocity(direction.x * NINJA_SPEED, direction.y * NINJA_SPEED);
+    const playerSpeed = this.debug.get().gameplayTuning.playerSpeed;
+    this.player.setVelocity(direction.x * playerSpeed, direction.y * playerSpeed);
     this.playNinjaAnimation('run');
   }
 
@@ -911,7 +906,9 @@ export class SandboxScene extends BaseScene {
       return 0;
     }
 
-    return this.facingDirection === 'left' ? -ATTACK3_FORWARD_SPEED : ATTACK3_FORWARD_SPEED;
+    const attackSpeed = this.debug.get().gameplayTuning.attack3ForwardSpeed;
+
+    return this.facingDirection === 'left' ? -attackSpeed : attackSpeed;
   }
 
   private startJump(): void {
@@ -982,7 +979,7 @@ export class SandboxScene extends BaseScene {
     );
     const distanceToPlayer = toPlayer.length();
 
-    if (distanceToPlayer <= ENEMY_ATTACK_RANGE) {
+    if (distanceToPlayer <= this.debug.get().gameplayTuning.enemyAttackRange) {
       this.startEnemyAttack();
       return;
     }
@@ -995,7 +992,8 @@ export class SandboxScene extends BaseScene {
 
     toPlayer.normalize();
     this.updateEnemyFacingFromVector(toPlayer);
-    this.enemy.setVelocity(toPlayer.x * ENEMY_NINJA_SPEED, toPlayer.y * ENEMY_NINJA_SPEED);
+    const enemySpeed = this.debug.get().gameplayTuning.enemySpeed;
+    this.enemy.setVelocity(toPlayer.x * enemySpeed, toPlayer.y * enemySpeed);
     this.playEnemyAnimation('run');
   }
 
@@ -1020,7 +1018,7 @@ export class SandboxScene extends BaseScene {
     }
 
     this.enemyAction = 'recover';
-    this.enemyRecoveryUntil = this.time.now + ENEMY_ATTACK_RECOVERY_MS;
+    this.enemyRecoveryUntil = this.time.now + this.debug.get().gameplayTuning.enemyRecoveryMs;
     this.enemyAttackDamageDealt = false;
     this.clearEnemyAttackHitArea();
     this.enemy.setVelocity(0, 0);
@@ -1067,9 +1065,10 @@ export class SandboxScene extends BaseScene {
       this.enemy.y - this.player.y
     );
     this.updateFacingFromVector(towardEnemy);
+    const knockbackSpeed = this.debug.get().gameplayTuning.playerKnockbackSpeed;
     this.player.setVelocity(
-      knockbackDirection.x * PLAYER_DAMAGE_KNOCKBACK_SPEED,
-      knockbackDirection.y * PLAYER_DAMAGE_KNOCKBACK_SPEED
+      knockbackDirection.x * knockbackSpeed,
+      knockbackDirection.y * knockbackSpeed
     );
     this.player.play(
       getMainNinjaAnimationKey('impact', this.facingDirection),
@@ -1413,7 +1412,7 @@ export class SandboxScene extends BaseScene {
 
     if (state.showEnemyRanges && this.enemy !== null) {
       graphic.lineStyle(2, 0xff8a65, 0.64);
-      graphic.strokeCircle(this.enemy.x, this.enemy.y, ENEMY_ATTACK_RANGE);
+      graphic.strokeCircle(this.enemy.x, this.enemy.y, state.gameplayTuning.enemyAttackRange);
     }
 
     if (state.showVisualBounds) {

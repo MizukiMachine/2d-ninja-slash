@@ -6,6 +6,8 @@ const debugBackgroundsModuleId = 'virtual:debug-backgrounds';
 const resolvedDebugBackgroundsModuleId = `\0${debugBackgroundsModuleId}`;
 const ninjaBoundsDirectory = resolve(process.cwd(), 'public', 'assets', 'config');
 const ninjaBoundsPath = join(ninjaBoundsDirectory, 'ninja-bounds.json');
+const gameplayTuningPath = join(ninjaBoundsDirectory, 'gameplay-tuning.json');
+const debugElementsPath = join(ninjaBoundsDirectory, 'debug-elements.json');
 
 interface DebugRequest {
   readonly method?: string;
@@ -150,6 +152,37 @@ function debugConfigWriterPlugin(): Plugin {
   return {
     name: 'debug-config-writer',
     configureServer(server) {
+      const writeJsonEndpoint = (endpoint: string, outputPath: string): void => {
+        server.middlewares.use(endpoint, async (request, response, next) => {
+          const debugRequest = request as unknown as DebugRequest;
+          const debugResponse = response as unknown as DebugResponse;
+
+          if (debugRequest.method !== 'PUT' && debugRequest.method !== 'POST') {
+            next();
+            return;
+          }
+
+          try {
+            const body = await readRequestBody(debugRequest);
+            const parsed = JSON.parse(body) as unknown;
+
+            if (!parsed || typeof parsed !== 'object') {
+              sendJson(debugResponse, 400, { ok: false, error: 'Expected a JSON object' });
+              return;
+            }
+
+            mkdirSync(ninjaBoundsDirectory, { recursive: true });
+            writeFileSync(outputPath, `${JSON.stringify(parsed, null, 2)}\n`);
+            sendJson(debugResponse, 200, { ok: true, path: outputPath });
+          } catch (error) {
+            sendJson(debugResponse, 500, {
+              ok: false,
+              error: error instanceof Error ? error.message : 'Unknown save error'
+            });
+          }
+        });
+      };
+
       server.middlewares.use('/__debug/ninja-bounds', async (request, response, next) => {
         const debugRequest = request as unknown as DebugRequest;
         const debugResponse = response as unknown as DebugResponse;
@@ -178,6 +211,8 @@ function debugConfigWriterPlugin(): Plugin {
           });
         }
       });
+      writeJsonEndpoint('/__debug/gameplay-tuning', gameplayTuningPath);
+      writeJsonEndpoint('/__debug/debug-elements', debugElementsPath);
     }
   };
 }

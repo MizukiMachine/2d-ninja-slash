@@ -11,6 +11,37 @@ import {
   isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
 import {
+  BACKGROUND_FIT_MODES,
+  DEBUG_ELEMENT_KINDS,
+  DEBUG_ELEMENTS_CONFIG_URL,
+  DEBUG_ELEMENTS_SAVE_ENDPOINT,
+  DEBUG_LEVELS,
+  DEFAULT_GAMEPLAY_TUNING,
+  GAMEPLAY_TUNING_CONFIG_URL,
+  GAMEPLAY_TUNING_LIMITS,
+  GAMEPLAY_TUNING_SAVE_ENDPOINT,
+  buildDebugElementsExport,
+  createDefaultDebugElementsConfig,
+  formatElementKind,
+  getDebugLevel,
+  getDebugLevelElements,
+  loadLevelProgress,
+  markLevelCompleted,
+  normalizeBackgroundLabSettings,
+  normalizeBaselineLabSettings,
+  normalizeDebugElementsConfig,
+  normalizeElementEditorSettings,
+  normalizeGameplayTuning,
+  normalizeLevelProgress,
+  normalizeRunnerSettings,
+  resetLevelProgress,
+  setLevelUnlocked,
+  type BackgroundFitMode,
+  type DebugElementKind,
+  type DebugElementsConfig,
+  type GameplayTuning
+} from '../game/debugFeatures';
+import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
   FACING_DIRECTIONS,
   NINJA_ACTORS,
@@ -79,6 +110,14 @@ function formatVector(x: number, y: number): string {
   return `${formatNumber(x)}, ${formatNumber(y)}`;
 }
 
+function formatFrameList(frameIndices: readonly number[]): string {
+  if (frameIndices.length === 0) {
+    return 'none';
+  }
+
+  return frameIndices.map((frameIndex) => String(frameIndex + 1)).join(', ');
+}
+
 function formatBackgroundLabel(fileName: string): string {
   return fileName.replace(/\.png$/u, '').replaceAll('-', ' ');
 }
@@ -89,12 +128,19 @@ function formatFrameStripButtons(
   currentFrame: number
 ): string {
   return Array.from({ length: frameCount }, (_, frameIndex) => {
-    const activeClass = isActive(frameIndex) ? ' is-active' : '';
+    const active = isActive(frameIndex);
+    const activeClass = active ? ' is-active' : '';
     const currentClass = frameIndex === currentFrame ? ' is-current' : '';
 
     return `<button class="frame-toggle${activeClass}${currentClass}" type="button" data-frame-index="${frameIndex}" aria-pressed="${
-      isActive(frameIndex) ? 'true' : 'false'
-    }" title="Attack frame ${frameIndex + 1}">${frameIndex + 1}</button>`;
+      active ? 'true' : 'false'
+    }" aria-label="Toggle attack frame ${frameIndex + 1}, currently ${
+      active ? 'active' : 'inactive'
+    }" title="Attack frame ${frameIndex + 1}: ${active ? 'active' : 'inactive'}"><span class="frame-toggle__number">F${String(
+      frameIndex + 1
+    ).padStart(2, '0')}</span><span class="frame-toggle__state">${
+      active ? 'ON' : 'off'
+    }</span></button>`;
   }).join('');
 }
 
@@ -149,6 +195,34 @@ async function loadNinjaBoundsConfig(): Promise<NinjaBoundsConfig | null> {
   }
 }
 
+async function loadGameplayTuningConfig(): Promise<GameplayTuning | null> {
+  try {
+    const response = await fetch(GAMEPLAY_TUNING_CONFIG_URL, { cache: 'no-store' });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return normalizeGameplayTuning(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+async function loadDebugElementsConfig(): Promise<DebugElementsConfig | null> {
+  try {
+    const response = await fetch(DEBUG_ELEMENTS_CONFIG_URL, { cache: 'no-store' });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return normalizeDebugElementsConfig(await response.json());
+  } catch {
+    return null;
+  }
+}
+
 const DEBUG_PANEL_WIDTH_STORAGE_KEY = 'ninja-slash.debugPanelWidth';
 const DEBUG_PANEL_DEFAULT_WIDTH = 330;
 const DEBUG_PANEL_MIN_WIDTH = 300;
@@ -188,7 +262,10 @@ export function createApp(root: HTMLDivElement | null): void {
   let playMode = false;
   let playToastTimeout: number | null = null;
   let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
+  let debugElementsConfig = createDefaultDebugElementsConfig();
   let gymSaveStatus = 'Loaded defaults';
+  let gameplayTuningSaveStatus = 'Loaded defaults';
+  let elementEditorSaveStatus = 'Loaded defaults';
   let gymSelectedActorId: NinjaActorId = 'mainNinja';
   let gymSelectedDirection: FacingDirection = 'right';
   let gymSelectedActionId = getDefaultNinjaActionId(gymSelectedActorId);
@@ -198,6 +275,8 @@ export function createApp(root: HTMLDivElement | null): void {
   let gymShowAttackBounds = true;
   let gymPlaybackRate = 1;
   let gymControlsRenderFrame: number | null = null;
+  let gymFrameStripSignature = '';
+  let levelProgressControlsSignature = '';
   let debugPanelWidth = loadDebugPanelWidth();
 
   const debugStore = createDebugStore();
@@ -206,7 +285,13 @@ export function createApp(root: HTMLDivElement | null): void {
     debugStore,
     settingsStore,
     getProfile: () => getProfileById(profileId),
-    getNinjaBoundsConfig: () => ninjaBoundsConfig
+    getNinjaBoundsConfig: () => ninjaBoundsConfig,
+    getDebugElementsConfig: () => debugElementsConfig,
+    setDebugElementsConfig: (config) => {
+      debugElementsConfig = normalizeDebugElementsConfig(config);
+      elementEditorSaveStatus = 'Unsaved element changes';
+      debugStore.setElementEditor(normalizeElementEditorSettings(debugStore.get().elementEditor));
+    }
   };
 
   root.className = 'app-shell';
@@ -214,9 +299,9 @@ export function createApp(root: HTMLDivElement | null): void {
   root.innerHTML = `
     <header class="app-shell__header">
       <div class="app-shell__brand">
-        <p class="eyebrow">PHASER-4-STARTER</p>
-        <h1>Phaser 4 Starter</h1>
-        <p class="subtitle">Reusable 2D browser game scaffold</p>
+        <p class="eyebrow">PHASER 4 DEBUG LAB</p>
+        <h1>2D Ninja Slash</h1>
+        <p class="subtitle">Level, element, runner, and tuning workspace</p>
       </div>
       <div class="app-shell__header-action">
         <button id="play-toggle" class="shell-button" data-variant="primary" type="button" aria-pressed="false">Play</button>
@@ -274,6 +359,18 @@ export function createApp(root: HTMLDivElement | null): void {
       </label>
     </div>
     <div class="panel-group">
+      <p class="panel-group__title">Scenes</p>
+      <div class="panel-group__row">
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Sandbox}">Sandbox</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Gym}">Gym</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LevelProgress}">Levels</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.ElementEditor}">Elements</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BaselineLevel}">Baseline</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.RunnerLab}">Runner</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BackgroundLab}">Background</button>
+      </div>
+    </div>
+    <div class="panel-group">
       <p class="panel-group__title">Overlays</p>
       <label class="toggle-row"><input id="show-visual-bounds" type="checkbox" /> Visual bounds</label>
       <label class="toggle-row"><input id="show-hit-boxes" type="checkbox" /> Hit boxes</label>
@@ -281,6 +378,125 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="toggle-row"><input id="show-origins" type="checkbox" /> Origins</label>
       <label class="toggle-row"><input id="show-pointer-probe" type="checkbox" /> Pointer probe</label>
       <label class="toggle-row"><input id="show-enemy-ranges" type="checkbox" /> Enemy ranges</label>
+    </div>
+    <div class="panel-group">
+      <p class="panel-group__title">Gameplay Tuning</p>
+      <label class="range-row">
+        <span>Player</span>
+        <input id="tuning-player-speed" type="range" min="${GAMEPLAY_TUNING_LIMITS.playerSpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.playerSpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.playerSpeed.step}" />
+        <strong id="tuning-player-speed-readout">260</strong>
+      </label>
+      <label class="range-row">
+        <span>Enemy</span>
+        <input id="tuning-enemy-speed" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemySpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.enemySpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.enemySpeed.step}" />
+        <strong id="tuning-enemy-speed-readout">260</strong>
+      </label>
+      <label class="range-row">
+        <span>Range</span>
+        <input id="tuning-attack-range" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemyAttackRange.min}" max="${GAMEPLAY_TUNING_LIMITS.enemyAttackRange.max}" step="${GAMEPLAY_TUNING_LIMITS.enemyAttackRange.step}" />
+        <strong id="tuning-attack-range-readout">112</strong>
+      </label>
+      <label class="range-row">
+        <span>Recover</span>
+        <input id="tuning-recovery" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.min}" max="${GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.max}" step="${GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.step}" />
+        <strong id="tuning-recovery-readout">900</strong>
+      </label>
+      <label class="range-row">
+        <span>Slash 3</span>
+        <input id="tuning-attack3-speed" type="range" min="${GAMEPLAY_TUNING_LIMITS.attack3ForwardSpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.attack3ForwardSpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.attack3ForwardSpeed.step}" />
+        <strong id="tuning-attack3-speed-readout">90</strong>
+      </label>
+      <label class="range-row">
+        <span>Knockback</span>
+        <input id="tuning-knockback" type="range" min="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.step}" />
+        <strong id="tuning-knockback-readout">360</strong>
+      </label>
+      <div class="panel-group__row">
+        <button id="tuning-save" class="shell-button" data-variant="primary" type="button">Save</button>
+        <button id="tuning-reset" class="shell-button" type="button">Reset</button>
+      </div>
+      <p id="tuning-save-status" class="panel-note">Loaded defaults</p>
+    </div>
+    <div class="panel-group">
+      <p class="panel-group__title">Level Progress</p>
+      <div id="level-progress-list" class="toggle-list"></div>
+      <div class="panel-group__row">
+        <button id="level-progress-complete" class="shell-button" type="button">Complete selected</button>
+        <button id="level-progress-reset" class="shell-button" type="button">Reset progress</button>
+      </div>
+    </div>
+    <div id="background-lab-controls" class="panel-group" hidden>
+      <p class="panel-group__title">Background Lab</p>
+      <label class="select-row" for="background-fit-mode">
+        <span>Fit</span>
+        <select id="background-fit-mode">
+          ${BACKGROUND_FIT_MODES.map((mode) => `<option value="${mode}">${mode}</option>`).join('')}
+        </select>
+      </label>
+      <label class="toggle-row"><input id="background-show-grid" type="checkbox" /> Grid</label>
+      <label class="toggle-row"><input id="background-show-safe" type="checkbox" /> Safe frame</label>
+      <label class="toggle-row"><input id="background-show-baseline" type="checkbox" /> Baseline</label>
+      <label class="range-row">
+        <span>Scroll</span>
+        <input id="background-scroll-speed" type="range" min="-220" max="220" step="10" />
+        <strong id="background-scroll-readout">0</strong>
+      </label>
+    </div>
+    <div id="runner-controls" class="panel-group" hidden>
+      <p class="panel-group__title">Runner Generator</p>
+      <label class="range-row"><span>Seed</span><input id="runner-seed" type="range" min="1" max="999" step="1" /><strong id="runner-seed-readout">7</strong></label>
+      <label class="range-row"><span>Difficulty</span><input id="runner-difficulty" type="range" min="0" max="1" step="0.01" /><strong id="runner-difficulty-readout">0.42</strong></label>
+      <label class="range-row"><span>Gaps</span><input id="runner-gaps" type="range" min="0" max="1" step="0.01" /><strong id="runner-gaps-readout">0.34</strong></label>
+      <label class="range-row"><span>Lanes</span><input id="runner-lanes" type="range" min="1" max="5" step="1" /><strong id="runner-lanes-readout">3</strong></label>
+      <label class="range-row"><span>Speed</span><input id="runner-speed" type="range" min="0" max="520" step="10" /><strong id="runner-speed-readout">230</strong></label>
+      <label class="toggle-row"><input id="runner-show-plan" type="checkbox" /> Plan view</label>
+      <label class="toggle-row"><input id="runner-show-hitboxes" type="checkbox" /> Hitboxes</label>
+    </div>
+    <div id="baseline-controls" class="panel-group" hidden>
+      <p class="panel-group__title">Baseline Level</p>
+      <label class="select-row" for="baseline-level-select">
+        <span>Level</span>
+        <select id="baseline-level-select">
+          ${DEBUG_LEVELS.map((level) => `<option value="${level.id}">${level.label}</option>`).join('')}
+        </select>
+      </label>
+      <label class="toggle-row"><input id="baseline-show-hitboxes" type="checkbox" /> Hitboxes</label>
+      <label class="toggle-row"><input id="baseline-show-spawn-goal" type="checkbox" /> Spawn / goal</label>
+      <label class="toggle-row"><input id="baseline-show-camera-bands" type="checkbox" /> Camera bands</label>
+    </div>
+    <div id="element-editor-controls" class="panel-group" hidden>
+      <p class="panel-group__title">Element Editor</p>
+      <label class="select-row" for="element-level">
+        <span>Level</span>
+        <select id="element-level">
+          ${DEBUG_LEVELS.map((level) => `<option value="${level.id}">${level.label}</option>`).join('')}
+        </select>
+      </label>
+      <label class="select-row" for="element-kind">
+        <span>Kind</span>
+        <select id="element-kind">
+          ${DEBUG_ELEMENT_KINDS.map((kind) => `<option value="${kind}">${formatElementKind(kind)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="toggle-row"><input id="element-show-grid" type="checkbox" /> Grid</label>
+      <label class="toggle-row"><input id="element-show-labels" type="checkbox" /> Labels</label>
+      <label class="toggle-row"><input id="element-show-collision" type="checkbox" /> Collision inset</label>
+      <div class="panel-group__row">
+        <button id="element-add" class="shell-button" type="button">Add</button>
+        <button id="element-duplicate" class="shell-button" type="button">Duplicate</button>
+        <button id="element-delete" class="shell-button" type="button">Delete</button>
+      </div>
+      <div class="panel-group__row">
+        <button class="shell-button" type="button" data-element-nudge="0,-8">Up</button>
+        <button class="shell-button" type="button" data-element-nudge="-8,0">Left</button>
+        <button class="shell-button" type="button" data-element-nudge="8,0">Right</button>
+        <button class="shell-button" type="button" data-element-nudge="0,8">Down</button>
+      </div>
+      <div class="panel-group__row">
+        <button id="element-save" class="shell-button" data-variant="primary" type="button">Save</button>
+        <button id="element-export" class="shell-button" type="button">Export</button>
+      </div>
+      <p id="element-editor-readout" class="panel-note">Loaded defaults</p>
     </div>
     <div id="gym-controls" class="panel-group" hidden>
       <div class="panel-group__header">
@@ -317,11 +533,17 @@ export function createApp(root: HTMLDivElement | null): void {
       </label>
       <div class="frame-control">
         <div class="frame-control__header">
-          <span>Frame</span>
+          <span>Attack Frames</span>
           <strong id="gym-frame-readout">1/32</strong>
         </div>
-        <p class="panel-note">Attack active frames</p>
+        <p id="gym-attack-frame-readout" class="panel-note">Active: none</p>
         <div id="gym-attack-frame-strip" class="frame-strip" aria-label="Attack active frames"></div>
+        <div class="panel-group__row">
+          <button id="gym-toggle-current-hit-frame" class="shell-button" type="button">Enable current</button>
+          <button id="gym-only-current-hit-frame" class="shell-button" type="button">Only current</button>
+          <button id="gym-clear-hit-frames" class="shell-button" type="button">Clear</button>
+          <button id="gym-reset-hit-frames" class="shell-button" type="button">Default</button>
+        </div>
       </div>
       <label class="select-row" for="gym-bounds-kind">
         <span>Bounds</span>
@@ -384,6 +606,201 @@ export function createApp(root: HTMLDivElement | null): void {
   );
   const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
   const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
+  const tuningPlayerSpeedInput = requireElement(
+    debugControls,
+    '#tuning-player-speed',
+    HTMLInputElement
+  );
+  const tuningPlayerSpeedReadout = requireElement(
+    debugControls,
+    '#tuning-player-speed-readout',
+    HTMLElement
+  );
+  const tuningEnemySpeedInput = requireElement(
+    debugControls,
+    '#tuning-enemy-speed',
+    HTMLInputElement
+  );
+  const tuningEnemySpeedReadout = requireElement(
+    debugControls,
+    '#tuning-enemy-speed-readout',
+    HTMLElement
+  );
+  const tuningAttackRangeInput = requireElement(
+    debugControls,
+    '#tuning-attack-range',
+    HTMLInputElement
+  );
+  const tuningAttackRangeReadout = requireElement(
+    debugControls,
+    '#tuning-attack-range-readout',
+    HTMLElement
+  );
+  const tuningRecoveryInput = requireElement(
+    debugControls,
+    '#tuning-recovery',
+    HTMLInputElement
+  );
+  const tuningRecoveryReadout = requireElement(
+    debugControls,
+    '#tuning-recovery-readout',
+    HTMLElement
+  );
+  const tuningAttack3SpeedInput = requireElement(
+    debugControls,
+    '#tuning-attack3-speed',
+    HTMLInputElement
+  );
+  const tuningAttack3SpeedReadout = requireElement(
+    debugControls,
+    '#tuning-attack3-speed-readout',
+    HTMLElement
+  );
+  const tuningKnockbackInput = requireElement(
+    debugControls,
+    '#tuning-knockback',
+    HTMLInputElement
+  );
+  const tuningKnockbackReadout = requireElement(
+    debugControls,
+    '#tuning-knockback-readout',
+    HTMLElement
+  );
+  const tuningSaveButton = requireElement(debugControls, '#tuning-save', HTMLButtonElement);
+  const tuningResetButton = requireElement(debugControls, '#tuning-reset', HTMLButtonElement);
+  const tuningSaveStatus = requireElement(debugControls, '#tuning-save-status', HTMLElement);
+  const levelProgressList = requireElement(debugControls, '#level-progress-list', HTMLElement);
+  const levelProgressCompleteButton = requireElement(
+    debugControls,
+    '#level-progress-complete',
+    HTMLButtonElement
+  );
+  const levelProgressResetButton = requireElement(
+    debugControls,
+    '#level-progress-reset',
+    HTMLButtonElement
+  );
+  const backgroundLabControls = requireElement(
+    debugControls,
+    '#background-lab-controls',
+    HTMLElement
+  );
+  const backgroundFitModeSelect = requireElement(
+    debugControls,
+    '#background-fit-mode',
+    HTMLSelectElement
+  );
+  const backgroundShowGridToggle = requireElement(
+    debugControls,
+    '#background-show-grid',
+    HTMLInputElement
+  );
+  const backgroundShowSafeToggle = requireElement(
+    debugControls,
+    '#background-show-safe',
+    HTMLInputElement
+  );
+  const backgroundShowBaselineToggle = requireElement(
+    debugControls,
+    '#background-show-baseline',
+    HTMLInputElement
+  );
+  const backgroundScrollSpeedInput = requireElement(
+    debugControls,
+    '#background-scroll-speed',
+    HTMLInputElement
+  );
+  const backgroundScrollReadout = requireElement(
+    debugControls,
+    '#background-scroll-readout',
+    HTMLElement
+  );
+  const runnerControls = requireElement(debugControls, '#runner-controls', HTMLElement);
+  const runnerSeedInput = requireElement(debugControls, '#runner-seed', HTMLInputElement);
+  const runnerSeedReadout = requireElement(debugControls, '#runner-seed-readout', HTMLElement);
+  const runnerDifficultyInput = requireElement(
+    debugControls,
+    '#runner-difficulty',
+    HTMLInputElement
+  );
+  const runnerDifficultyReadout = requireElement(
+    debugControls,
+    '#runner-difficulty-readout',
+    HTMLElement
+  );
+  const runnerGapsInput = requireElement(debugControls, '#runner-gaps', HTMLInputElement);
+  const runnerGapsReadout = requireElement(debugControls, '#runner-gaps-readout', HTMLElement);
+  const runnerLanesInput = requireElement(debugControls, '#runner-lanes', HTMLInputElement);
+  const runnerLanesReadout = requireElement(debugControls, '#runner-lanes-readout', HTMLElement);
+  const runnerSpeedInput = requireElement(debugControls, '#runner-speed', HTMLInputElement);
+  const runnerSpeedReadout = requireElement(debugControls, '#runner-speed-readout', HTMLElement);
+  const runnerShowPlanToggle = requireElement(
+    debugControls,
+    '#runner-show-plan',
+    HTMLInputElement
+  );
+  const runnerShowHitboxesToggle = requireElement(
+    debugControls,
+    '#runner-show-hitboxes',
+    HTMLInputElement
+  );
+  const baselineControls = requireElement(debugControls, '#baseline-controls', HTMLElement);
+  const baselineLevelSelect = requireElement(
+    debugControls,
+    '#baseline-level-select',
+    HTMLSelectElement
+  );
+  const baselineShowHitboxesToggle = requireElement(
+    debugControls,
+    '#baseline-show-hitboxes',
+    HTMLInputElement
+  );
+  const baselineShowSpawnGoalToggle = requireElement(
+    debugControls,
+    '#baseline-show-spawn-goal',
+    HTMLInputElement
+  );
+  const baselineShowCameraBandsToggle = requireElement(
+    debugControls,
+    '#baseline-show-camera-bands',
+    HTMLInputElement
+  );
+  const elementEditorControls = requireElement(
+    debugControls,
+    '#element-editor-controls',
+    HTMLElement
+  );
+  const elementLevelSelect = requireElement(debugControls, '#element-level', HTMLSelectElement);
+  const elementKindSelect = requireElement(debugControls, '#element-kind', HTMLSelectElement);
+  const elementShowGridToggle = requireElement(
+    debugControls,
+    '#element-show-grid',
+    HTMLInputElement
+  );
+  const elementShowLabelsToggle = requireElement(
+    debugControls,
+    '#element-show-labels',
+    HTMLInputElement
+  );
+  const elementShowCollisionToggle = requireElement(
+    debugControls,
+    '#element-show-collision',
+    HTMLInputElement
+  );
+  const elementAddButton = requireElement(debugControls, '#element-add', HTMLButtonElement);
+  const elementDuplicateButton = requireElement(
+    debugControls,
+    '#element-duplicate',
+    HTMLButtonElement
+  );
+  const elementDeleteButton = requireElement(debugControls, '#element-delete', HTMLButtonElement);
+  const elementSaveButton = requireElement(debugControls, '#element-save', HTMLButtonElement);
+  const elementExportButton = requireElement(debugControls, '#element-export', HTMLButtonElement);
+  const elementEditorReadout = requireElement(
+    debugControls,
+    '#element-editor-readout',
+    HTMLElement
+  );
   const gymControls = requireElement(debugControls, '#gym-controls', HTMLElement);
   const gymExitButton = requireElement(debugControls, '#gym-exit', HTMLButtonElement);
   const gymActorSelect = requireElement(debugControls, '#gym-actor', HTMLSelectElement);
@@ -407,10 +824,35 @@ export function createApp(root: HTMLDivElement | null): void {
     HTMLElement
   );
   const gymFrameReadout = requireElement(debugControls, '#gym-frame-readout', HTMLElement);
+  const gymAttackFrameReadout = requireElement(
+    debugControls,
+    '#gym-attack-frame-readout',
+    HTMLElement
+  );
   const gymAttackFrameStrip = requireElement(
     debugControls,
     '#gym-attack-frame-strip',
     HTMLElement
+  );
+  const gymToggleCurrentHitFrameButton = requireElement(
+    debugControls,
+    '#gym-toggle-current-hit-frame',
+    HTMLButtonElement
+  );
+  const gymOnlyCurrentHitFrameButton = requireElement(
+    debugControls,
+    '#gym-only-current-hit-frame',
+    HTMLButtonElement
+  );
+  const gymClearHitFramesButton = requireElement(
+    debugControls,
+    '#gym-clear-hit-frames',
+    HTMLButtonElement
+  );
+  const gymResetHitFramesButton = requireElement(
+    debugControls,
+    '#gym-reset-hit-frames',
+    HTMLButtonElement
   );
   const gymBoundsKindSelect = requireElement(
     debugControls,
@@ -463,6 +905,17 @@ export function createApp(root: HTMLDivElement | null): void {
   const enemyReadout = requireElement(debugControls, '#enemy-readout', HTMLElement);
   const attackReadout = requireElement(debugControls, '#attack-readout', HTMLElement);
 
+  const setControlGroupHidden = (group: HTMLElement, hidden: boolean): void => {
+    group.hidden = hidden;
+    group
+      .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
+        'input, select, button'
+      )
+      .forEach((control) => {
+        control.disabled = hidden;
+      });
+  };
+
   const refreshScale = (): void => {
     requestAnimationFrameOnce(() => {
       const activeGame = game;
@@ -480,6 +933,17 @@ export function createApp(root: HTMLDivElement | null): void {
     requestAnimationFrameOnce(() => {
       gameMount.focus({ preventScroll: true });
     });
+  };
+
+  const startGameScene = (sceneKey: string): void => {
+    for (const knownSceneKey of Object.values(SceneKeys)) {
+      if (knownSceneKey !== sceneKey) {
+        game?.scene.stop(knownSceneKey);
+      }
+    }
+
+    game?.scene.start(sceneKey);
+    focusGame();
   };
 
   const getDebugPanelMaxWidth = (): number => {
@@ -560,6 +1024,141 @@ export function createApp(root: HTMLDivElement | null): void {
         return option;
       })
     );
+  };
+
+  const readGameplayTuningInputs = (): GameplayTuning =>
+    normalizeGameplayTuning({
+      playerSpeed: Number(tuningPlayerSpeedInput.value),
+      enemySpeed: Number(tuningEnemySpeedInput.value),
+      enemyAttackRange: Number(tuningAttackRangeInput.value),
+      enemyRecoveryMs: Number(tuningRecoveryInput.value),
+      attack3ForwardSpeed: Number(tuningAttack3SpeedInput.value),
+      playerKnockbackSpeed: Number(tuningKnockbackInput.value)
+    });
+
+  const setGameplayTuningFromInputs = (): void => {
+    debugStore.setGameplayTuning(readGameplayTuningInputs());
+    gameplayTuningSaveStatus = 'Unsaved tuning changes';
+  };
+
+  const triggerElementCommand = (
+    command: 'add' | 'delete' | 'duplicate' | 'nudge',
+    nudgeX = 0,
+    nudgeY = 0
+  ): void => {
+    const current = normalizeElementEditorSettings(debugStore.get().elementEditor);
+    debugStore.setElementEditor({
+      ...current,
+      command,
+      commandSerial: current.commandSerial + 1,
+      nudgeX,
+      nudgeY
+    });
+  };
+
+  const renderLevelProgressControls = (): void => {
+    const progress = normalizeLevelProgress(debugStore.get().levelProgress);
+    const signature = JSON.stringify(progress);
+
+    if (signature === levelProgressControlsSignature) {
+      return;
+    }
+
+    levelProgressControlsSignature = signature;
+
+    levelProgressList.replaceChildren(
+      ...DEBUG_LEVELS.map((level) => {
+        const row = document.createElement('label');
+        const input = document.createElement('input');
+        const completed = progress.completedLevelIds.includes(level.id);
+
+        row.className = 'toggle-row';
+        input.type = 'checkbox';
+        input.checked = progress.unlockedLevelIds.includes(level.id);
+        input.disabled = level.id === DEBUG_LEVELS[0].id;
+        input.addEventListener('change', () => {
+          const next = setLevelUnlocked(level.id, input.checked);
+          debugStore.setLevelProgress(next);
+        });
+        row.append(input, `${level.label}${completed ? ' complete' : ''}`);
+
+        return row;
+      })
+    );
+  };
+
+  const renderGameplayTuningControls = (): void => {
+    const tuning = normalizeGameplayTuning(debugStore.get().gameplayTuning);
+
+    tuningPlayerSpeedInput.value = String(tuning.playerSpeed);
+    tuningEnemySpeedInput.value = String(tuning.enemySpeed);
+    tuningAttackRangeInput.value = String(tuning.enemyAttackRange);
+    tuningRecoveryInput.value = String(tuning.enemyRecoveryMs);
+    tuningAttack3SpeedInput.value = String(tuning.attack3ForwardSpeed);
+    tuningKnockbackInput.value = String(tuning.playerKnockbackSpeed);
+    tuningPlayerSpeedReadout.textContent = String(tuning.playerSpeed);
+    tuningEnemySpeedReadout.textContent = String(tuning.enemySpeed);
+    tuningAttackRangeReadout.textContent = String(tuning.enemyAttackRange);
+    tuningRecoveryReadout.textContent = String(tuning.enemyRecoveryMs);
+    tuningAttack3SpeedReadout.textContent = String(tuning.attack3ForwardSpeed);
+    tuningKnockbackReadout.textContent = String(tuning.playerKnockbackSpeed);
+    tuningSaveStatus.textContent = gameplayTuningSaveStatus;
+  };
+
+  const renderBackgroundLabControls = (): void => {
+    const state = normalizeBackgroundLabSettings(debugStore.get().backgroundLab);
+
+    backgroundFitModeSelect.value = state.fitMode;
+    backgroundShowGridToggle.checked = state.showGrid;
+    backgroundShowSafeToggle.checked = state.showSafeFrame;
+    backgroundShowBaselineToggle.checked = state.showBaseline;
+    backgroundScrollSpeedInput.value = String(state.scrollSpeed);
+    backgroundScrollReadout.textContent = String(state.scrollSpeed);
+  };
+
+  const renderRunnerControls = (): void => {
+    const state = normalizeRunnerSettings(debugStore.get().runnerGeneration);
+
+    runnerSeedInput.value = String(state.seed);
+    runnerDifficultyInput.value = String(state.difficulty);
+    runnerGapsInput.value = String(state.gapDensity);
+    runnerLanesInput.value = String(state.laneCount);
+    runnerSpeedInput.value = String(state.scrollSpeed);
+    runnerShowPlanToggle.checked = state.showPlanView;
+    runnerShowHitboxesToggle.checked = state.showHitboxes;
+    runnerSeedReadout.textContent = String(state.seed);
+    runnerDifficultyReadout.textContent = state.difficulty.toFixed(2);
+    runnerGapsReadout.textContent = state.gapDensity.toFixed(2);
+    runnerLanesReadout.textContent = String(state.laneCount);
+    runnerSpeedReadout.textContent = String(state.scrollSpeed);
+  };
+
+  const renderBaselineControls = (): void => {
+    const state = normalizeBaselineLabSettings(debugStore.get().baselineLab);
+
+    baselineLevelSelect.value = state.selectedLevelId;
+    baselineShowHitboxesToggle.checked = state.showHitboxes;
+    baselineShowSpawnGoalToggle.checked = state.showSpawnGoal;
+    baselineShowCameraBandsToggle.checked = state.showCameraBands;
+  };
+
+  const renderElementEditorControls = (): void => {
+    const state = normalizeElementEditorSettings(debugStore.get().elementEditor);
+    const level = getDebugLevel(state.selectedLevelId);
+    const elements = getDebugLevelElements(debugElementsConfig, state.selectedLevelId);
+    const selected = elements.find((element) => element.id === state.selectedElementId);
+
+    elementLevelSelect.value = state.selectedLevelId;
+    elementKindSelect.value = state.selectedKind;
+    elementShowGridToggle.checked = state.showGrid;
+    elementShowLabelsToggle.checked = state.showLabels;
+    elementShowCollisionToggle.checked = state.showCollision;
+    elementDeleteButton.disabled = Boolean(elementEditorControls.hidden) || selected === undefined;
+    elementDuplicateButton.disabled = Boolean(elementEditorControls.hidden) || selected === undefined;
+    elementEditorReadout.textContent =
+      selected === undefined
+        ? `${level.label} | ${elements.length} elements | ${elementEditorSaveStatus}`
+        : `${level.label} | ${selected.id} ${selected.width}x${selected.height} | ${elementEditorSaveStatus}`;
   };
 
   const scheduleGymControlsRender = (): void => {
@@ -685,6 +1284,97 @@ export function createApp(root: HTMLDivElement | null): void {
     patchGymState();
   };
 
+  const getGymActiveHitFrames = (
+    config: NinjaBoundsConfig,
+    actorId: NinjaActorId,
+    direction: FacingDirection,
+    actionId: string
+  ): readonly number[] => {
+    const frameCount = getNinjaAction(actorId, actionId).frameCount;
+
+    return Array.from({ length: frameCount }, (_, frameIndex) => frameIndex).filter(
+      (frameIndex) => isNinjaHitFrameActive(config, actorId, direction, actionId, frameIndex)
+    );
+  };
+
+  const setGymAttackFrames = (
+    actorId: NinjaActorId,
+    direction: FacingDirection,
+    actionId: string,
+    isActive: (frameIndex: number) => boolean
+  ): void => {
+    const frameCount = getNinjaAction(actorId, actionId).frameCount;
+
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+      ninjaBoundsConfig = setNinjaHitFrame(
+        ninjaBoundsConfig,
+        actorId,
+        direction,
+        actionId,
+        frameIndex,
+        isActive(frameIndex)
+      );
+    }
+  };
+
+  const renderGymAttackFrameStrip = (
+    actorId: NinjaActorId,
+    direction: FacingDirection,
+    actionId: string,
+    frameCount: number,
+    currentFrame: number
+  ): void => {
+    const signature = `${actorId}:${direction}:${actionId}:${frameCount}`;
+
+    if (signature !== gymFrameStripSignature) {
+      gymFrameStripSignature = signature;
+      gymAttackFrameStrip.innerHTML = formatFrameStripButtons(
+        frameCount,
+        (frameIndex) =>
+          isNinjaHitFrameActive(
+            ninjaBoundsConfig,
+            actorId,
+            direction,
+            actionId,
+            frameIndex
+          ),
+        currentFrame
+      );
+    }
+
+    gymAttackFrameStrip
+      .querySelectorAll<HTMLButtonElement>('button[data-frame-index]')
+      .forEach((button) => {
+        const frameIndex = Number(button.dataset.frameIndex);
+        const active = isNinjaHitFrameActive(
+          ninjaBoundsConfig,
+          actorId,
+          direction,
+          actionId,
+          frameIndex
+        );
+        const frameNumber = frameIndex + 1;
+        const number = button.querySelector<HTMLElement>('.frame-toggle__number');
+        const state = button.querySelector<HTMLElement>('.frame-toggle__state');
+
+        button.classList.toggle('is-active', active);
+        button.classList.toggle('is-current', frameIndex === currentFrame);
+        button.setAttribute('aria-pressed', String(active));
+        button.setAttribute(
+          'aria-label',
+          `Toggle attack frame ${frameNumber}, currently ${active ? 'active' : 'inactive'}`
+        );
+        button.title = `Attack frame ${frameNumber}: ${active ? 'active' : 'inactive'}`;
+
+        if (number !== null) {
+          number.textContent = `F${String(frameNumber).padStart(2, '0')}`;
+        }
+        if (state !== null) {
+          state.textContent = active ? 'ON' : 'off';
+        }
+      });
+  };
+
   const renderGymControls = (): void => {
     const active = debugStore.get().activeScene === SceneKeys.Gym;
     const actorId = normalizeNinjaActorId(gymSelectedActorId);
@@ -707,6 +1397,13 @@ export function createApp(root: HTMLDivElement | null): void {
       direction,
       actionId
     )[boundsKind];
+    const activeHitFrames = getGymActiveHitFrames(
+      ninjaBoundsConfig,
+      actorId,
+      direction,
+      actionId
+    );
+    const currentFrameActive = activeHitFrames.includes(currentFrame);
 
     gymControls.hidden = !active;
     gymActorSelect.value = actorId;
@@ -732,20 +1429,20 @@ export function createApp(root: HTMLDivElement | null): void {
     gymPlaybackRateInput.value = String(gymPlaybackRate);
     gymPlaybackReadout.textContent = `${gymPlaybackRate.toFixed(2)}x`;
     gymFrameReadout.textContent = `${currentFrame + 1}/${actionDefinition.frameCount}`;
+    gymAttackFrameReadout.textContent = `Active: ${formatFrameList(activeHitFrames)}`;
+    gymToggleCurrentHitFrameButton.textContent = currentFrameActive
+      ? 'Disable current'
+      : 'Enable current';
+    gymToggleCurrentHitFrameButton.title = `Frame ${currentFrame + 1}`;
     gymMirrorDirectionButton.textContent = `Mirror to ${getOppositeFacingDirection(direction)}`;
     gymMirrorDirectionButton.title = `Copy selected ${boundsKind} bounds to ${getOppositeFacingDirection(
       direction
     )} with horizontal flip`;
-    gymAttackFrameStrip.innerHTML = formatFrameStripButtons(
+    renderGymAttackFrameStrip(
+      actorId,
+      direction,
+      actionId,
       actionDefinition.frameCount,
-      (frameIndex) =>
-        isNinjaHitFrameActive(
-          ninjaBoundsConfig,
-          actorId,
-          direction,
-          actionId,
-          frameIndex
-        ),
       currentFrame
     );
 
@@ -826,7 +1523,7 @@ export function createApp(root: HTMLDivElement | null): void {
 
   const enterPlayMode = async (): Promise<void> => {
     if (debugStore.get().activeScene !== SceneKeys.Sandbox) {
-      game?.scene.start(SceneKeys.Sandbox);
+      startGameScene(SceneKeys.Sandbox);
     }
 
     setPlayMode(true);
@@ -865,6 +1562,19 @@ export function createApp(root: HTMLDivElement | null): void {
     showEnemyRangesToggle.checked = state.showEnemyRanges;
     enemyChaseToggle.checked = state.enemyChaseEnabled;
     backgroundFileSelect.value = state.backgroundFileName;
+    setControlGroupHidden(backgroundLabControls, state.activeScene !== SceneKeys.BackgroundLab);
+    setControlGroupHidden(runnerControls, state.activeScene !== SceneKeys.RunnerLab);
+    setControlGroupHidden(
+      baselineControls,
+      state.activeScene !== SceneKeys.BaselineLevel && state.activeScene !== SceneKeys.LevelProgress
+    );
+    setControlGroupHidden(elementEditorControls, state.activeScene !== SceneKeys.ElementEditor);
+    renderGameplayTuningControls();
+    renderLevelProgressControls();
+    renderBackgroundLabControls();
+    renderRunnerControls();
+    renderBaselineControls();
+    renderElementEditorControls();
     fpsReadout.textContent = `${state.performance.fps.toFixed(1)} / ${state.performance.physicsBodies} bodies`;
     pointerReadout.textContent = `${state.pointer.x}, ${state.pointer.y} / ${state.pointer.worldX}, ${state.pointer.worldY} ${
       state.pointer.down ? 'down' : 'up'
@@ -891,6 +1601,7 @@ export function createApp(root: HTMLDivElement | null): void {
   };
 
   renderBackgroundFileOptions();
+  debugStore.setLevelProgress(loadLevelProgress());
   void loadNinjaBoundsConfig().then((loadedConfig) => {
     if (loadedConfig === null) {
       return;
@@ -900,6 +1611,23 @@ export function createApp(root: HTMLDivElement | null): void {
     gymSaveStatus = 'Loaded public/assets/config/ninja-bounds.json';
     syncNinjaGymGlobal();
     renderGymControls();
+  });
+  void loadGameplayTuningConfig().then((loadedConfig) => {
+    if (loadedConfig === null) {
+      return;
+    }
+
+    gameplayTuningSaveStatus = 'Loaded public/assets/config/gameplay-tuning.json';
+    debugStore.setGameplayTuning(loadedConfig);
+  });
+  void loadDebugElementsConfig().then((loadedConfig) => {
+    if (loadedConfig === null) {
+      return;
+    }
+
+    debugElementsConfig = loadedConfig;
+    elementEditorSaveStatus = 'Loaded public/assets/config/debug-elements.json';
+    renderElementEditorControls();
   });
 
   const subscriptions: Unsubscribe[] = [
@@ -1007,9 +1735,204 @@ export function createApp(root: HTMLDivElement | null): void {
     }
   });
 
+  debugControls.addEventListener('click', (event) => {
+    const sceneButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-debug-scene]'
+    );
+
+    if (sceneButton === null) {
+      return;
+    }
+
+    const sceneKey = sceneButton.dataset.debugScene;
+
+    if (sceneKey !== undefined) {
+      startGameScene(sceneKey);
+    }
+  });
+
+  tuningPlayerSpeedInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningEnemySpeedInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningAttackRangeInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningRecoveryInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningAttack3SpeedInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningKnockbackInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningSaveButton.addEventListener('click', async () => {
+    gameplayTuningSaveStatus = 'Saving tuning...';
+    renderGameplayTuningControls();
+
+    const payload = normalizeGameplayTuning(debugStore.get().gameplayTuning);
+
+    try {
+      const response = await fetch(GAMEPLAY_TUNING_SAVE_ENDPOINT, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Save failed with ${response.status}`);
+      }
+
+      gameplayTuningSaveStatus = 'Saved public/assets/config/gameplay-tuning.json';
+    } catch {
+      downloadJsonFile('gameplay-tuning.json', payload);
+      gameplayTuningSaveStatus = 'Downloaded gameplay-tuning.json';
+    }
+
+    renderGameplayTuningControls();
+  });
+  tuningResetButton.addEventListener('click', () => {
+    gameplayTuningSaveStatus = 'Reset to defaults';
+    debugStore.setGameplayTuning(DEFAULT_GAMEPLAY_TUNING);
+  });
+
+  levelProgressCompleteButton.addEventListener('click', () => {
+    const selectedLevelId = normalizeBaselineLabSettings(debugStore.get().baselineLab).selectedLevelId;
+    debugStore.setLevelProgress(markLevelCompleted(selectedLevelId));
+  });
+  levelProgressResetButton.addEventListener('click', () => {
+    debugStore.setLevelProgress(resetLevelProgress());
+  });
+
+  backgroundFitModeSelect.addEventListener('change', () => {
+    const fitMode = backgroundFitModeSelect.value as BackgroundFitMode;
+    debugStore.setBackgroundLab({
+      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
+      fitMode
+    });
+  });
+  backgroundShowGridToggle.addEventListener('change', () => {
+    debugStore.setBackgroundLab({
+      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
+      showGrid: backgroundShowGridToggle.checked
+    });
+  });
+  backgroundShowSafeToggle.addEventListener('change', () => {
+    debugStore.setBackgroundLab({
+      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
+      showSafeFrame: backgroundShowSafeToggle.checked
+    });
+  });
+  backgroundShowBaselineToggle.addEventListener('change', () => {
+    debugStore.setBackgroundLab({
+      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
+      showBaseline: backgroundShowBaselineToggle.checked
+    });
+  });
+  backgroundScrollSpeedInput.addEventListener('input', () => {
+    debugStore.setBackgroundLab({
+      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
+      scrollSpeed: Number(backgroundScrollSpeedInput.value)
+    });
+  });
+
+  const patchRunnerSettings = (): void => {
+    debugStore.setRunnerGeneration(
+      normalizeRunnerSettings({
+        seed: Number(runnerSeedInput.value),
+        difficulty: Number(runnerDifficultyInput.value),
+        gapDensity: Number(runnerGapsInput.value),
+        laneCount: Number(runnerLanesInput.value),
+        scrollSpeed: Number(runnerSpeedInput.value),
+        showPlanView: runnerShowPlanToggle.checked,
+        showHitboxes: runnerShowHitboxesToggle.checked
+      })
+    );
+  };
+  runnerSeedInput.addEventListener('input', patchRunnerSettings);
+  runnerDifficultyInput.addEventListener('input', patchRunnerSettings);
+  runnerGapsInput.addEventListener('input', patchRunnerSettings);
+  runnerLanesInput.addEventListener('input', patchRunnerSettings);
+  runnerSpeedInput.addEventListener('input', patchRunnerSettings);
+  runnerShowPlanToggle.addEventListener('change', patchRunnerSettings);
+  runnerShowHitboxesToggle.addEventListener('change', patchRunnerSettings);
+
+  const patchBaselineSettings = (): void => {
+    debugStore.setBaselineLab(
+      normalizeBaselineLabSettings({
+        selectedLevelId: baselineLevelSelect.value,
+        showHitboxes: baselineShowHitboxesToggle.checked,
+        showSpawnGoal: baselineShowSpawnGoalToggle.checked,
+        showCameraBands: baselineShowCameraBandsToggle.checked
+      })
+    );
+  };
+  baselineLevelSelect.addEventListener('change', patchBaselineSettings);
+  baselineShowHitboxesToggle.addEventListener('change', patchBaselineSettings);
+  baselineShowSpawnGoalToggle.addEventListener('change', patchBaselineSettings);
+  baselineShowCameraBandsToggle.addEventListener('change', patchBaselineSettings);
+
+  const patchElementEditorSettings = (): void => {
+    const current = normalizeElementEditorSettings(debugStore.get().elementEditor);
+    const selectedLevelId = elementLevelSelect.value;
+    const selectedElementId =
+      current.selectedLevelId === selectedLevelId ? current.selectedElementId : null;
+    const selectedKind = elementKindSelect.value as DebugElementKind;
+    debugStore.setElementEditor({
+      ...current,
+      selectedLevelId,
+      selectedElementId,
+      selectedKind,
+      showGrid: elementShowGridToggle.checked,
+      showLabels: elementShowLabelsToggle.checked,
+      showCollision: elementShowCollisionToggle.checked
+    });
+  };
+  elementLevelSelect.addEventListener('change', patchElementEditorSettings);
+  elementKindSelect.addEventListener('change', patchElementEditorSettings);
+  elementShowGridToggle.addEventListener('change', patchElementEditorSettings);
+  elementShowLabelsToggle.addEventListener('change', patchElementEditorSettings);
+  elementShowCollisionToggle.addEventListener('change', patchElementEditorSettings);
+  elementAddButton.addEventListener('click', () => triggerElementCommand('add'));
+  elementDuplicateButton.addEventListener('click', () => triggerElementCommand('duplicate'));
+  elementDeleteButton.addEventListener('click', () => triggerElementCommand('delete'));
+  debugControls.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-element-nudge]'
+    );
+
+    if (button === null || button.dataset.elementNudge === undefined) {
+      return;
+    }
+
+    const [nudgeX = 0, nudgeY = 0] = button.dataset.elementNudge
+      .split(',')
+      .map((value) => Number(value));
+    triggerElementCommand('nudge', nudgeX, nudgeY);
+  });
+  elementSaveButton.addEventListener('click', async () => {
+    elementEditorSaveStatus = 'Saving elements...';
+    renderElementEditorControls();
+
+    const payload = buildDebugElementsExport(debugElementsConfig);
+
+    try {
+      const response = await fetch(DEBUG_ELEMENTS_SAVE_ENDPOINT, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Save failed with ${response.status}`);
+      }
+
+      debugElementsConfig = payload;
+      elementEditorSaveStatus = 'Saved public/assets/config/debug-elements.json';
+    } catch {
+      downloadJsonFile('debug-elements.json', payload);
+      elementEditorSaveStatus = 'Downloaded debug-elements.json';
+    }
+
+    renderElementEditorControls();
+  });
+  elementExportButton.addEventListener('click', () => {
+    downloadJsonFile('debug-elements.json', buildDebugElementsExport(debugElementsConfig));
+  });
+
   gymExitButton.addEventListener('click', () => {
-    game?.scene.start(SceneKeys.MainMenu);
-    focusGame();
+    startGameScene(SceneKeys.MainMenu);
   });
   gymActorSelect.addEventListener('change', () => {
     gymSelectedActorId = normalizeNinjaActorId(gymActorSelect.value);
@@ -1029,6 +1952,80 @@ export function createApp(root: HTMLDivElement | null): void {
   gymBoundsYInput.addEventListener('input', updateSelectedGymBounds);
   gymBoundsWidthInput.addEventListener('input', updateSelectedGymBounds);
   gymBoundsHeightInput.addEventListener('input', updateSelectedGymBounds);
+  gymToggleCurrentHitFrameButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    const frameIndex = clampInteger(
+      globalThis.__NINJA_SLASH_GYM__?.currentFrame ?? 0,
+      0,
+      getNinjaAction(selection.actorId, selection.actionId).frameCount - 1
+    );
+    const active = isNinjaHitFrameActive(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      frameIndex
+    );
+
+    ninjaBoundsConfig = setNinjaHitFrame(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      frameIndex,
+      !active
+    );
+    gymSaveStatus = `${active ? 'Disabled' : 'Enabled'} frame ${frameIndex + 1} for ${selection.actorId} ${selection.direction} ${selection.actionId}`;
+    patchGymState();
+  });
+  gymOnlyCurrentHitFrameButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    const frameIndex = clampInteger(
+      globalThis.__NINJA_SLASH_GYM__?.currentFrame ?? 0,
+      0,
+      getNinjaAction(selection.actorId, selection.actionId).frameCount - 1
+    );
+
+    setGymAttackFrames(
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      (candidateFrameIndex) => candidateFrameIndex === frameIndex
+    );
+    gymSaveStatus = `Set only frame ${frameIndex + 1} active for ${selection.actorId} ${selection.direction} ${selection.actionId}`;
+    patchGymState();
+  });
+  gymClearHitFramesButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+
+    setGymAttackFrames(
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      () => false
+    );
+    gymSaveStatus = `Cleared attack frames for ${selection.actorId} ${selection.direction} ${selection.actionId}`;
+    patchGymState();
+  });
+  gymResetHitFramesButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+
+    setGymAttackFrames(
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      (frameIndex) =>
+        isNinjaHitFrameActive(
+          DEFAULT_NINJA_BOUNDS_CONFIG,
+          selection.actorId,
+          selection.direction,
+          selection.actionId,
+          frameIndex
+        )
+    );
+    gymSaveStatus = `Reset attack frames for ${selection.actorId} ${selection.direction} ${selection.actionId}`;
+    patchGymState();
+  });
   gymAttackFrameStrip.addEventListener('click', (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
       'button[data-frame-index]'

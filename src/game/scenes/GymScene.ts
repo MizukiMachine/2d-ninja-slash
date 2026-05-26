@@ -744,12 +744,20 @@ export class GymScene extends BaseScene {
     const actor = getNinjaActor(this.selectedActorId);
     const actionDefinition = getNinjaAction(this.selectedActorId, this.selectedActionId);
     const frameCount = actionDefinition.frameCount;
+    const currentFrame = this.getCurrentFrameIndex();
+    const hitFrameActive = isNinjaHitFrameActive(
+      this.boundsConfig,
+      this.selectedActorId,
+      this.selectedDirection,
+      this.selectedActionId,
+      currentFrame
+    );
 
     this.titleText?.setText('Ninja Gym');
     this.detailText?.setText(
       `${actor.label} • ${this.selectedDirection} • ${actionDefinition.label} • frame ${
-        this.getCurrentFrameIndex() + 1
-      }/${frameCount} • ${actionDefinition.frameRate}fps • ${this.playbackRate.toFixed(
+        currentFrame + 1
+      }/${frameCount} • hit ${hitFrameActive ? 'ON' : 'off'} • ${actionDefinition.frameRate}fps • ${this.playbackRate.toFixed(
         2
       )}x • zoom ${this.previewZoom.toFixed(2)}x`
     );

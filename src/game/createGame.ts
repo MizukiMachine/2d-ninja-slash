@@ -1,8 +1,13 @@
 import Phaser from 'phaser';
 import { setAppContext, type AppContext } from '../app/context';
+import { BackgroundLabScene } from './scenes/BackgroundLabScene';
+import { BaselineLevelScene } from './scenes/BaselineLevelScene';
 import { BootScene } from './scenes/BootScene';
+import { ElementEditorScene } from './scenes/ElementEditorScene';
 import { GymScene } from './scenes/GymScene';
+import { LevelProgressScene } from './scenes/LevelProgressScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
+import { RunnerLabScene } from './scenes/RunnerLabScene';
 import { SandboxScene } from './scenes/SandboxScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { SplashScene } from './scenes/SplashScene';
@@ -59,7 +64,19 @@ export function createGame({ parent, context }: CreateGameOptions): Phaser.Game 
       touch: true,
       gamepad: false
     },
-    scene: [BootScene, SplashScene, MainMenuScene, SandboxScene, GymScene, SettingsScene]
+    scene: [
+      BootScene,
+      SplashScene,
+      MainMenuScene,
+      SandboxScene,
+      GymScene,
+      LevelProgressScene,
+      ElementEditorScene,
+      BackgroundLabScene,
+      RunnerLabScene,
+      BaselineLevelScene,
+      SettingsScene
+    ]
   };
 
   return new Phaser.Game(config);
