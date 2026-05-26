@@ -10,6 +10,38 @@ import {
   BACKGROUND_FILE_NAMES,
   isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
+import {
+  DEFAULT_NINJA_BOUNDS_CONFIG,
+  FACING_DIRECTIONS,
+  NINJA_ACTORS,
+  NINJA_BOUNDS_CONFIG_URL,
+  NINJA_BOUNDS_SAVE_ENDPOINT,
+  areNinjaRectsEqual,
+  applyAllNinjaBoundsToAllActions,
+  applyNinjaBoundsKindToAllActions,
+  buildNinjaBoundsExport,
+  cloneNinjaBoundsConfig,
+  getDefaultNinjaActionId,
+  getNinjaAction,
+  getNinjaAnimationBounds,
+  getNinjaAnimationsForActor,
+  getOppositeFacingDirection,
+  isNinjaHitFrameActive,
+  mirrorNinjaRectHorizontally,
+  normalizeFacingDirection,
+  normalizeNinjaActionId,
+  normalizeNinjaActorId,
+  normalizeNinjaBoundsConfig,
+  normalizeNinjaBoundsKind,
+  resetNinjaAnimationConfig,
+  setNinjaAnimationBounds,
+  setNinjaHitFrame,
+  type FacingDirection,
+  type NinjaActorId,
+  type NinjaBoundsConfig,
+  type NinjaBoundsKind,
+  type NinjaRect
+} from '../game/ninjaBounds';
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
 import type { AppContext } from './context';
@@ -51,6 +83,101 @@ function formatBackgroundLabel(fileName: string): string {
   return fileName.replace(/\.png$/u, '').replaceAll('-', ' ');
 }
 
+function formatFrameStripButtons(
+  frameCount: number,
+  isActive: (frameIndex: number) => boolean,
+  currentFrame: number
+): string {
+  return Array.from({ length: frameCount }, (_, frameIndex) => {
+    const activeClass = isActive(frameIndex) ? ' is-active' : '';
+    const currentClass = frameIndex === currentFrame ? ' is-current' : '';
+
+    return `<button class="frame-toggle${activeClass}${currentClass}" type="button" data-frame-index="${frameIndex}" aria-pressed="${
+      isActive(frameIndex) ? 'true' : 'false'
+    }" title="Attack frame ${frameIndex + 1}">${frameIndex + 1}</button>`;
+  }).join('');
+}
+
+function normalizePlaybackRate(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.min(2, Math.max(0.25, Math.round(value * 100) / 100));
+}
+
+function clampRectToFrame(rect: NinjaRect): NinjaRect {
+  const x = clampInteger(rect.x, 0, 255);
+  const y = clampInteger(rect.y, 0, 255);
+  const width = clampInteger(rect.width, 1, 256 - x);
+  const height = clampInteger(rect.height, 1, 256 - y);
+
+  return { x, y, width, height };
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function downloadJsonFile(filename: string, payload: object): void {
+  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
+    type: 'application/json'
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function loadNinjaBoundsConfig(): Promise<NinjaBoundsConfig | null> {
+  try {
+    const response = await fetch(NINJA_BOUNDS_CONFIG_URL, { cache: 'no-store' });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return normalizeNinjaBoundsConfig(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+const DEBUG_PANEL_WIDTH_STORAGE_KEY = 'ninja-slash.debugPanelWidth';
+const DEBUG_PANEL_DEFAULT_WIDTH = 330;
+const DEBUG_PANEL_MIN_WIDTH = 300;
+const DEBUG_PANEL_MIN_GAME_WIDTH = 420;
+const DEBUG_PANEL_PORTRAIT_MIN_GAME_WIDTH = 320;
+const DEBUG_PANEL_RESIZE_STEP = 24;
+
+function loadDebugPanelWidth(): number {
+  try {
+    const storedWidth = window.localStorage.getItem(DEBUG_PANEL_WIDTH_STORAGE_KEY);
+
+    return clampInteger(
+      storedWidth === null ? DEBUG_PANEL_DEFAULT_WIDTH : Number(storedWidth),
+      DEBUG_PANEL_MIN_WIDTH,
+      900
+    );
+  } catch {
+    return DEBUG_PANEL_DEFAULT_WIDTH;
+  }
+}
+
+function saveDebugPanelWidth(width: number): void {
+  try {
+    window.localStorage.setItem(DEBUG_PANEL_WIDTH_STORAGE_KEY, String(width));
+  } catch {
+    // Ignore storage failures; resizing should still work for the current session.
+  }
+}
+
 export function createApp(root: HTMLDivElement | null): void {
   if (root === null) {
     throw new Error('Missing #app root.');
@@ -60,13 +187,26 @@ export function createApp(root: HTMLDivElement | null): void {
   let game: ReturnType<typeof createGame> | null = null;
   let playMode = false;
   let playToastTimeout: number | null = null;
+  let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
+  let gymSaveStatus = 'Loaded defaults';
+  let gymSelectedActorId: NinjaActorId = 'mainNinja';
+  let gymSelectedDirection: FacingDirection = 'right';
+  let gymSelectedActionId = getDefaultNinjaActionId(gymSelectedActorId);
+  let gymSelectedBoundsKind: NinjaBoundsKind = 'collision';
+  let gymShowVisualBounds = true;
+  let gymShowCollisionBounds = true;
+  let gymShowAttackBounds = true;
+  let gymPlaybackRate = 1;
+  let gymControlsRenderFrame: number | null = null;
+  let debugPanelWidth = loadDebugPanelWidth();
 
   const debugStore = createDebugStore();
   const settingsStore = createSettingsStore();
   const context: AppContext = {
     debugStore,
     settingsStore,
-    getProfile: () => getProfileById(profileId)
+    getProfile: () => getProfileById(profileId),
+    getNinjaBoundsConfig: () => ninjaBoundsConfig
   };
 
   root.className = 'app-shell';
@@ -94,6 +234,7 @@ export function createApp(root: HTMLDivElement | null): void {
         </div>
         <div id="game-root" class="game-root"></div>
       </section>
+      <div id="debug-resize" class="debug-resize" role="separator" aria-label="Resize debug console" aria-orientation="vertical" tabindex="0"></div>
       <aside id="debug-panel" class="debug-panel">
         <div class="debug-panel__header">
           <h2 class="debug-panel__title">Debug Console</h2>
@@ -110,7 +251,9 @@ export function createApp(root: HTMLDivElement | null): void {
   const playButton = requireElement(root, '#play-toggle', HTMLButtonElement);
   const profileToggle = requireElement(root, '#profile-toggle', HTMLButtonElement);
   const sceneBadge = requireElement(root, '#scene-badge', HTMLElement);
+  const workspace = requireElement(root, '.app-shell__workspace', HTMLElement);
   const gameMount = requireElement(root, '#game-root', HTMLDivElement);
+  const debugResizeHandle = requireElement(root, '#debug-resize', HTMLDivElement);
   const debugPanel = requireElement(root, '#debug-panel', HTMLElement);
   const debugCollapse = requireElement(root, '#debug-collapse', HTMLButtonElement);
   const debugControls = requireElement(root, '#debug-controls', HTMLDivElement);
@@ -138,6 +281,70 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="toggle-row"><input id="show-origins" type="checkbox" /> Origins</label>
       <label class="toggle-row"><input id="show-pointer-probe" type="checkbox" /> Pointer probe</label>
       <label class="toggle-row"><input id="show-enemy-ranges" type="checkbox" /> Enemy ranges</label>
+    </div>
+    <div id="gym-controls" class="panel-group" hidden>
+      <div class="panel-group__header">
+        <p class="panel-group__title">Gym</p>
+        <button id="gym-exit" class="shell-button" type="button">Exit Gym</button>
+      </div>
+      <label class="select-row" for="gym-actor">
+        <span>Actor</span>
+        <select id="gym-actor">
+          ${NINJA_ACTORS.map(
+            (actor) => `<option value="${actor.id}">${actor.label}</option>`
+          ).join('')}
+        </select>
+      </label>
+      <label class="select-row" for="gym-direction">
+        <span>Direction</span>
+        <select id="gym-direction">
+          ${FACING_DIRECTIONS.map(
+            (direction) => `<option value="${direction}">${direction}</option>`
+          ).join('')}
+        </select>
+      </label>
+      <label class="select-row" for="gym-action">
+        <span>Animation</span>
+        <select id="gym-action"></select>
+      </label>
+      <label class="toggle-row"><input id="gym-show-visual" type="checkbox" /> Visual bounds</label>
+      <label class="toggle-row"><input id="gym-show-collision" type="checkbox" /> Collision bounds</label>
+      <label class="toggle-row"><input id="gym-show-attack" type="checkbox" /> Attack bounds</label>
+      <label class="range-row">
+        <span>Playback</span>
+        <input id="gym-playback-rate" type="range" min="0.25" max="2" step="0.05" />
+        <strong id="gym-playback-readout">1.00x</strong>
+      </label>
+      <div class="frame-control">
+        <div class="frame-control__header">
+          <span>Frame</span>
+          <strong id="gym-frame-readout">1/32</strong>
+        </div>
+        <p class="panel-note">Attack active frames</p>
+        <div id="gym-attack-frame-strip" class="frame-strip" aria-label="Attack active frames"></div>
+      </div>
+      <label class="select-row" for="gym-bounds-kind">
+        <span>Bounds</span>
+        <select id="gym-bounds-kind">
+          <option value="visual">Visual</option>
+          <option value="collision">Collision</option>
+          <option value="attack">Attack</option>
+        </select>
+      </label>
+      <div class="editor-grid">
+        <label class="number-row"><span>X</span><input id="gym-bounds-x" type="number" min="0" max="255" step="1" /></label>
+        <label class="number-row"><span>Y</span><input id="gym-bounds-y" type="number" min="0" max="255" step="1" /></label>
+        <label class="number-row"><span>W</span><input id="gym-bounds-width" type="number" min="1" max="256" step="1" /></label>
+        <label class="number-row"><span>H</span><input id="gym-bounds-height" type="number" min="1" max="256" step="1" /></label>
+      </div>
+      <div class="panel-group__row">
+        <button id="gym-save-bounds" class="shell-button" data-variant="primary" type="button">Save</button>
+        <button id="gym-reset-bounds" class="shell-button" type="button">Reset</button>
+        <button id="gym-mirror-direction" class="shell-button" type="button">Mirror selected</button>
+        <button id="gym-apply-kind-all" class="shell-button" type="button">Apply selected</button>
+        <button id="gym-apply-all" class="shell-button" type="button">Apply all</button>
+      </div>
+      <p id="gym-save-status" class="panel-note">Loaded defaults</p>
     </div>
     <div class="metrics">
       <div class="metrics__row"><span>Scene</span><strong id="scene-readout">Boot</strong></div>
@@ -177,6 +384,77 @@ export function createApp(root: HTMLDivElement | null): void {
   );
   const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
   const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
+  const gymControls = requireElement(debugControls, '#gym-controls', HTMLElement);
+  const gymExitButton = requireElement(debugControls, '#gym-exit', HTMLButtonElement);
+  const gymActorSelect = requireElement(debugControls, '#gym-actor', HTMLSelectElement);
+  const gymDirectionSelect = requireElement(debugControls, '#gym-direction', HTMLSelectElement);
+  const gymActionSelect = requireElement(debugControls, '#gym-action', HTMLSelectElement);
+  const gymShowVisualToggle = requireElement(debugControls, '#gym-show-visual', HTMLInputElement);
+  const gymShowCollisionToggle = requireElement(
+    debugControls,
+    '#gym-show-collision',
+    HTMLInputElement
+  );
+  const gymShowAttackToggle = requireElement(debugControls, '#gym-show-attack', HTMLInputElement);
+  const gymPlaybackRateInput = requireElement(
+    debugControls,
+    '#gym-playback-rate',
+    HTMLInputElement
+  );
+  const gymPlaybackReadout = requireElement(
+    debugControls,
+    '#gym-playback-readout',
+    HTMLElement
+  );
+  const gymFrameReadout = requireElement(debugControls, '#gym-frame-readout', HTMLElement);
+  const gymAttackFrameStrip = requireElement(
+    debugControls,
+    '#gym-attack-frame-strip',
+    HTMLElement
+  );
+  const gymBoundsKindSelect = requireElement(
+    debugControls,
+    '#gym-bounds-kind',
+    HTMLSelectElement
+  );
+  const gymBoundsXInput = requireElement(debugControls, '#gym-bounds-x', HTMLInputElement);
+  const gymBoundsYInput = requireElement(debugControls, '#gym-bounds-y', HTMLInputElement);
+  const gymBoundsWidthInput = requireElement(
+    debugControls,
+    '#gym-bounds-width',
+    HTMLInputElement
+  );
+  const gymBoundsHeightInput = requireElement(
+    debugControls,
+    '#gym-bounds-height',
+    HTMLInputElement
+  );
+  const gymSaveBoundsButton = requireElement(
+    debugControls,
+    '#gym-save-bounds',
+    HTMLButtonElement
+  );
+  const gymResetBoundsButton = requireElement(
+    debugControls,
+    '#gym-reset-bounds',
+    HTMLButtonElement
+  );
+  const gymMirrorDirectionButton = requireElement(
+    debugControls,
+    '#gym-mirror-direction',
+    HTMLButtonElement
+  );
+  const gymApplyKindAllButton = requireElement(
+    debugControls,
+    '#gym-apply-kind-all',
+    HTMLButtonElement
+  );
+  const gymApplyAllButton = requireElement(
+    debugControls,
+    '#gym-apply-all',
+    HTMLButtonElement
+  );
+  const gymSaveStatusElement = requireElement(debugControls, '#gym-save-status', HTMLElement);
   const sceneReadout = requireElement(debugControls, '#scene-readout', HTMLElement);
   const fpsReadout = requireElement(debugControls, '#fps-readout', HTMLElement);
   const pointerReadout = requireElement(debugControls, '#pointer-readout', HTMLElement);
@@ -187,7 +465,14 @@ export function createApp(root: HTMLDivElement | null): void {
 
   const refreshScale = (): void => {
     requestAnimationFrameOnce(() => {
-      game?.scale.refresh();
+      const activeGame = game;
+      const canvas = activeGame?.scale.canvas as HTMLCanvasElement | null | undefined;
+
+      if (activeGame === null || canvas === null || canvas === undefined || !canvas.isConnected) {
+        return;
+      }
+
+      activeGame.scale.refresh();
     });
   };
 
@@ -195,6 +480,75 @@ export function createApp(root: HTMLDivElement | null): void {
     requestAnimationFrameOnce(() => {
       gameMount.focus({ preventScroll: true });
     });
+  };
+
+  const getDebugPanelMaxWidth = (): number => {
+    const workspaceWidth = workspace.getBoundingClientRect().width;
+    const minimumGameWidth =
+      profileId === 'portrait' ? DEBUG_PANEL_PORTRAIT_MIN_GAME_WIDTH : DEBUG_PANEL_MIN_GAME_WIDTH;
+    const resizeTrackBudget = 28;
+
+    return Math.max(
+      DEBUG_PANEL_MIN_WIDTH,
+      Math.floor(workspaceWidth - minimumGameWidth - resizeTrackBudget)
+    );
+  };
+
+  const updateDebugResizeHandleState = (): void => {
+    const enabled = !playMode && !window.matchMedia('(max-width: 960px)').matches;
+
+    debugResizeHandle.tabIndex = enabled ? 0 : -1;
+    debugResizeHandle.setAttribute('aria-hidden', String(!enabled));
+  };
+
+  const applyDebugPanelWidth = (width: number, persist = true): void => {
+    const maxWidth = getDebugPanelMaxWidth();
+
+    debugPanelWidth = clampInteger(width, DEBUG_PANEL_MIN_WIDTH, maxWidth);
+    root.style.setProperty('--debug-panel-width', `${debugPanelWidth}px`);
+    updateDebugResizeHandleState();
+    debugResizeHandle.setAttribute('aria-valuemin', String(DEBUG_PANEL_MIN_WIDTH));
+    debugResizeHandle.setAttribute('aria-valuemax', String(maxWidth));
+    debugResizeHandle.setAttribute('aria-valuenow', String(debugPanelWidth));
+    debugResizeHandle.title = `Debug console width: ${debugPanelWidth}px`;
+
+    if (persist) {
+      saveDebugPanelWidth(debugPanelWidth);
+    }
+
+    refreshScale();
+  };
+
+  const startDebugPanelResize = (event: PointerEvent): void => {
+    if (window.matchMedia('(max-width: 960px)').matches) {
+      return;
+    }
+
+    event.preventDefault();
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startWidth = debugPanelWidth;
+    root.classList.add('is-debug-resizing');
+    debugResizeHandle.setPointerCapture(pointerId);
+
+    const resize = (resizeEvent: PointerEvent): void => {
+      applyDebugPanelWidth(startWidth - (resizeEvent.clientX - startX));
+    };
+
+    const stopResize = (): void => {
+      root.classList.remove('is-debug-resizing');
+      window.removeEventListener('pointermove', resize);
+      window.removeEventListener('pointerup', stopResize);
+      window.removeEventListener('pointercancel', stopResize);
+
+      if (debugResizeHandle.hasPointerCapture(pointerId)) {
+        debugResizeHandle.releasePointerCapture(pointerId);
+      }
+    };
+
+    window.addEventListener('pointermove', resize);
+    window.addEventListener('pointerup', stopResize);
+    window.addEventListener('pointercancel', stopResize);
   };
 
   const renderBackgroundFileOptions = (): void => {
@@ -206,6 +560,218 @@ export function createApp(root: HTMLDivElement | null): void {
         return option;
       })
     );
+  };
+
+  const scheduleGymControlsRender = (): void => {
+    if (gymControlsRenderFrame !== null) {
+      return;
+    }
+
+    gymControlsRenderFrame = window.requestAnimationFrame(() => {
+      gymControlsRenderFrame = null;
+      renderGymControls();
+    });
+  };
+
+  const updateGymBoundsFromScene = (
+    actorId: NinjaActorId,
+    direction: FacingDirection,
+    actionId: string,
+    boundsKind: NinjaBoundsKind,
+    rect: NinjaRect
+  ): void => {
+    const currentBounds = getNinjaAnimationBounds(
+      ninjaBoundsConfig,
+      actorId,
+      direction,
+      actionId
+    )[boundsKind];
+
+    if (!areNinjaRectsEqual(currentBounds, rect)) {
+      ninjaBoundsConfig = setNinjaAnimationBounds(
+        ninjaBoundsConfig,
+        actorId,
+        direction,
+        actionId,
+        boundsKind,
+        rect
+      );
+      gymSaveStatus = `Updated ${actorId} ${direction} ${actionId} ${boundsKind}`;
+    }
+
+    gymSelectedActorId = actorId;
+    gymSelectedDirection = direction;
+    gymSelectedActionId = actionId;
+    gymSelectedBoundsKind = boundsKind;
+    syncNinjaGymGlobal();
+    scheduleGymControlsRender();
+  };
+
+  const syncNinjaGymGlobal = (): void => {
+    const current = globalThis.__NINJA_SLASH_GYM__;
+    const actorId = normalizeNinjaActorId(gymSelectedActorId);
+    const direction = normalizeFacingDirection(gymSelectedDirection);
+    const actionId = normalizeNinjaActionId(actorId, gymSelectedActionId);
+
+    globalThis.__NINJA_SLASH_GYM__ = {
+      active: debugStore.get().activeScene === SceneKeys.Gym,
+      selectedActorId: actorId,
+      selectedDirection: direction,
+      selectedActionId: actionId,
+      selectedBoundsKind: normalizeNinjaBoundsKind(gymSelectedBoundsKind),
+      showVisualBounds: gymShowVisualBounds,
+      showCollisionBounds: gymShowCollisionBounds,
+      showAttackBounds: gymShowAttackBounds,
+      playbackRate: gymPlaybackRate,
+      boundsConfig: ninjaBoundsConfig,
+      currentFrame: current?.currentFrame ?? 0,
+      zoom: current?.zoom ?? 1.35,
+      updateBounds: updateGymBoundsFromScene
+    };
+  };
+
+  const getGymSelection = (): {
+    actorId: NinjaActorId;
+    direction: FacingDirection;
+    actionId: string;
+    boundsKind: NinjaBoundsKind;
+  } => {
+    const actorId = normalizeNinjaActorId(gymActorSelect.value || gymSelectedActorId);
+    const direction = normalizeFacingDirection(gymDirectionSelect.value || gymSelectedDirection);
+
+    return {
+      actorId,
+      direction,
+      actionId: normalizeNinjaActionId(actorId, gymActionSelect.value || gymSelectedActionId),
+      boundsKind: normalizeNinjaBoundsKind(
+        gymBoundsKindSelect.value || gymSelectedBoundsKind
+      )
+    };
+  };
+
+  const patchGymState = (): void => {
+    const selection = getGymSelection();
+    gymSelectedActorId = selection.actorId;
+    gymSelectedDirection = selection.direction;
+    gymSelectedActionId = selection.actionId;
+    gymSelectedBoundsKind = selection.boundsKind;
+    gymShowVisualBounds = gymShowVisualToggle.checked;
+    gymShowCollisionBounds = gymShowCollisionToggle.checked;
+    gymShowAttackBounds = gymShowAttackToggle.checked;
+    gymPlaybackRate = normalizePlaybackRate(Number(gymPlaybackRateInput.value));
+    syncNinjaGymGlobal();
+    renderGymControls();
+  };
+
+  const readGymBoundsInputs = (): NinjaRect =>
+    clampRectToFrame({
+      x: Number(gymBoundsXInput.value),
+      y: Number(gymBoundsYInput.value),
+      width: Number(gymBoundsWidthInput.value),
+      height: Number(gymBoundsHeightInput.value)
+    });
+
+  const updateSelectedGymBounds = (): void => {
+    const selection = getGymSelection();
+    ninjaBoundsConfig = setNinjaAnimationBounds(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      selection.boundsKind,
+      readGymBoundsInputs()
+    );
+    gymSaveStatus = `Updated ${selection.actorId} ${selection.direction} ${selection.actionId} ${selection.boundsKind}`;
+    patchGymState();
+  };
+
+  const renderGymControls = (): void => {
+    const active = debugStore.get().activeScene === SceneKeys.Gym;
+    const actorId = normalizeNinjaActorId(gymSelectedActorId);
+    const direction = normalizeFacingDirection(gymSelectedDirection);
+    const actionId = normalizeNinjaActionId(actorId, gymSelectedActionId);
+    const boundsKind = normalizeNinjaBoundsKind(gymSelectedBoundsKind);
+    const actionDefinition = getNinjaAction(actorId, actionId);
+    const actionOptionsSignature = `${actorId}:${getNinjaAnimationsForActor(actorId)
+      .map((actionDefinitionItem) => actionDefinitionItem.id)
+      .join('|')}`;
+    const currentOptionsSignature = gymActionSelect.dataset.optionsSignature;
+    const currentFrame = clampInteger(
+      globalThis.__NINJA_SLASH_GYM__?.currentFrame ?? 0,
+      0,
+      actionDefinition.frameCount - 1
+    );
+    const activeBounds = getNinjaAnimationBounds(
+      ninjaBoundsConfig,
+      actorId,
+      direction,
+      actionId
+    )[boundsKind];
+
+    gymControls.hidden = !active;
+    gymActorSelect.value = actorId;
+    gymDirectionSelect.value = direction;
+
+    if (currentOptionsSignature !== actionOptionsSignature) {
+      gymActionSelect.dataset.optionsSignature = actionOptionsSignature;
+      gymActionSelect.replaceChildren(
+        ...getNinjaAnimationsForActor(actorId).map((action) => {
+          const option = document.createElement('option');
+          option.value = action.id;
+          option.textContent = action.label;
+          return option;
+        })
+      );
+    }
+
+    gymActionSelect.value = actionId;
+    gymBoundsKindSelect.value = boundsKind;
+    gymShowVisualToggle.checked = gymShowVisualBounds;
+    gymShowCollisionToggle.checked = gymShowCollisionBounds;
+    gymShowAttackToggle.checked = gymShowAttackBounds;
+    gymPlaybackRateInput.value = String(gymPlaybackRate);
+    gymPlaybackReadout.textContent = `${gymPlaybackRate.toFixed(2)}x`;
+    gymFrameReadout.textContent = `${currentFrame + 1}/${actionDefinition.frameCount}`;
+    gymMirrorDirectionButton.textContent = `Mirror to ${getOppositeFacingDirection(direction)}`;
+    gymMirrorDirectionButton.title = `Copy selected ${boundsKind} bounds to ${getOppositeFacingDirection(
+      direction
+    )} with horizontal flip`;
+    gymAttackFrameStrip.innerHTML = formatFrameStripButtons(
+      actionDefinition.frameCount,
+      (frameIndex) =>
+        isNinjaHitFrameActive(
+          ninjaBoundsConfig,
+          actorId,
+          direction,
+          actionId,
+          frameIndex
+        ),
+      currentFrame
+    );
+
+    if (document.activeElement !== gymBoundsXInput) {
+      gymBoundsXInput.value = String(activeBounds.x);
+    }
+    if (document.activeElement !== gymBoundsYInput) {
+      gymBoundsYInput.value = String(activeBounds.y);
+    }
+    if (document.activeElement !== gymBoundsWidthInput) {
+      gymBoundsWidthInput.value = String(activeBounds.width);
+    }
+    if (document.activeElement !== gymBoundsHeightInput) {
+      gymBoundsHeightInput.value = String(activeBounds.height);
+    }
+
+    gymControls
+      .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
+        'input, select, button'
+      )
+      .forEach((control) => {
+        control.disabled = !active;
+      });
+
+    gymSaveStatusElement.textContent = gymSaveStatus;
+    syncNinjaGymGlobal();
   };
 
   const mountGame = (): void => {
@@ -245,6 +811,7 @@ export function createApp(root: HTMLDivElement | null): void {
       playToastTimeout = null;
     }
 
+    updateDebugResizeHandleState();
     refreshScale();
     focusGame();
   };
@@ -320,9 +887,20 @@ export function createApp(root: HTMLDivElement | null): void {
           state.attack.y
         )} hits ${state.attack.hitCount}`
       : 'inactive';
+    renderGymControls();
   };
 
   renderBackgroundFileOptions();
+  void loadNinjaBoundsConfig().then((loadedConfig) => {
+    if (loadedConfig === null) {
+      return;
+    }
+
+    ninjaBoundsConfig = loadedConfig;
+    gymSaveStatus = 'Loaded public/assets/config/ninja-bounds.json';
+    syncNinjaGymGlobal();
+    renderGymControls();
+  });
 
   const subscriptions: Unsubscribe[] = [
     debugStore.subscribe(renderDebug, { immediate: true })
@@ -339,6 +917,35 @@ export function createApp(root: HTMLDivElement | null): void {
 
   gameMount.addEventListener('pointerdown', () => {
     focusGame();
+  });
+
+  debugResizeHandle.addEventListener('pointerdown', startDebugPanelResize);
+  debugResizeHandle.addEventListener('dblclick', () => {
+    applyDebugPanelWidth(DEBUG_PANEL_DEFAULT_WIDTH);
+  });
+  debugResizeHandle.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      applyDebugPanelWidth(debugPanelWidth + DEBUG_PANEL_RESIZE_STEP);
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      applyDebugPanelWidth(debugPanelWidth - DEBUG_PANEL_RESIZE_STEP);
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      applyDebugPanelWidth(DEBUG_PANEL_MIN_WIDTH);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      applyDebugPanelWidth(getDebugPanelMaxWidth());
+    }
   });
 
   profileToggle.addEventListener('click', () => {
@@ -400,6 +1007,158 @@ export function createApp(root: HTMLDivElement | null): void {
     }
   });
 
+  gymExitButton.addEventListener('click', () => {
+    game?.scene.start(SceneKeys.MainMenu);
+    focusGame();
+  });
+  gymActorSelect.addEventListener('change', () => {
+    gymSelectedActorId = normalizeNinjaActorId(gymActorSelect.value);
+    gymSelectedActionId = getDefaultNinjaActionId(gymSelectedActorId);
+    gymActionSelect.value = '';
+    patchGymState();
+  });
+
+  gymDirectionSelect.addEventListener('change', patchGymState);
+  gymActionSelect.addEventListener('change', patchGymState);
+  gymBoundsKindSelect.addEventListener('change', patchGymState);
+  gymShowVisualToggle.addEventListener('change', patchGymState);
+  gymShowCollisionToggle.addEventListener('change', patchGymState);
+  gymShowAttackToggle.addEventListener('change', patchGymState);
+  gymPlaybackRateInput.addEventListener('input', patchGymState);
+  gymBoundsXInput.addEventListener('input', updateSelectedGymBounds);
+  gymBoundsYInput.addEventListener('input', updateSelectedGymBounds);
+  gymBoundsWidthInput.addEventListener('input', updateSelectedGymBounds);
+  gymBoundsHeightInput.addEventListener('input', updateSelectedGymBounds);
+  gymAttackFrameStrip.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-frame-index]'
+    );
+
+    if (button === null) {
+      return;
+    }
+
+    const selection = getGymSelection();
+    const frameIndex = Number(button.dataset.frameIndex);
+    const active = isNinjaHitFrameActive(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      frameIndex
+    );
+
+    ninjaBoundsConfig = setNinjaHitFrame(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      frameIndex,
+      !active
+    );
+    gymSaveStatus = `Updated ${selection.actorId} ${selection.direction} ${selection.actionId} attack frames`;
+    patchGymState();
+  });
+  gymSaveBoundsButton.addEventListener('click', async () => {
+    gymSaveStatus = 'Saving bounds...';
+    renderGymControls();
+
+    const payload = buildNinjaBoundsExport(ninjaBoundsConfig);
+
+    try {
+      const response = await fetch(NINJA_BOUNDS_SAVE_ENDPOINT, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Save failed with ${response.status}`);
+      }
+
+      gymSaveStatus = 'Saved public/assets/config/ninja-bounds.json';
+    } catch {
+      downloadJsonFile('ninja-bounds.json', payload);
+      gymSaveStatus = 'Downloaded ninja-bounds.json';
+    }
+
+    renderGymControls();
+  });
+  gymResetBoundsButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    ninjaBoundsConfig = resetNinjaAnimationConfig(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId
+    );
+    gymSaveStatus = `Reset ${selection.actorId} ${selection.direction} ${selection.actionId}`;
+    patchGymState();
+  });
+  gymMirrorDirectionButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    const targetDirection = getOppositeFacingDirection(selection.direction);
+    const sourceBounds = readGymBoundsInputs();
+    const mirroredBounds = mirrorNinjaRectHorizontally(sourceBounds);
+
+    ninjaBoundsConfig = setNinjaAnimationBounds(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      selection.boundsKind,
+      sourceBounds
+    );
+    ninjaBoundsConfig = setNinjaAnimationBounds(
+      ninjaBoundsConfig,
+      selection.actorId,
+      targetDirection,
+      selection.actionId,
+      selection.boundsKind,
+      mirroredBounds
+    );
+    gymSelectedActorId = selection.actorId;
+    gymSelectedDirection = targetDirection;
+    gymSelectedActionId = selection.actionId;
+    gymSelectedBoundsKind = selection.boundsKind;
+    gymSaveStatus = `Mirrored ${selection.boundsKind} from ${selection.direction} to ${targetDirection}`;
+    syncNinjaGymGlobal();
+    renderGymControls();
+  });
+  gymApplyKindAllButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    ninjaBoundsConfig = applyNinjaBoundsKindToAllActions(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.boundsKind,
+      readGymBoundsInputs()
+    );
+    gymSaveStatus = `Applied ${selection.boundsKind} to all ${selection.actorId} ${selection.direction} animations`;
+    patchGymState();
+  });
+  gymApplyAllButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    const currentBounds = {
+      ...getNinjaAnimationBounds(
+        ninjaBoundsConfig,
+        selection.actorId,
+        selection.direction,
+        selection.actionId
+      ),
+      [selection.boundsKind]: readGymBoundsInputs()
+    };
+
+    ninjaBoundsConfig = applyAllNinjaBoundsToAllActions(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      currentBounds
+    );
+    gymSaveStatus = `Applied all bounds to all ${selection.actorId} ${selection.direction} animations`;
+    patchGymState();
+  });
+
   debugCollapse.addEventListener('click', () => {
     debugPanel.classList.toggle('is-collapsed');
     debugCollapse.textContent = debugPanel.classList.contains('is-collapsed') ? 'Expand' : 'Collapse';
@@ -425,7 +1184,17 @@ export function createApp(root: HTMLDivElement | null): void {
     }
   });
 
+  window.addEventListener('resize', () => {
+    updateDebugResizeHandleState();
+    applyDebugPanelWidth(debugPanelWidth, false);
+  });
+
   window.addEventListener('beforeunload', () => {
+    if (gymControlsRenderFrame !== null) {
+      window.cancelAnimationFrame(gymControlsRenderFrame);
+      gymControlsRenderFrame = null;
+    }
+
     for (const unsubscribe of subscriptions) {
       unsubscribe();
     }
@@ -433,5 +1202,6 @@ export function createApp(root: HTMLDivElement | null): void {
     game?.destroy(true);
   });
 
+  applyDebugPanelWidth(debugPanelWidth, false);
   mountGame();
 }

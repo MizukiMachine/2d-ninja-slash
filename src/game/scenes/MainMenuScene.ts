@@ -13,14 +13,21 @@ export class MainMenuScene extends BaseScene {
 
     this.createTextButton({
       x: this.centerX,
-      y: this.centerY,
+      y: this.centerY - 54,
       label: 'Sandbox',
       onClick: () => this.goTo(SceneKeys.Sandbox)
     });
 
     this.createTextButton({
       x: this.centerX,
-      y: this.centerY + 82,
+      y: this.centerY + 18,
+      label: 'Gym',
+      onClick: () => this.goTo(SceneKeys.Gym)
+    });
+
+    this.createTextButton({
+      x: this.centerX,
+      y: this.centerY + 90,
       label: 'Settings',
       onClick: () => this.goTo(SceneKeys.Settings)
     });

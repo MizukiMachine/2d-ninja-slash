@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { setAppContext, type AppContext } from '../app/context';
 import { BootScene } from './scenes/BootScene';
+import { GymScene } from './scenes/GymScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { SandboxScene } from './scenes/SandboxScene';
 import { SettingsScene } from './scenes/SettingsScene';
@@ -58,7 +59,7 @@ export function createGame({ parent, context }: CreateGameOptions): Phaser.Game 
       touch: true,
       gamepad: false
     },
-    scene: [BootScene, SplashScene, MainMenuScene, SandboxScene, SettingsScene]
+    scene: [BootScene, SplashScene, MainMenuScene, SandboxScene, GymScene, SettingsScene]
   };
 
   return new Phaser.Game(config);

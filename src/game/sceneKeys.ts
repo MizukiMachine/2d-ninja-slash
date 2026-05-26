@@ -3,6 +3,7 @@ export const SceneKeys = {
   Splash: 'Splash',
   MainMenu: 'MainMenu',
   Sandbox: 'Sandbox',
+  Gym: 'Gym',
   Settings: 'Settings'
 } as const;
 
