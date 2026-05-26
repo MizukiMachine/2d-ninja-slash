@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "savedAt": "2026-05-26T14:33:20.585Z",
+  "savedAt": "2026-05-26T16:48:57.965Z",
   "boundsByActor": {
     "mainNinja": {
       "left": {
@@ -158,10 +158,10 @@
             "height": 90
           },
           "attack": {
-            "x": 26,
-            "y": 118,
-            "width": 70,
-            "height": 24
+            "x": 14,
+            "y": 106,
+            "width": 80,
+            "height": 54
           }
         },
         "slash2": {
@@ -380,9 +380,9 @@
             "height": 90
           },
           "attack": {
-            "x": 160,
-            "y": 118,
-            "width": 70,
+            "x": 162,
+            "y": 109,
+            "width": 80,
             "height": 24
           }
         },
@@ -452,142 +452,142 @@
       "left": {
         "crouching": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 91,
+            "y": 86,
             "width": 67,
-            "height": 74
+            "height": 96
           },
           "attack": {
-            "x": 44,
-            "y": 156,
+            "x": 45,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         },
         "death": {
           "visual": {
-            "x": 38,
-            "y": 42,
-            "width": 180,
-            "height": 194
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
-            "width": 67,
+            "x": 74,
+            "y": 112,
+            "width": 119,
             "height": 74
           },
           "attack": {
-            "x": 44,
-            "y": 156,
+            "x": 45,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         },
         "idle": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 91,
+            "y": 86,
             "width": 67,
-            "height": 74
+            "height": 96
           },
           "attack": {
-            "x": 44,
-            "y": 156,
+            "x": 45,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         },
         "jump": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 92,
+            "y": 65,
             "width": 67,
-            "height": 74
+            "height": 100
           },
           "attack": {
-            "x": 44,
-            "y": 156,
+            "x": 45,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         },
         "run": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 91,
+            "y": 86,
             "width": 67,
-            "height": 74
+            "height": 96
           },
           "attack": {
-            "x": 44,
-            "y": 156,
+            "x": 45,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         },
         "slash": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 91,
+            "y": 86,
             "width": 67,
-            "height": 74
+            "height": 96
           },
           "attack": {
-            "x": 32,
-            "y": 156,
-            "width": 70,
-            "height": 22
+            "x": 15,
+            "y": 102,
+            "width": 88,
+            "height": 42
           }
         },
         "walk": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 94,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 91,
+            "y": 86,
             "width": 67,
-            "height": 74
+            "height": 96
           },
           "attack": {
-            "x": 44,
-            "y": 156,
+            "x": 45,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         }
       },
@@ -620,9 +620,9 @@
             "height": 194
           },
           "collision": {
-            "x": 95,
-            "y": 163,
-            "width": 67,
+            "x": 63,
+            "y": 112,
+            "width": 119,
             "height": 74
           },
           "attack": {
@@ -634,22 +634,22 @@
         },
         "idle": {
           "visual": {
-            "x": 54,
-            "y": 34,
-            "width": 150,
-            "height": 204
+            "x": 95,
+            "y": 86,
+            "width": 67,
+            "height": 97
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 98,
+            "y": 86,
             "width": 67,
-            "height": 74
+            "height": 96
           },
           "attack": {
-            "x": 154,
-            "y": 156,
+            "x": 153,
+            "y": 115,
             "width": 58,
-            "height": 22
+            "height": 19
           }
         },
         "jump": {
@@ -660,10 +660,10 @@
             "height": 204
           },
           "collision": {
-            "x": 95,
-            "y": 163,
+            "x": 97,
+            "y": 65,
             "width": 67,
-            "height": 74
+            "height": 100
           },
           "attack": {
             "x": 154,
@@ -706,10 +706,10 @@
             "height": 74
           },
           "attack": {
-            "x": 154,
-            "y": 156,
-            "width": 70,
-            "height": 22
+            "x": 156,
+            "y": 92,
+            "width": 88,
+            "height": 42
           }
         },
         "walk": {
@@ -1003,11 +1003,11 @@
             false,
             false,
             false,
-            false,
-            false,
             true,
             true,
-            false,
+            true,
+            true,
+            true,
             false,
             false,
             false,
@@ -1401,11 +1401,11 @@
             false,
             false,
             false,
-            false,
-            false,
             true,
             true,
-            false,
+            true,
+            true,
+            true,
             false,
             false,
             false,
@@ -1735,7 +1735,7 @@
             false,
             true,
             true,
-            false,
+            true,
             false,
             false,
             false,
@@ -1989,7 +1989,7 @@
             false,
             true,
             true,
-            false,
+            true,
             false,
             false,
             false,
