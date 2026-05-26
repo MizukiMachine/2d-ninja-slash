@@ -73,11 +73,7 @@ const NINJA_SHADOW_WIDTH = Math.round(
 const NINJA_SHADOW_HEIGHT = Math.round(
   DEFAULT_NINJA_COLLISION_RECT.height * NINJA_SCALE * 0.24
 );
-// Idle and run frames keep transparent padding below the feet.
-const NINJA_SHADOW_SOURCE_BOTTOM_PADDING = 72;
-const NINJA_SHADOW_Y_OFFSET = -Math.round(
-  NINJA_SHADOW_SOURCE_BOTTOM_PADDING * NINJA_SCALE - NINJA_SHADOW_HEIGHT * 0.35
-);
+const NINJA_SHADOW_FOOT_LINE_RATIO = 0.35;
 const NINJA_SHADOW_COLOR = 0x03050a;
 const NINJA_SHADOW_ALPHA = 0.32;
 
@@ -472,22 +468,58 @@ export class SandboxScene extends BaseScene {
   }
 
   private syncActorShadows(): void {
-    this.syncActorShadow(this.playerShadow, this.player);
-    this.syncActorShadow(this.enemyShadow, this.enemy);
+    this.syncActorShadow(
+      this.playerShadow,
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
+    this.syncActorShadow(
+      this.enemyShadow,
+      this.enemy,
+      'enemyNinja',
+      this.enemyFacingDirection,
+      this.getEnemyBoundsAction()
+    );
   }
 
   private syncActorShadow(
     shadow: Phaser.GameObjects.Ellipse | null,
-    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    actorId: 'mainNinja' | 'enemyNinja',
+    direction: FacingDirection,
+    action: string
   ): void {
     if (shadow === null || actor === null) {
       return;
     }
 
+    const visualBottomY = this.getActorVisualBottomY(actor, actorId, direction, action);
+    const shadowCenterY =
+      visualBottomY + NINJA_SHADOW_HEIGHT * (0.5 - NINJA_SHADOW_FOOT_LINE_RATIO);
+
     shadow
-      .setPosition(actor.x, actor.y + NINJA_SHADOW_Y_OFFSET)
+      .setPosition(actor.x, shadowCenterY)
       .setAlpha(actor.alpha)
       .setVisible(actor.visible);
+  }
+
+  private getActorVisualBottomY(
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    actorId: 'mainNinja' | 'enemyNinja',
+    direction: FacingDirection,
+    action: string
+  ): number {
+    const bounds = getNinjaAnimationBounds(
+      this.app.getNinjaBoundsConfig(),
+      actorId,
+      direction,
+      action
+    ).visual;
+    const frameTop = actor.y - NINJA_FRAME_SIZE * actor.scaleY;
+
+    return frameTop + (bounds.y + bounds.height) * actor.scaleY;
   }
 
   private syncActorCollisionBounds(): void {
