@@ -8,8 +8,8 @@ import {
 import assetIndex from '../public/assets/index.json';
 
 const SPRITE_SHEET_SIZE = {
-  width: 2048,
-  height: 1024
+  width: 1024,
+  height: 512
 } as const;
 const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'impact', 'death'] as const;
 const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'death'] as const;
@@ -58,7 +58,7 @@ function getBackgroundFileNamesFromDirectory(directory: URL): readonly string[] 
 }
 
 describe('ninja sprite sheet assets', () => {
-  it('has complete 256px sprite sheets with expected dimensions', () => {
+  it('has complete 128px sprite sheets with expected dimensions', () => {
     for (const action of MAIN_NINJA_ACTIONS) {
       for (const direction of DIRECTIONS) {
         const filePath = new URL(
