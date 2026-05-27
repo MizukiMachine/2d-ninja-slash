@@ -80,7 +80,7 @@ describe('debugStore', () => {
     store.setEnemy({ action: 'slash', x: 300, y: 220, velocityX: -260 });
     store.setAttack({
       active: true,
-      action: 'slash2',
+      action: 'slash',
       x: 180,
       y: 130,
       width: 132,
@@ -127,7 +127,7 @@ describe('debugStore', () => {
       },
       attack: {
         active: true,
-        action: 'slash2',
+        action: 'slash',
         x: 180,
         y: 130,
         width: 132,

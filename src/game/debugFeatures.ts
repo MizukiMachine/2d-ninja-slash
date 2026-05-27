@@ -40,7 +40,6 @@ export interface GameplayTuning {
   readonly enemySpeed: number;
   readonly enemyAttackRange: number;
   readonly enemyRecoveryMs: number;
-  readonly attack3ForwardSpeed: number;
   readonly playerKnockbackSpeed: number;
 }
 
@@ -120,7 +119,6 @@ export const GAMEPLAY_TUNING_LIMITS = {
   enemySpeed: { min: 80, max: 480, step: 10 },
   enemyAttackRange: { min: 48, max: 240, step: 4 },
   enemyRecoveryMs: { min: 120, max: 1800, step: 30 },
-  attack3ForwardSpeed: { min: 0, max: 260, step: 5 },
   playerKnockbackSpeed: { min: 80, max: 760, step: 10 }
 } as const;
 
@@ -129,7 +127,6 @@ export const DEFAULT_GAMEPLAY_TUNING: GameplayTuning = {
   enemySpeed: 260,
   enemyAttackRange: 112,
   enemyRecoveryMs: 900,
-  attack3ForwardSpeed: 90,
   playerKnockbackSpeed: 360
 };
 
@@ -374,12 +371,6 @@ export function normalizeGameplayTuning(value: unknown): GameplayTuning {
       GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.min,
       GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.max,
       DEFAULT_GAMEPLAY_TUNING.enemyRecoveryMs
-    ),
-    attack3ForwardSpeed: clampNumber(
-      candidate?.attack3ForwardSpeed,
-      GAMEPLAY_TUNING_LIMITS.attack3ForwardSpeed.min,
-      GAMEPLAY_TUNING_LIMITS.attack3ForwardSpeed.max,
-      DEFAULT_GAMEPLAY_TUNING.attack3ForwardSpeed
     ),
     playerKnockbackSpeed: clampNumber(
       candidate?.playerKnockbackSpeed,

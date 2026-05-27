@@ -154,8 +154,6 @@ const MAIN_NINJA_ACTIONS: readonly NinjaActionDefinition[] = [
   action('jump', 'Jump', 14 * PLAYBACK_RATE_MULTIPLIER, 0),
   action('run', 'Run', 12 * PLAYBACK_RATE_MULTIPLIER, -1),
   action('slash', 'Slash 1', 12 * PLAYBACK_RATE_MULTIPLIER, 0),
-  action('slash2', 'Slash 2', 14 * PLAYBACK_RATE_MULTIPLIER, 0),
-  action('slash3', 'Slash 3', 16 * PLAYBACK_RATE_MULTIPLIER, 0),
   action('walk', 'Walk', 10 * PLAYBACK_RATE_MULTIPLIER, -1)
 ];
 
@@ -621,7 +619,7 @@ function createDefaultVisualRect(actorId: NinjaActorId, actionId: string): Ninja
       : { x: 54, y: 34, width: 150, height: 204 };
   }
 
-  if (actionId === 'slash3' || actionId === 'attack') {
+  if (actionId === 'attack') {
     return { x: 26, y: 28, width: 204, height: 218 };
   }
 
@@ -656,11 +654,7 @@ function getDefaultAttackWidth(actorId: NinjaActorId, actionId: string): number 
     return actionId === 'slash' ? 70 : 58;
   }
 
-  if (actionId === 'slash3') {
-    return 96;
-  }
-
-  if (actionId === 'slash2' || actionId === 'attack') {
+  if (actionId === 'attack') {
     return 82;
   }
 
@@ -688,12 +682,7 @@ function createDefaultAttackFrames(
 }
 
 function getMainNinjaDefaultAttackFrames(actionId: string): readonly number[] {
-  return actionId === 'attack' ||
-    actionId === 'slash' ||
-    actionId === 'slash2' ||
-    actionId === 'slash3'
-    ? [13, 14]
-    : [];
+  return actionId === 'attack' || actionId === 'slash' ? [13, 14] : [];
 }
 
 function getEnemyNinjaDefaultAttackFrames(actionId: string): readonly number[] {
