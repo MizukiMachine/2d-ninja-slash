@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 
-export const NINJA_FRAME_SIZE = 256;
+export const NINJA_FRAME_SIZE = 128;
 export const NINJA_FRAME_COUNT = 32;
 export const NINJA_CENTER = {
   x: NINJA_FRAME_SIZE / 2,
@@ -8,10 +8,10 @@ export const NINJA_CENTER = {
 } as const;
 
 export const DEFAULT_NINJA_COLLISION_RECT = {
-  x: 95,
-  y: 163,
-  width: 67,
-  height: 74
+  x: 48,
+  y: 82,
+  width: 34,
+  height: 37
 } as const satisfies NinjaRect;
 
 export const NINJA_BOUNDS_CONFIG_URL = '/assets/config/ninja-bounds.json';
@@ -691,19 +691,19 @@ function createDefaultBounds(
 function createDefaultVisualRect(actorId: NinjaActorId, actionId: string): NinjaRect {
   if (actorId === 'enemyNinja') {
     return actionId === 'death'
-      ? { x: 38, y: 42, width: 180, height: 194 }
-      : { x: 54, y: 34, width: 150, height: 204 };
+      ? { x: 19, y: 21, width: 90, height: 97 }
+      : { x: 27, y: 17, width: 75, height: 102 };
   }
 
   if (actionId === 'attack') {
-    return { x: 26, y: 28, width: 204, height: 218 };
+    return { x: 13, y: 14, width: 102, height: 109 };
   }
 
   if (actionId === 'death') {
-    return { x: 30, y: 44, width: 200, height: 190 };
+    return { x: 15, y: 22, width: 100, height: 95 };
   }
 
-  return { x: 48, y: 34, width: 160, height: 210 };
+  return { x: 24, y: 17, width: 80, height: 105 };
 }
 
 function createDefaultAttackRect(
@@ -712,9 +712,9 @@ function createDefaultAttackRect(
   actionId: string
 ): NinjaRect {
   const baseWidth = getDefaultAttackWidth(actorId, actionId);
-  const baseHeight = actorId === 'mainNinja' ? 24 : 22;
-  const y = actorId === 'mainNinja' ? 154 : 156;
-  const rightX = actorId === 'mainNinja' ? 156 : 154;
+  const baseHeight = actorId === 'mainNinja' ? 12 : 11;
+  const y = actorId === 'mainNinja' ? 77 : 78;
+  const rightX = actorId === 'mainNinja' ? 78 : 77;
   const x = direction === 'right' ? rightX : NINJA_FRAME_SIZE - rightX - baseWidth;
 
   return {
@@ -727,14 +727,14 @@ function createDefaultAttackRect(
 
 function getDefaultAttackWidth(actorId: NinjaActorId, actionId: string): number {
   if (actorId === 'enemyNinja') {
-    return actionId === 'slash' ? 70 : 58;
+    return actionId === 'slash' ? 35 : 29;
   }
 
   if (actionId === 'attack') {
-    return 82;
+    return 41;
   }
 
-  return 70;
+  return 35;
 }
 
 function createDefaultAttackFrames(

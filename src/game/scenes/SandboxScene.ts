@@ -10,6 +10,7 @@ import {
   getNinjaAnimationBounds,
   getNinjaAnimationPlaybackRate,
   isNinjaHitFrameActive,
+  NINJA_FRAME_SIZE,
   type NinjaRect
 } from '../ninjaBounds';
 import {
@@ -82,13 +83,10 @@ interface EnemyState {
 }
 
 const NINJA_ACTOR_ROOT_URL = '/assets/actors';
-const NINJA_FRAME_SIZE = 256;
-const NINJA_REFERENCE_FRAME_SIZE = 216;
 const NINJA_FRAME_COUNT = 32;
 const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
-const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
-const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
+const NINJA_SPRITE_SCALE = 2.1;
 const PLAYER_DEPTH = 10;
 const ENEMY_DEPTH = 9;
 const HUD_DEPTH = 120;
@@ -109,10 +107,8 @@ const ENEMY_CORPSE_HOLD_MS = 1300;
 const ENEMY_CORPSE_BLINK_DURATION_MS = 90;
 const ENEMY_CORPSE_BLINK_REPEAT = 8;
 const PLAYER_DAMAGE_KNOCKBACK_DISTANCE = 160;
-const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 48;
-const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 18;
-
-const NINJA_SCALE = NINJA_TARGET_SCALE * (NINJA_REFERENCE_FRAME_SIZE / NINJA_FRAME_SIZE);
+const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 24;
+const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 9;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -387,7 +383,7 @@ export class SandboxScene extends BaseScene {
     );
     this.player
       .setOrigin(0.5, 1)
-      .setScale(NINJA_SCALE)
+      .setScale(NINJA_SPRITE_SCALE)
       .setCollideWorldBounds(true)
       .setDepth(PLAYER_DEPTH);
     this.applyActorPlaybackRate(this.player, 'mainNinja', 'idle');
@@ -458,7 +454,7 @@ export class SandboxScene extends BaseScene {
     );
     enemySprite
       .setOrigin(0.5, 1)
-      .setScale(NINJA_SCALE)
+      .setScale(NINJA_SPRITE_SCALE)
       .setCollideWorldBounds(true)
       .setDepth(ENEMY_DEPTH);
     const enemy = this.createEnemyState(enemySprite, 'left');
@@ -1900,16 +1896,7 @@ export class SandboxScene extends BaseScene {
     actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
     rect: NinjaRect
   ): void {
-    const scale = actor.scaleX;
-    const frameLeft = actor.x - (NINJA_FRAME_SIZE / 2) * scale;
-    const frameTop = actor.y - NINJA_FRAME_SIZE * scale;
-
-    hitArea.setTo(
-      frameLeft + rect.x * scale,
-      frameTop + rect.y * scale,
-      rect.width * scale,
-      rect.height * scale
-    );
+    this.getWorldRectFromFrameRect(actor, rect, hitArea);
   }
 
   private isHitAreaOverlappingActor(

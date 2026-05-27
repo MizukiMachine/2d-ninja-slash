@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "root": "/assets",
   "generatedFrom": "public/assets",
-  "lastVerified": "2026-05-26",
+  "lastVerified": "2026-05-28",
   "defaults": {
     "background": {
       "loader": "image",
@@ -19,8 +19,8 @@
     "characterSpritesheet": {
       "loader": "spritesheet",
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "grid": {
         "columns": 8,
@@ -39,11 +39,11 @@
         "y": 0.5
       },
       "physicsBody": {
-        "width": 67,
-        "height": 74,
+        "width": 34,
+        "height": 37,
         "offset": {
-          "x": 95,
-          "y": 163
+          "x": 48,
+          "y": 82
         }
       }
     }
@@ -199,11 +199,11 @@
       "role": "player",
       "action": "attack",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -235,8 +235,8 @@
         "textureKey": "character.mainNinja.left.attack.spritesheet",
         "url": "/assets/actors/main-ninja/attack-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -252,15 +252,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -284,11 +284,11 @@
       "role": "player",
       "action": "attack",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -320,8 +320,8 @@
         "textureKey": "character.mainNinja.right.attack.spritesheet",
         "url": "/assets/actors/main-ninja/attack-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -337,15 +337,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -369,11 +369,11 @@
       "role": "player",
       "action": "death",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -405,8 +405,8 @@
         "textureKey": "character.mainNinja.left.death.spritesheet",
         "url": "/assets/actors/main-ninja/death-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -422,15 +422,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -454,11 +454,11 @@
       "role": "player",
       "action": "death",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -490,8 +490,8 @@
         "textureKey": "character.mainNinja.right.death.spritesheet",
         "url": "/assets/actors/main-ninja/death-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -507,15 +507,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -539,11 +539,11 @@
       "role": "player",
       "action": "idle",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -575,8 +575,8 @@
         "textureKey": "character.mainNinja.left.idle.spritesheet",
         "url": "/assets/actors/main-ninja/idle-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -592,15 +592,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -624,11 +624,11 @@
       "role": "player",
       "action": "idle",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -660,8 +660,8 @@
         "textureKey": "character.mainNinja.right.idle.spritesheet",
         "url": "/assets/actors/main-ninja/idle-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -677,15 +677,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -709,11 +709,11 @@
       "role": "player",
       "action": "impact",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -745,8 +745,8 @@
         "textureKey": "character.mainNinja.left.impact.spritesheet",
         "url": "/assets/actors/main-ninja/impact-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -762,15 +762,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -794,11 +794,11 @@
       "role": "player",
       "action": "impact",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -830,8 +830,8 @@
         "textureKey": "character.mainNinja.right.impact.spritesheet",
         "url": "/assets/actors/main-ninja/impact-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -847,15 +847,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -879,11 +879,11 @@
       "role": "player",
       "action": "jump",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -915,8 +915,8 @@
         "textureKey": "character.mainNinja.left.jump.spritesheet",
         "url": "/assets/actors/main-ninja/jump-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -932,15 +932,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -964,11 +964,11 @@
       "role": "player",
       "action": "jump",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1000,8 +1000,8 @@
         "textureKey": "character.mainNinja.right.jump.spritesheet",
         "url": "/assets/actors/main-ninja/jump-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1017,15 +1017,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -1049,11 +1049,11 @@
       "role": "player",
       "action": "run",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1085,8 +1085,8 @@
         "textureKey": "character.mainNinja.left.run.spritesheet",
         "url": "/assets/actors/main-ninja/run-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1102,15 +1102,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -1134,11 +1134,11 @@
       "role": "player",
       "action": "run",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1170,8 +1170,8 @@
         "textureKey": "character.mainNinja.right.run.spritesheet",
         "url": "/assets/actors/main-ninja/run-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1187,15 +1187,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -1219,11 +1219,11 @@
       "role": "player",
       "action": "slash",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1255,8 +1255,8 @@
         "textureKey": "character.mainNinja.left.slash.spritesheet",
         "url": "/assets/actors/main-ninja/slash-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1272,15 +1272,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -1295,10 +1295,10 @@
       },
       "combat": {
         "hitBox": {
-          "width": 108,
-          "height": 34,
-          "frontOffset": 48,
-          "yOffset": -148
+          "width": 54,
+          "height": 17,
+          "frontOffset": 24,
+          "yOffset": -74
         },
         "hitFrames": {
           "phaserAnimationFrameIndex": [
@@ -1322,11 +1322,11 @@
       "role": "player",
       "action": "slash",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1358,8 +1358,8 @@
         "textureKey": "character.mainNinja.right.slash.spritesheet",
         "url": "/assets/actors/main-ninja/slash-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1375,15 +1375,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -1398,422 +1398,10 @@
       },
       "combat": {
         "hitBox": {
-          "width": 108,
-          "height": 34,
-          "frontOffset": 48,
-          "yOffset": -148
-        },
-        "hitFrames": {
-          "phaserAnimationFrameIndex": [
-            14,
-            15
-          ],
-          "zeroBasedFrameIndex": [
-            13,
-            14
-          ]
-        }
-      }
-    },
-    {
-      "key": "character.mainNinja.left.slash2.spritesheet",
-      "type": "character-spritesheet",
-      "label": "mainNinja.left.slash2",
-      "filePath": "public/assets/actors/main-ninja/slash2-left.png",
-      "path": "/assets/actors/main-ninja/slash2-left.png",
-      "actor": "mainNinja",
-      "role": "player",
-      "action": "slash2",
-      "direction": "left",
-      "width": 2048,
-      "height": 1024,
-      "frameSize": {
-        "width": 256,
-        "height": 256
-      },
-      "frameCount": 32,
-      "grid": {
-        "columns": 8,
-        "rows": 4,
-        "order": "row-major",
-        "nonEmptyFrameCount": 32,
-        "allFramesNonEmpty": true
-      },
-      "offset": {
-        "x": 0,
-        "y": 0
-      },
-      "margin": 0,
-      "spacing": 0,
-      "animationUse": "second slash combo attack",
-      "animation": {
-        "key": "anim.mainNinja.left.slash2",
-        "frameRate": 42,
-        "repeat": 0,
-        "loop": false,
-        "frames": {
-          "start": 0,
-          "end": 31
-        }
-      },
-      "phaser": {
-        "loader": "spritesheet",
-        "textureKey": "character.mainNinja.left.slash2.spritesheet",
-        "url": "/assets/actors/main-ninja/slash2-left.png",
-        "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
-          "margin": 0,
-          "spacing": 0,
-          "startFrame": 0,
-          "endFrame": 31
-        },
-        "animationKey": "anim.mainNinja.left.slash2",
-        "generateFrameNumbers": {
-          "start": 0,
-          "end": 31
-        },
-        "display": {
-          "origin": {
-            "x": 0.5,
-            "y": 0.5
-          },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
-        },
-        "physicsBody": {
-          "width": 67,
-          "height": 74,
-          "offset": {
-            "x": 95,
-            "y": 163
-          }
-        }
-      },
-      "metadata": {
-        "currentSandboxSceneLoad": true,
-        "source": "SandboxScene constants and PNG probe",
-        "recommendedFor": [
-          "player",
-          "slash2",
-          "left"
-        ]
-      },
-      "combat": {
-        "hitBox": {
-          "width": 132,
-          "height": 36,
-          "frontOffset": 48,
-          "yOffset": -150
-        },
-        "hitFrames": {
-          "phaserAnimationFrameIndex": [
-            14,
-            15
-          ],
-          "zeroBasedFrameIndex": [
-            13,
-            14
-          ]
-        }
-      }
-    },
-    {
-      "key": "character.mainNinja.right.slash2.spritesheet",
-      "type": "character-spritesheet",
-      "label": "mainNinja.right.slash2",
-      "filePath": "public/assets/actors/main-ninja/slash2-right.png",
-      "path": "/assets/actors/main-ninja/slash2-right.png",
-      "actor": "mainNinja",
-      "role": "player",
-      "action": "slash2",
-      "direction": "right",
-      "width": 2048,
-      "height": 1024,
-      "frameSize": {
-        "width": 256,
-        "height": 256
-      },
-      "frameCount": 32,
-      "grid": {
-        "columns": 8,
-        "rows": 4,
-        "order": "row-major",
-        "nonEmptyFrameCount": 32,
-        "allFramesNonEmpty": true
-      },
-      "offset": {
-        "x": 0,
-        "y": 0
-      },
-      "margin": 0,
-      "spacing": 0,
-      "animationUse": "second slash combo attack",
-      "animation": {
-        "key": "anim.mainNinja.right.slash2",
-        "frameRate": 42,
-        "repeat": 0,
-        "loop": false,
-        "frames": {
-          "start": 0,
-          "end": 31
-        }
-      },
-      "phaser": {
-        "loader": "spritesheet",
-        "textureKey": "character.mainNinja.right.slash2.spritesheet",
-        "url": "/assets/actors/main-ninja/slash2-right.png",
-        "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
-          "margin": 0,
-          "spacing": 0,
-          "startFrame": 0,
-          "endFrame": 31
-        },
-        "animationKey": "anim.mainNinja.right.slash2",
-        "generateFrameNumbers": {
-          "start": 0,
-          "end": 31
-        },
-        "display": {
-          "origin": {
-            "x": 0.5,
-            "y": 0.5
-          },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
-        },
-        "physicsBody": {
-          "width": 67,
-          "height": 74,
-          "offset": {
-            "x": 95,
-            "y": 163
-          }
-        }
-      },
-      "metadata": {
-        "currentSandboxSceneLoad": true,
-        "source": "SandboxScene constants and PNG probe",
-        "recommendedFor": [
-          "player",
-          "slash2",
-          "right"
-        ]
-      },
-      "combat": {
-        "hitBox": {
-          "width": 132,
-          "height": 36,
-          "frontOffset": 48,
-          "yOffset": -150
-        },
-        "hitFrames": {
-          "phaserAnimationFrameIndex": [
-            14,
-            15
-          ],
-          "zeroBasedFrameIndex": [
-            13,
-            14
-          ]
-        }
-      }
-    },
-    {
-      "key": "character.mainNinja.left.slash3.spritesheet",
-      "type": "character-spritesheet",
-      "label": "mainNinja.left.slash3",
-      "filePath": "public/assets/actors/main-ninja/slash3-left.png",
-      "path": "/assets/actors/main-ninja/slash3-left.png",
-      "actor": "mainNinja",
-      "role": "player",
-      "action": "slash3",
-      "direction": "left",
-      "width": 2048,
-      "height": 1024,
-      "frameSize": {
-        "width": 256,
-        "height": 256
-      },
-      "frameCount": 32,
-      "grid": {
-        "columns": 8,
-        "rows": 4,
-        "order": "row-major",
-        "nonEmptyFrameCount": 32,
-        "allFramesNonEmpty": true
-      },
-      "offset": {
-        "x": 0,
-        "y": 0
-      },
-      "margin": 0,
-      "spacing": 0,
-      "animationUse": "third slash combo attack",
-      "animation": {
-        "key": "anim.mainNinja.left.slash3",
-        "frameRate": 48,
-        "repeat": 0,
-        "loop": false,
-        "frames": {
-          "start": 0,
-          "end": 31
-        }
-      },
-      "phaser": {
-        "loader": "spritesheet",
-        "textureKey": "character.mainNinja.left.slash3.spritesheet",
-        "url": "/assets/actors/main-ninja/slash3-left.png",
-        "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
-          "margin": 0,
-          "spacing": 0,
-          "startFrame": 0,
-          "endFrame": 31
-        },
-        "animationKey": "anim.mainNinja.left.slash3",
-        "generateFrameNumbers": {
-          "start": 0,
-          "end": 31
-        },
-        "display": {
-          "origin": {
-            "x": 0.5,
-            "y": 0.5
-          },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
-        },
-        "physicsBody": {
-          "width": 67,
-          "height": 74,
-          "offset": {
-            "x": 95,
-            "y": 163
-          }
-        }
-      },
-      "metadata": {
-        "currentSandboxSceneLoad": true,
-        "source": "SandboxScene constants and PNG probe",
-        "recommendedFor": [
-          "player",
-          "slash3",
-          "left"
-        ]
-      },
-      "combat": {
-        "hitBox": {
-          "width": 156,
-          "height": 38,
-          "frontOffset": 50,
-          "yOffset": -150
-        },
-        "hitFrames": {
-          "phaserAnimationFrameIndex": [
-            14,
-            15
-          ],
-          "zeroBasedFrameIndex": [
-            13,
-            14
-          ]
-        }
-      }
-    },
-    {
-      "key": "character.mainNinja.right.slash3.spritesheet",
-      "type": "character-spritesheet",
-      "label": "mainNinja.right.slash3",
-      "filePath": "public/assets/actors/main-ninja/slash3-right.png",
-      "path": "/assets/actors/main-ninja/slash3-right.png",
-      "actor": "mainNinja",
-      "role": "player",
-      "action": "slash3",
-      "direction": "right",
-      "width": 2048,
-      "height": 1024,
-      "frameSize": {
-        "width": 256,
-        "height": 256
-      },
-      "frameCount": 32,
-      "grid": {
-        "columns": 8,
-        "rows": 4,
-        "order": "row-major",
-        "nonEmptyFrameCount": 32,
-        "allFramesNonEmpty": true
-      },
-      "offset": {
-        "x": 0,
-        "y": 0
-      },
-      "margin": 0,
-      "spacing": 0,
-      "animationUse": "third slash combo attack",
-      "animation": {
-        "key": "anim.mainNinja.right.slash3",
-        "frameRate": 48,
-        "repeat": 0,
-        "loop": false,
-        "frames": {
-          "start": 0,
-          "end": 31
-        }
-      },
-      "phaser": {
-        "loader": "spritesheet",
-        "textureKey": "character.mainNinja.right.slash3.spritesheet",
-        "url": "/assets/actors/main-ninja/slash3-right.png",
-        "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
-          "margin": 0,
-          "spacing": 0,
-          "startFrame": 0,
-          "endFrame": 31
-        },
-        "animationKey": "anim.mainNinja.right.slash3",
-        "generateFrameNumbers": {
-          "start": 0,
-          "end": 31
-        },
-        "display": {
-          "origin": {
-            "x": 0.5,
-            "y": 0.5
-          },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
-        },
-        "physicsBody": {
-          "width": 67,
-          "height": 74,
-          "offset": {
-            "x": 95,
-            "y": 163
-          }
-        }
-      },
-      "metadata": {
-        "currentSandboxSceneLoad": true,
-        "source": "SandboxScene constants and PNG probe",
-        "recommendedFor": [
-          "player",
-          "slash3",
-          "right"
-        ]
-      },
-      "combat": {
-        "hitBox": {
-          "width": 156,
-          "height": 38,
-          "frontOffset": 50,
-          "yOffset": -150
+          "width": 54,
+          "height": 17,
+          "frontOffset": 24,
+          "yOffset": -74
         },
         "hitFrames": {
           "phaserAnimationFrameIndex": [
@@ -1837,11 +1425,11 @@
       "role": "player",
       "action": "walk",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1873,8 +1461,8 @@
         "textureKey": "character.mainNinja.left.walk.spritesheet",
         "url": "/assets/actors/main-ninja/walk-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1890,15 +1478,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -1922,11 +1510,11 @@
       "role": "player",
       "action": "walk",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -1958,8 +1546,8 @@
         "textureKey": "character.mainNinja.right.walk.spritesheet",
         "url": "/assets/actors/main-ninja/walk-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -1975,15 +1563,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2007,11 +1595,11 @@
       "role": "enemy",
       "action": "crouching",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2043,8 +1631,8 @@
         "textureKey": "character.enemyNinja.left.crouching.spritesheet",
         "url": "/assets/actors/enemy-ninja/crouching-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2060,15 +1648,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2092,11 +1680,11 @@
       "role": "enemy",
       "action": "crouching",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2128,8 +1716,8 @@
         "textureKey": "character.enemyNinja.right.crouching.spritesheet",
         "url": "/assets/actors/enemy-ninja/crouching-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2145,15 +1733,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2177,11 +1765,11 @@
       "role": "enemy",
       "action": "death",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2213,8 +1801,8 @@
         "textureKey": "character.enemyNinja.left.death.spritesheet",
         "url": "/assets/actors/enemy-ninja/death-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2230,15 +1818,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2262,11 +1850,11 @@
       "role": "enemy",
       "action": "death",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2298,8 +1886,8 @@
         "textureKey": "character.enemyNinja.right.death.spritesheet",
         "url": "/assets/actors/enemy-ninja/death-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2315,15 +1903,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2347,11 +1935,11 @@
       "role": "enemy",
       "action": "idle",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2383,8 +1971,8 @@
         "textureKey": "character.enemyNinja.left.idle.spritesheet",
         "url": "/assets/actors/enemy-ninja/idle-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2400,15 +1988,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2432,11 +2020,11 @@
       "role": "enemy",
       "action": "idle",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2468,8 +2056,8 @@
         "textureKey": "character.enemyNinja.right.idle.spritesheet",
         "url": "/assets/actors/enemy-ninja/idle-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2485,15 +2073,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2517,11 +2105,11 @@
       "role": "enemy",
       "action": "jump",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2553,8 +2141,8 @@
         "textureKey": "character.enemyNinja.left.jump.spritesheet",
         "url": "/assets/actors/enemy-ninja/jump-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2570,15 +2158,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2602,11 +2190,11 @@
       "role": "enemy",
       "action": "jump",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2638,8 +2226,8 @@
         "textureKey": "character.enemyNinja.right.jump.spritesheet",
         "url": "/assets/actors/enemy-ninja/jump-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2655,15 +2243,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2687,11 +2275,11 @@
       "role": "enemy",
       "action": "run",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2723,8 +2311,8 @@
         "textureKey": "character.enemyNinja.left.run.spritesheet",
         "url": "/assets/actors/enemy-ninja/run-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2740,15 +2328,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2772,11 +2360,11 @@
       "role": "enemy",
       "action": "run",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2808,8 +2396,8 @@
         "textureKey": "character.enemyNinja.right.run.spritesheet",
         "url": "/assets/actors/enemy-ninja/run-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2825,15 +2413,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2857,11 +2445,11 @@
       "role": "enemy",
       "action": "slash",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2893,8 +2481,8 @@
         "textureKey": "character.enemyNinja.left.slash.spritesheet",
         "url": "/assets/actors/enemy-ninja/slash-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -2910,15 +2498,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -2933,10 +2521,10 @@
       },
       "combat": {
         "hitBox": {
-          "width": 112,
-          "height": 34,
-          "frontOffset": 46,
-          "yOffset": -144
+          "width": 56,
+          "height": 17,
+          "frontOffset": 23,
+          "yOffset": -72
         },
         "hitFrames": {
           "phaserAnimationFrameIndex": [
@@ -2960,11 +2548,11 @@
       "role": "enemy",
       "action": "slash",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -2996,8 +2584,8 @@
         "textureKey": "character.enemyNinja.right.slash.spritesheet",
         "url": "/assets/actors/enemy-ninja/slash-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -3013,15 +2601,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -3036,10 +2624,10 @@
       },
       "combat": {
         "hitBox": {
-          "width": 112,
-          "height": 34,
-          "frontOffset": 46,
-          "yOffset": -144
+          "width": 56,
+          "height": 17,
+          "frontOffset": 23,
+          "yOffset": -72
         },
         "hitFrames": {
           "phaserAnimationFrameIndex": [
@@ -3063,11 +2651,11 @@
       "role": "enemy",
       "action": "walk",
       "direction": "left",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -3099,8 +2687,8 @@
         "textureKey": "character.enemyNinja.left.walk.spritesheet",
         "url": "/assets/actors/enemy-ninja/walk-left.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -3116,15 +2704,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -3148,11 +2736,11 @@
       "role": "enemy",
       "action": "walk",
       "direction": "right",
-      "width": 2048,
-      "height": 1024,
+      "width": 1024,
+      "height": 512,
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
       "frameCount": 32,
       "grid": {
@@ -3184,8 +2772,8 @@
         "textureKey": "character.enemyNinja.right.walk.spritesheet",
         "url": "/assets/actors/enemy-ninja/walk-right.png",
         "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
+          "frameWidth": 128,
+          "frameHeight": 128,
           "margin": 0,
           "spacing": 0,
           "startFrame": 0,
@@ -3201,15 +2789,15 @@
             "x": 0.5,
             "y": 0.5
           },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
+          "currentSandboxScale": 2.1,
+          "referenceFrameSize": 128
         },
         "physicsBody": {
-          "width": 67,
-          "height": 74,
+          "width": 34,
+          "height": 37,
           "offset": {
-            "x": 95,
-            "y": 163
+            "x": 48,
+            "y": 82
           }
         }
       },
@@ -3247,10 +2835,6 @@
         "character.mainNinja.right.run.spritesheet",
         "character.mainNinja.left.slash.spritesheet",
         "character.mainNinja.right.slash.spritesheet",
-        "character.mainNinja.left.slash2.spritesheet",
-        "character.mainNinja.right.slash2.spritesheet",
-        "character.mainNinja.left.slash3.spritesheet",
-        "character.mainNinja.right.slash3.spritesheet",
         "character.mainNinja.left.walk.spritesheet",
         "character.mainNinja.right.walk.spritesheet"
       ],
@@ -3273,15 +2857,15 @@
     }
   },
   "validation": {
-    "pngAssetCount": 38,
+    "pngAssetCount": 34,
     "backgroundCount": 4,
-    "characterSpritesheetCount": 34,
+    "characterSpritesheetCount": 30,
     "spriteSheetProbe": {
       "frameSize": {
-        "width": 256,
-        "height": 256
+        "width": 128,
+        "height": 128
       },
-      "result": "all character spritesheets are 8x4 grids with 32 non-empty frames"
+      "result": "all character spritesheets are 8x4 grids with 32 non-empty 128px frames"
     }
   }
 }

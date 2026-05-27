@@ -47,7 +47,7 @@ describe('ninja bounds config', () => {
     expect(mainNinja?.actions.map((action) => action.id)).not.toContain('crouching');
   });
 
-  it('clamps edited bounds to the 256px source frame', () => {
+  it('clamps edited bounds to the 128px source frame', () => {
     const config = setNinjaAnimationBounds(
       DEFAULT_NINJA_BOUNDS_CONFIG,
       'mainNinja',
@@ -58,14 +58,14 @@ describe('ninja bounds config', () => {
     );
     const bounds = getNinjaAnimationBounds(config, 'mainNinja', 'right', 'slash');
 
-    expect(bounds.attack).toEqual({ x: 250, y: 0, width: 6, height: 256 });
+    expect(bounds.attack).toEqual({ x: 127, y: 0, width: 1, height: 128 });
   });
 
   it('mirrors bounds horizontally for the opposite facing direction', () => {
     expect(getOppositeFacingDirection('right')).toBe('left');
     expect(getOppositeFacingDirection('left')).toBe('right');
     expect(mirrorNinjaRectHorizontally({ x: 24, y: 40, width: 50, height: 70 })).toEqual({
-      x: 182,
+      x: 54,
       y: 40,
       width: 50,
       height: 70
