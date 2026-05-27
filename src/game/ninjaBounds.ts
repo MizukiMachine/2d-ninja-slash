@@ -35,6 +35,11 @@ export interface NinjaRect {
   readonly height: number;
 }
 
+export interface NinjaLaneAnchor {
+  readonly x: number;
+  readonly y: number;
+}
+
 export function areNinjaRectsEqual(left: NinjaRect, right: NinjaRect): boolean {
   return (
     left.x === right.x &&
@@ -84,11 +89,17 @@ export type NinjaActorPlaybackRatesMap = Record<string, number>;
 export type NinjaBoundsByActor = Record<NinjaActorId, NinjaActorBoundsMap>;
 export type NinjaHitFramesByActor = Record<NinjaActorId, NinjaActorHitFramesMap>;
 export type NinjaPlaybackRatesByActor = Record<NinjaActorId, NinjaActorPlaybackRatesMap>;
+export type NinjaActorLaneAnchorMap = Record<
+  FacingDirection,
+  Record<string, NinjaLaneAnchor>
+>;
+export type NinjaLaneAnchorsByActor = Record<NinjaActorId, NinjaActorLaneAnchorMap>;
 
 export interface NinjaBoundsConfig {
   readonly boundsByActor: NinjaBoundsByActor;
   readonly hitFramesByActor: NinjaHitFramesByActor;
   readonly playbackRatesByActor: NinjaPlaybackRatesByActor;
+  readonly laneAnchorsByActor: NinjaLaneAnchorsByActor;
 }
 
 export interface NinjaBoundsExport extends NinjaBoundsConfig {
@@ -145,6 +156,12 @@ export interface NinjaGymBridge {
     actionId: string,
     boundsKind: NinjaBoundsKind,
     rect: NinjaRect
+  ) => void;
+  readonly updateLaneAnchor?: (
+    actorId: NinjaActorId,
+    direction: FacingDirection,
+    actionId: string,
+    anchor: NinjaLaneAnchor
   ) => void;
 }
 
@@ -390,6 +407,10 @@ export function normalizeNinjaBoundsConfig(config: unknown): NinjaBoundsConfig {
     playbackRatesByActor: normalizePlaybackRatesByActor(
       candidate.playbackRatesByActor,
       defaults.playbackRatesByActor
+    ),
+    laneAnchorsByActor: normalizeLaneAnchorsByActor(
+      candidate.laneAnchorsByActor,
+      defaults.laneAnchorsByActor
     )
   };
 }
@@ -402,11 +423,12 @@ export function buildNinjaBoundsExport(config: NinjaBoundsConfig): NinjaBoundsEx
   const normalized = normalizeNinjaBoundsConfig(config);
 
   return {
-    version: 2,
+    version: 3,
     savedAt: new Date().toISOString(),
     boundsByActor: normalized.boundsByActor,
     hitFramesByActor: normalized.hitFramesByActor,
-    playbackRatesByActor: normalized.playbackRatesByActor
+    playbackRatesByActor: normalized.playbackRatesByActor,
+    laneAnchorsByActor: normalized.laneAnchorsByActor
   };
 }
 
@@ -427,6 +449,26 @@ export function getNinjaAnimationBounds(
     DEFAULT_NINJA_BOUNDS_CONFIG.boundsByActor[normalizedActorId][normalizedDirection][
       normalizedActionId
     ]
+  );
+}
+
+export function getNinjaLaneAnchor(
+  config: NinjaBoundsConfig,
+  actorId: string,
+  direction: string,
+  actionId: string
+): NinjaLaneAnchor {
+  const normalizedActorId = normalizeNinjaActorId(actorId);
+  const normalizedDirection = normalizeFacingDirection(direction);
+  const normalizedActionId = normalizeNinjaActionId(normalizedActorId, actionId);
+
+  return (
+    config.laneAnchorsByActor[normalizedActorId]?.[normalizedDirection]?.[
+      normalizedActionId
+    ] ??
+    DEFAULT_NINJA_BOUNDS_CONFIG.laneAnchorsByActor[normalizedActorId][
+      normalizedDirection
+    ][normalizedActionId]
   );
 }
 
@@ -491,6 +533,37 @@ export function setNinjaAnimationBounds(
   };
 
   return next;
+}
+
+export function setNinjaLaneAnchor(
+  config: NinjaBoundsConfig,
+  actorId: string,
+  direction: string,
+  actionId: string,
+  anchor: NinjaLaneAnchor
+): NinjaBoundsConfig {
+  const next = cloneNinjaBoundsConfig(config);
+  const normalizedActorId = normalizeNinjaActorId(actorId);
+  const normalizedDirection = normalizeFacingDirection(direction);
+  const normalizedActionId = normalizeNinjaActionId(normalizedActorId, actionId);
+  const fallback =
+    DEFAULT_NINJA_BOUNDS_CONFIG.laneAnchorsByActor[normalizedActorId][
+      normalizedDirection
+    ][normalizedActionId];
+
+  next.laneAnchorsByActor[normalizedActorId][normalizedDirection][normalizedActionId] =
+    normalizeLaneAnchor(anchor, fallback);
+
+  return next;
+}
+
+export function mirrorNinjaLaneAnchorHorizontally(
+  anchor: NinjaLaneAnchor
+): NinjaLaneAnchor {
+  return {
+    x: NINJA_FRAME_SIZE - 1 - clampInteger(anchor.x, 0, NINJA_FRAME_SIZE - 1, 0),
+    y: clampInteger(anchor.y, 0, NINJA_FRAME_SIZE - 1, NINJA_FRAME_SIZE - 1)
+  };
 }
 
 export function setNinjaHitFrame(
@@ -566,6 +639,12 @@ export function resetNinjaAnimationConfig(
     DEFAULT_NINJA_BOUNDS_CONFIG.playbackRatesByActor[normalizedActorId][
       normalizedActionId
     ];
+  next.laneAnchorsByActor[normalizedActorId][normalizedDirection][normalizedActionId] =
+    {
+      ...DEFAULT_NINJA_BOUNDS_CONFIG.laneAnchorsByActor[normalizedActorId][
+        normalizedDirection
+      ][normalizedActionId]
+    };
 
   return next;
 }
@@ -590,6 +669,29 @@ export function applyNinjaBoundsKindToAllActions(
       actionDefinition.id,
       normalizedBoundsKind,
       rect
+    );
+  }
+
+  return next;
+}
+
+export function applyNinjaLaneAnchorToAllActions(
+  config: NinjaBoundsConfig,
+  actorId: string,
+  direction: string,
+  anchor: NinjaLaneAnchor
+): NinjaBoundsConfig {
+  const normalizedActorId = normalizeNinjaActorId(actorId);
+  const normalizedDirection = normalizeFacingDirection(direction);
+  let next = cloneNinjaBoundsConfig(config);
+
+  for (const actionDefinition of getNinjaAnimationsForActor(normalizedActorId)) {
+    next = setNinjaLaneAnchor(
+      next,
+      normalizedActorId,
+      normalizedDirection,
+      actionDefinition.id,
+      anchor
     );
   }
 
@@ -672,7 +774,23 @@ function createDefaultNinjaBoundsConfig(): NinjaBoundsConfig {
           ])
         )
       ])
-    ) as NinjaPlaybackRatesByActor
+    ) as NinjaPlaybackRatesByActor,
+    laneAnchorsByActor: Object.fromEntries(
+      NINJA_ACTORS.map((actorDefinition) => [
+        actorDefinition.id,
+        Object.fromEntries(
+          FACING_DIRECTIONS.map((direction) => [
+            direction,
+            Object.fromEntries(
+              actorDefinition.actions.map((actionDefinition) => [
+                actionDefinition.id,
+                createDefaultLaneAnchor(actorDefinition.id, actionDefinition.id)
+              ])
+            )
+          ])
+        )
+      ])
+    ) as NinjaLaneAnchorsByActor
   };
 }
 
@@ -686,6 +804,21 @@ function createDefaultBounds(
     collision: { ...DEFAULT_NINJA_COLLISION_RECT },
     attack: createDefaultAttackRect(actorId, direction, actionId)
   };
+}
+
+function createDefaultLaneAnchor(
+  actorId: NinjaActorId,
+  actionId: string
+): NinjaLaneAnchor {
+  const visual = createDefaultVisualRect(actorId, actionId);
+
+  return normalizeLaneAnchor(
+    {
+      x: visual.x + Math.round(visual.width / 2),
+      y: visual.y + visual.height
+    },
+    { x: NINJA_CENTER.x, y: NINJA_FRAME_SIZE - 1 }
+  );
 }
 
 function createDefaultVisualRect(actorId: NinjaActorId, actionId: string): NinjaRect {
@@ -849,6 +982,43 @@ function normalizePlaybackRatesByActor(
       )
     ])
   ) as NinjaPlaybackRatesByActor;
+}
+
+function normalizeLaneAnchorsByActor(
+  laneAnchorsByActor: Partial<NinjaLaneAnchorsByActor> | undefined,
+  defaults: NinjaLaneAnchorsByActor
+): NinjaLaneAnchorsByActor {
+  return Object.fromEntries(
+    NINJA_ACTORS.map((actorDefinition) => [
+      actorDefinition.id,
+      Object.fromEntries(
+        FACING_DIRECTIONS.map((direction) => [
+          direction,
+          Object.fromEntries(
+            actorDefinition.actions.map((actionDefinition) => [
+              actionDefinition.id,
+              normalizeLaneAnchor(
+                laneAnchorsByActor?.[actorDefinition.id]?.[direction]?.[
+                  actionDefinition.id
+                ],
+                defaults[actorDefinition.id][direction][actionDefinition.id]
+              )
+            ])
+          )
+        ])
+      )
+    ])
+  ) as NinjaLaneAnchorsByActor;
+}
+
+function normalizeLaneAnchor(
+  anchor: Partial<NinjaLaneAnchor> | undefined,
+  fallback: NinjaLaneAnchor
+): NinjaLaneAnchor {
+  return {
+    x: clampInteger(anchor?.x, 0, NINJA_FRAME_SIZE - 1, fallback.x),
+    y: clampInteger(anchor?.y, 0, NINJA_FRAME_SIZE - 1, fallback.y)
+  };
 }
 
 function normalizeRect(rect: Partial<NinjaRect> | undefined, fallback: NinjaRect): NinjaRect {

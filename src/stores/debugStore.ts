@@ -10,12 +10,14 @@ import {
   DEFAULT_GAMEPLAY_TUNING,
   DEFAULT_LEVEL_PROGRESS,
   DEFAULT_RUNNER_SETTINGS,
+  DEFAULT_SANDBOX_LANE_SETTINGS,
   type BackgroundLabSettings,
   type BaselineLabSettings,
   type ElementEditorSettings,
   type GameplayTuning,
   type LevelProgressState,
-  type RunnerGenerationSettings
+  type RunnerGenerationSettings,
+  type SandboxLaneSettings
 } from '../game/debugFeatures';
 
 export interface DebugPointerState {
@@ -83,9 +85,11 @@ export interface DebugState {
   readonly showOrigins: boolean;
   readonly showPointerProbe: boolean;
   readonly showEnemyRanges: boolean;
+  readonly showLaneGuides: boolean;
   readonly enemyChaseEnabled: boolean;
   readonly backgroundFileName: DebugBackgroundFileName;
   readonly gameplayTuning: GameplayTuning;
+  readonly sandboxLaneSettings: SandboxLaneSettings;
   readonly levelProgress: LevelProgressState;
   readonly runnerGeneration: RunnerGenerationSettings;
   readonly baselineLab: BaselineLabSettings;
@@ -113,10 +117,12 @@ export interface DebugStore extends WritableStore<DebugState> {
   setShowOrigins(showOrigins: boolean): void;
   setShowPointerProbe(showPointerProbe: boolean): void;
   setShowEnemyRanges(showEnemyRanges: boolean): void;
+  setShowLaneGuides(showLaneGuides: boolean): void;
   setEnemyChaseEnabled(enemyChaseEnabled: boolean): void;
   toggleEnemyChase(): void;
   setBackgroundFileName(backgroundFileName: DebugBackgroundFileName): void;
   setGameplayTuning(gameplayTuning: GameplayTuning): void;
+  setSandboxLaneSettings(sandboxLaneSettings: SandboxLaneSettings): void;
   setLevelProgress(levelProgress: LevelProgressState): void;
   setRunnerGeneration(runnerGeneration: RunnerGenerationSettings): void;
   setBaselineLab(baselineLab: BaselineLabSettings): void;
@@ -160,9 +166,11 @@ function createInitialDebugState(): DebugState {
     showOrigins: false,
     showPointerProbe: false,
     showEnemyRanges: false,
+    showLaneGuides: true,
     enemyChaseEnabled: false,
     backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
     gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
+    sandboxLaneSettings: DEFAULT_SANDBOX_LANE_SETTINGS,
     levelProgress: DEFAULT_LEVEL_PROGRESS,
     runnerGeneration: DEFAULT_RUNNER_SETTINGS,
     baselineLab: DEFAULT_BASELINE_LAB_SETTINGS,
@@ -248,6 +256,9 @@ export function createDebugStore(): DebugStore {
     setShowEnemyRanges: (showEnemyRanges) => {
       store.update((state) => ({ ...state, showEnemyRanges }));
     },
+    setShowLaneGuides: (showLaneGuides) => {
+      store.update((state) => ({ ...state, showLaneGuides }));
+    },
     setEnemyChaseEnabled: (enemyChaseEnabled) => {
       store.update((state) => ({ ...state, enemyChaseEnabled }));
     },
@@ -259,6 +270,9 @@ export function createDebugStore(): DebugStore {
     },
     setGameplayTuning: (gameplayTuning) => {
       store.update((state) => ({ ...state, gameplayTuning }));
+    },
+    setSandboxLaneSettings: (sandboxLaneSettings) => {
+      store.update((state) => ({ ...state, sandboxLaneSettings }));
     },
     setLevelProgress: (levelProgress) => {
       store.update((state) => ({ ...state, levelProgress }));
@@ -318,9 +332,11 @@ export function createDebugStore(): DebugStore {
         showOrigins: current.showOrigins,
         showPointerProbe: current.showPointerProbe,
         showEnemyRanges: current.showEnemyRanges,
+        showLaneGuides: current.showLaneGuides,
         enemyChaseEnabled: current.enemyChaseEnabled,
         backgroundFileName: current.backgroundFileName,
         gameplayTuning: current.gameplayTuning,
+        sandboxLaneSettings: current.sandboxLaneSettings,
         levelProgress: current.levelProgress,
         runnerGeneration: current.runnerGeneration,
         baselineLab: current.baselineLab,

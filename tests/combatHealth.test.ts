@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAttackDamage,
   ATTACK_DAMAGE,
+  canPlayerReceiveEnemyAttack,
   ENEMY_MAX_HEALTH,
   getHealthBand,
   getHealthRatio,
@@ -19,6 +20,15 @@ describe('combat health', () => {
     expect(applyAttackDamage(PLAYER_MAX_HEALTH)).toBe(4);
     expect(applyAttackDamage(ENEMY_MAX_HEALTH)).toBe(0);
     expect(applyAttackDamage(0)).toBe(0);
+  });
+
+  it('prevents enemy attacks from hitting while the player is jumping', () => {
+    expect(canPlayerReceiveEnemyAttack('idle')).toBe(true);
+    expect(canPlayerReceiveEnemyAttack('run')).toBe(true);
+    expect(canPlayerReceiveEnemyAttack('slash')).toBe(true);
+    expect(canPlayerReceiveEnemyAttack('hurt')).toBe(true);
+    expect(canPlayerReceiveEnemyAttack('jump')).toBe(false);
+    expect(canPlayerReceiveEnemyAttack('dead')).toBe(false);
   });
 
   it('classifies player health into green, yellow, and critical bands', () => {
