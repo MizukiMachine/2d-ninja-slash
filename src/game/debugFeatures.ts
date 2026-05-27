@@ -2,11 +2,17 @@ import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
   type DebugBackgroundFileName
 } from './assets/ninjaAssetCatalog';
+import {
+  createDefaultThreeLaneYSettings,
+  normalizeThreeLaneYSettings,
+  type ThreeLaneYSettings
+} from './playerLaneMovement';
 
 export type DebugElementKind = 'platform' | 'hazard' | 'pickup' | 'spawn' | 'goal' | 'enemy';
 export type BackgroundFitMode = 'cover' | 'contain' | 'native';
 export type ElementEditorCommandKind = 'none' | 'add' | 'delete' | 'duplicate' | 'nudge';
 export type RoundEnemyGrowthMode = 'linear' | 'fibonacci';
+export type SandboxLaneSettings = ThreeLaneYSettings;
 
 export interface DebugRect {
   readonly x: number;
@@ -103,6 +109,8 @@ export const GAMEPLAY_TUNING_CONFIG_URL = '/assets/config/gameplay-tuning.json';
 export const GAMEPLAY_TUNING_SAVE_ENDPOINT = '/__debug/gameplay-tuning';
 export const LEVEL_PROGRESS_STORAGE_KEY = 'ninja-slash.levelProgress.v1';
 export const LEVEL_PROGRESS_CHANGED_EVENT = 'ninja-slash-level-progress-changed';
+export const SANDBOX_LANE_SETTINGS_STORAGE_KEY_PREFIX =
+  'ninja-slash.sandboxLaneSettings.v1';
 
 export const DEBUG_ELEMENT_KINDS: readonly DebugElementKind[] = [
   'platform',
@@ -146,6 +154,9 @@ export const DEFAULT_GAMEPLAY_TUNING: GameplayTuning = {
   roundEnemyGrowthMode: 'fibonacci',
   roundIntermissionMs: 1200
 };
+
+export const DEFAULT_SANDBOX_LANE_SETTINGS: SandboxLaneSettings =
+  createDefaultThreeLaneYSettings({ worldHeight: 720 });
 
 export const DEFAULT_RUNNER_SETTINGS: RunnerGenerationSettings = {
   seed: 7,
@@ -421,6 +432,66 @@ export function normalizeGameplayTuning(value: unknown): GameplayTuning {
       DEFAULT_GAMEPLAY_TUNING.roundIntermissionMs
     )
   };
+}
+
+export function createDefaultSandboxLaneSettings(
+  worldHeight: number
+): SandboxLaneSettings {
+  return createDefaultThreeLaneYSettings({ worldHeight });
+}
+
+export function normalizeSandboxLaneSettings(
+  value: unknown,
+  worldHeight: number
+): SandboxLaneSettings {
+  return normalizeThreeLaneYSettings(value, {
+    worldHeight,
+    fallback: createDefaultSandboxLaneSettings(worldHeight)
+  });
+}
+
+export function loadSandboxLaneSettings(
+  profileId: string,
+  worldHeight: number,
+  storage: Storage = window.localStorage
+): SandboxLaneSettings {
+  try {
+    const raw = storage.getItem(getSandboxLaneSettingsStorageKey(profileId));
+
+    return raw === null
+      ? createDefaultSandboxLaneSettings(worldHeight)
+      : normalizeSandboxLaneSettings(JSON.parse(raw), worldHeight);
+  } catch {
+    return createDefaultSandboxLaneSettings(worldHeight);
+  }
+}
+
+export function saveSandboxLaneSettings(
+  profileId: string,
+  settings: SandboxLaneSettings,
+  worldHeight: number,
+  storage: Storage = window.localStorage
+): SandboxLaneSettings {
+  const normalized = normalizeSandboxLaneSettings(settings, worldHeight);
+  storage.setItem(
+    getSandboxLaneSettingsStorageKey(profileId),
+    JSON.stringify(normalized)
+  );
+
+  return normalized;
+}
+
+export function resetSandboxLaneSettings(
+  profileId: string,
+  worldHeight: number,
+  storage: Storage = window.localStorage
+): SandboxLaneSettings {
+  return saveSandboxLaneSettings(
+    profileId,
+    createDefaultSandboxLaneSettings(worldHeight),
+    worldHeight,
+    storage
+  );
 }
 
 export function getRoundEnemyCount(
@@ -761,6 +832,10 @@ function getNextLevelId(levelId: string): string | null {
   const index = PLAYABLE_LEVEL_IDS.indexOf(levelId);
 
   return index >= 0 ? PLAYABLE_LEVEL_IDS[index + 1] ?? null : null;
+}
+
+function getSandboxLaneSettingsStorageKey(profileId: string): string {
+  return `${SANDBOX_LANE_SETTINGS_STORAGE_KEY_PREFIX}.${encodeURIComponent(profileId)}`;
 }
 
 function sortPlayableIds(levelIds: readonly string[]): readonly string[] {

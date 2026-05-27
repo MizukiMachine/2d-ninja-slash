@@ -14,6 +14,7 @@ export class MainMenuScene extends BaseScene {
     const buttons = [
       { label: 'Sandbox', scene: SceneKeys.Sandbox },
       { label: 'Ninja Gym', scene: SceneKeys.Gym },
+      { label: 'Lane Editor', scene: SceneKeys.LaneEditor },
       { label: 'Level Progress', scene: SceneKeys.LevelProgress },
       { label: 'Element Editor', scene: SceneKeys.ElementEditor },
       { label: 'Gameplay Baseline', scene: SceneKeys.BaselineLevel },

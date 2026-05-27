@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createDefaultThreeLaneYSettings } from '../src/game/playerLaneMovement';
 import { createDebugStore } from '../src/stores/debugStore';
 import { createSettingsStore, DEFAULT_SETTINGS } from '../src/stores/settingsStore';
 
@@ -63,6 +64,10 @@ describe('debugStore', () => {
     const store = createDebugStore();
 
     expect(store.get().enemyChaseEnabled).toBe(false);
+    expect(store.get().showLaneGuides).toBe(true);
+    expect(store.get().sandboxLaneSettings).toEqual(
+      createDefaultThreeLaneYSettings({ worldHeight: 720 })
+    );
   });
 
   it('tracks scene, pause, world bounds, pointer, and input state', () => {
@@ -77,8 +82,10 @@ describe('debugStore', () => {
     store.setShowOrigins(true);
     store.setShowPointerProbe(true);
     store.setShowEnemyRanges(true);
+    store.setShowLaneGuides(false);
     store.setEnemyChaseEnabled(false);
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
     store.setPointer({ x: 12, y: 24, worldX: 120, worldY: 240, down: true });
     store.setInput({ left: true, lastKey: 'KeyA' });
@@ -114,8 +121,14 @@ describe('debugStore', () => {
       showOrigins: true,
       showPointerProbe: true,
       showEnemyRanges: true,
+      showLaneGuides: false,
       enemyChaseEnabled: false,
       backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      sandboxLaneSettings: {
+        upperY: 320,
+        middleY: 455,
+        lowerY: 610
+      },
       actorResetRequestId: 1,
       pointer: {
         x: 12,
@@ -176,8 +189,10 @@ describe('debugStore', () => {
     store.setShowOrigins(true);
     store.setShowPointerProbe(true);
     store.setShowEnemyRanges(true);
+    store.setShowLaneGuides(false);
     store.setEnemyChaseEnabled(false);
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
     store.setPlayer({ action: 'run', x: 100 });
     store.setRound({
@@ -201,8 +216,14 @@ describe('debugStore', () => {
       showOrigins: true,
       showPointerProbe: true,
       showEnemyRanges: true,
+      showLaneGuides: false,
       enemyChaseEnabled: false,
       backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      sandboxLaneSettings: {
+        upperY: 320,
+        middleY: 455,
+        lowerY: 610
+      },
       actorResetRequestId: 1,
       player: {
         action: 'none',

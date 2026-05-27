@@ -8,12 +8,15 @@ import {
   getNinjaAction,
   getNinjaAnimationBounds,
   getNinjaAnimationPlaybackRate,
+  getNinjaLaneAnchor,
   getOppositeFacingDirection,
   isNinjaHitFrameActive,
+  mirrorNinjaLaneAnchorHorizontally,
   mirrorNinjaRectHorizontally,
   normalizeNinjaBoundsConfig,
   resetNinjaAnimationConfig,
   setNinjaAnimationBounds,
+  setNinjaLaneAnchor,
   setNinjaAnimationPlaybackRate,
   setNinjaHitFrame
 } from '../src/game/ninjaBounds';
@@ -26,9 +29,12 @@ describe('ninja bounds config', () => {
       for (const direction of FACING_DIRECTIONS) {
         for (const action of actor.actions) {
           const bounds = getNinjaAnimationBounds(config, actor.id, direction, action.id);
+          const anchor = getNinjaLaneAnchor(config, actor.id, direction, action.id);
 
           expect(bounds.collision.width).toBeGreaterThan(0);
           expect(bounds.collision.height).toBeGreaterThan(0);
+          expect(anchor.x).toBeGreaterThanOrEqual(0);
+          expect(anchor.y).toBeGreaterThanOrEqual(0);
           expect(getNinjaAnimationPlaybackRate(config, actor.id, action.id)).toBe(1);
         }
       }
@@ -69,6 +75,47 @@ describe('ninja bounds config', () => {
       y: 40,
       width: 50,
       height: 70
+    });
+  });
+
+  it('stores lane anchors separately from bounds', () => {
+    const config = setNinjaLaneAnchor(
+      DEFAULT_NINJA_BOUNDS_CONFIG,
+      'mainNinja',
+      'right',
+      'idle',
+      { x: 74, y: 118 }
+    );
+
+    expect(getNinjaLaneAnchor(config, 'mainNinja', 'right', 'idle')).toEqual({
+      x: 74,
+      y: 118
+    });
+    expect(getNinjaLaneAnchor(config, 'mainNinja', 'left', 'idle')).not.toEqual({
+      x: 74,
+      y: 118
+    });
+    expect(getNinjaAnimationBounds(config, 'mainNinja', 'right', 'idle')).toEqual(
+      getNinjaAnimationBounds(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja', 'right', 'idle')
+    );
+  });
+
+  it('clamps and mirrors lane anchors within the source frame', () => {
+    const config = setNinjaLaneAnchor(
+      DEFAULT_NINJA_BOUNDS_CONFIG,
+      'enemyNinja',
+      'left',
+      'run',
+      { x: -20, y: 999 }
+    );
+
+    expect(getNinjaLaneAnchor(config, 'enemyNinja', 'left', 'run')).toEqual({
+      x: 0,
+      y: 127
+    });
+    expect(mirrorNinjaLaneAnchorHorizontally({ x: 24, y: 110 })).toEqual({
+      x: 103,
+      y: 110
     });
   });
 
@@ -133,10 +180,11 @@ describe('ninja bounds config', () => {
 
   it('exports a versioned payload', () => {
     expect(buildNinjaBoundsExport(DEFAULT_NINJA_BOUNDS_CONFIG)).toMatchObject({
-      version: 2,
+      version: 3,
       boundsByActor: expect.any(Object),
       hitFramesByActor: expect.any(Object),
-      playbackRatesByActor: expect.any(Object)
+      playbackRatesByActor: expect.any(Object),
+      laneAnchorsByActor: expect.any(Object)
     });
   });
 });

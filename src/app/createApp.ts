@@ -23,10 +23,12 @@ import {
   ROUND_ENEMY_GROWTH_MODES,
   buildDebugElementsExport,
   createDefaultDebugElementsConfig,
+  createDefaultSandboxLaneSettings,
   formatElementKind,
   getDebugLevel,
   getDebugLevelElements,
   loadLevelProgress,
+  loadSandboxLaneSettings,
   markLevelCompleted,
   normalizeBackgroundLabSettings,
   normalizeBaselineLabSettings,
@@ -35,24 +37,34 @@ import {
   normalizeGameplayTuning,
   normalizeLevelProgress,
   normalizeRunnerSettings,
+  normalizeSandboxLaneSettings,
   resetLevelProgress,
+  resetSandboxLaneSettings,
+  saveSandboxLaneSettings,
   setLevelUnlocked,
   type BackgroundFitMode,
   type DebugElementKind,
   type DebugElementsConfig,
   type GameplayTuning,
-  type RoundEnemyGrowthMode
+  type RoundEnemyGrowthMode,
+  type SandboxLaneSettings
 } from '../game/debugFeatures';
+import {
+  THREE_LANE_BOTTOM_INSET,
+  THREE_LANE_MIN_Y
+} from '../game/playerLaneMovement';
 import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
   FACING_DIRECTIONS,
   NINJA_ACTORS,
   NINJA_BOUNDS_CONFIG_URL,
   NINJA_BOUNDS_SAVE_ENDPOINT,
+  NINJA_FRAME_SIZE,
   NINJA_PLAYBACK_RATE_LIMITS,
   areNinjaRectsEqual,
   applyAllNinjaBoundsToAllActions,
   applyNinjaBoundsKindToAllActions,
+  applyNinjaLaneAnchorToAllActions,
   buildNinjaBoundsExport,
   cloneNinjaBoundsConfig,
   getDefaultNinjaActionId,
@@ -60,8 +72,10 @@ import {
   getNinjaAnimationBounds,
   getNinjaAnimationPlaybackRate,
   getNinjaAnimationsForActor,
+  getNinjaLaneAnchor,
   getOppositeFacingDirection,
   isNinjaHitFrameActive,
+  mirrorNinjaLaneAnchorHorizontally,
   mirrorNinjaRectHorizontally,
   normalizeFacingDirection,
   normalizeNinjaActionId,
@@ -71,12 +85,14 @@ import {
   normalizeNinjaPlaybackRate,
   resetNinjaAnimationConfig,
   setNinjaAnimationBounds,
+  setNinjaLaneAnchor,
   setNinjaAnimationPlaybackRate,
   setNinjaHitFrame,
   type FacingDirection,
   type NinjaActorId,
   type NinjaBoundsConfig,
   type NinjaBoundsKind,
+  type NinjaLaneAnchor,
   type NinjaRect
 } from '../game/ninjaBounds';
 import { createDebugStore } from '../stores/debugStore';
@@ -165,6 +181,17 @@ function clampRectToFrame(rect: NinjaRect): NinjaRect {
   const height = clampInteger(rect.height, 1, 256 - y);
 
   return { x, y, width, height };
+}
+
+function clampLaneAnchorToFrame(anchor: NinjaLaneAnchor): NinjaLaneAnchor {
+  return {
+    x: clampInteger(anchor.x, 0, NINJA_FRAME_SIZE - 1),
+    y: clampInteger(anchor.y, 0, NINJA_FRAME_SIZE - 1)
+  };
+}
+
+function areNinjaLaneAnchorsEqual(left: NinjaLaneAnchor, right: NinjaLaneAnchor): boolean {
+  return left.x === right.x && left.y === right.y;
 }
 
 function clampInteger(value: number, min: number, max: number): number {
@@ -271,6 +298,7 @@ export function createApp(root: HTMLDivElement | null): void {
   let debugElementsConfig = createDefaultDebugElementsConfig();
   let gymSaveStatus = 'Loaded defaults';
   let gameplayTuningSaveStatus = 'Loaded defaults';
+  let laneEditorSaveStatus = 'Loaded defaults';
   let elementEditorSaveStatus = 'Loaded defaults';
   let gymSelectedActorId: NinjaActorId = 'mainNinja';
   let gymSelectedDirection: FacingDirection = 'right';
@@ -369,6 +397,7 @@ export function createApp(root: HTMLDivElement | null): void {
       <div class="panel-group__row">
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Sandbox}">Sandbox</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Gym}">Gym</button>
+        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LaneEditor}">Lanes</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LevelProgress}">Levels</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.ElementEditor}">Elements</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BaselineLevel}">Baseline</button>
@@ -384,6 +413,34 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="toggle-row"><input id="show-origins" type="checkbox" /> Origins</label>
       <label class="toggle-row"><input id="show-pointer-probe" type="checkbox" /> Pointer probe</label>
       <label class="toggle-row"><input id="show-enemy-ranges" type="checkbox" /> Enemy attack box</label>
+    </div>
+    <div id="lane-editor-controls" class="panel-group">
+      <p class="panel-group__title">Lane Editor</p>
+      <label class="toggle-row"><input id="show-lane-guides" type="checkbox" /> Show in Sandbox</label>
+      <label class="range-row">
+        <span>Upper Y</span>
+        <input id="lane-upper-y" type="range" min="0" max="720" step="1" />
+        <strong id="lane-upper-y-readout">372</strong>
+      </label>
+      <label class="range-row">
+        <span>Middle Y</span>
+        <input id="lane-middle-y" type="range" min="0" max="720" step="1" />
+        <strong id="lane-middle-y-readout">468</strong>
+      </label>
+      <label class="range-row">
+        <span>Lower Y</span>
+        <input id="lane-lower-y" type="range" min="0" max="720" step="1" />
+        <strong id="lane-lower-y-readout">564</strong>
+      </label>
+      <div class="editor-grid">
+        <label class="number-row"><span>U</span><input id="lane-upper-y-number" type="number" min="0" max="720" step="1" /></label>
+        <label class="number-row"><span>M</span><input id="lane-middle-y-number" type="number" min="0" max="720" step="1" /></label>
+        <label class="number-row"><span>L</span><input id="lane-lower-y-number" type="number" min="0" max="720" step="1" /></label>
+      </div>
+      <div class="panel-group__row">
+        <button id="lane-reset" class="shell-button" type="button">Reset lanes</button>
+      </div>
+      <p id="lane-save-status" class="panel-note">Loaded defaults</p>
     </div>
     <div class="panel-group">
       <p class="panel-group__title">Gameplay Tuning</p>
@@ -588,6 +645,20 @@ export function createApp(root: HTMLDivElement | null): void {
         <button id="gym-apply-kind-all" class="shell-button" type="button">Apply selected</button>
         <button id="gym-apply-all" class="shell-button" type="button">Apply all</button>
       </div>
+      <div class="frame-control">
+        <div class="frame-control__header">
+          <span>Lane Anchor</span>
+          <strong id="gym-lane-anchor-readout">X64 Y127</strong>
+        </div>
+        <div class="editor-grid">
+          <label class="number-row"><span>X</span><input id="gym-lane-anchor-x" type="number" min="0" max="${NINJA_FRAME_SIZE - 1}" step="1" /></label>
+          <label class="number-row"><span>Y</span><input id="gym-lane-anchor-y" type="number" min="0" max="${NINJA_FRAME_SIZE - 1}" step="1" /></label>
+        </div>
+        <div class="panel-group__row">
+          <button id="gym-mirror-lane-anchor" class="shell-button" type="button">Mirror anchor</button>
+          <button id="gym-apply-lane-anchor-all" class="shell-button" type="button">Apply anchor all</button>
+        </div>
+      </div>
       <p id="gym-save-status" class="panel-note">Loaded defaults</p>
     </div>
     <div class="metrics">
@@ -627,6 +698,51 @@ export function createApp(root: HTMLDivElement | null): void {
     '#show-enemy-ranges',
     HTMLInputElement
   );
+  const laneEditorControls = requireElement(
+    debugControls,
+    '#lane-editor-controls',
+    HTMLElement
+  );
+  const showLaneGuidesToggle = requireElement(
+    debugControls,
+    '#show-lane-guides',
+    HTMLInputElement
+  );
+  const laneUpperYInput = requireElement(debugControls, '#lane-upper-y', HTMLInputElement);
+  const laneMiddleYInput = requireElement(debugControls, '#lane-middle-y', HTMLInputElement);
+  const laneLowerYInput = requireElement(debugControls, '#lane-lower-y', HTMLInputElement);
+  const laneUpperYReadout = requireElement(
+    debugControls,
+    '#lane-upper-y-readout',
+    HTMLElement
+  );
+  const laneMiddleYReadout = requireElement(
+    debugControls,
+    '#lane-middle-y-readout',
+    HTMLElement
+  );
+  const laneLowerYReadout = requireElement(
+    debugControls,
+    '#lane-lower-y-readout',
+    HTMLElement
+  );
+  const laneUpperYNumberInput = requireElement(
+    debugControls,
+    '#lane-upper-y-number',
+    HTMLInputElement
+  );
+  const laneMiddleYNumberInput = requireElement(
+    debugControls,
+    '#lane-middle-y-number',
+    HTMLInputElement
+  );
+  const laneLowerYNumberInput = requireElement(
+    debugControls,
+    '#lane-lower-y-number',
+    HTMLInputElement
+  );
+  const laneResetButton = requireElement(debugControls, '#lane-reset', HTMLButtonElement);
+  const laneSaveStatus = requireElement(debugControls, '#lane-save-status', HTMLElement);
   const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
   const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
   const tuningPlayerSpeedInput = requireElement(
@@ -944,6 +1060,31 @@ export function createApp(root: HTMLDivElement | null): void {
     '#gym-apply-all',
     HTMLButtonElement
   );
+  const gymLaneAnchorReadout = requireElement(
+    debugControls,
+    '#gym-lane-anchor-readout',
+    HTMLElement
+  );
+  const gymLaneAnchorXInput = requireElement(
+    debugControls,
+    '#gym-lane-anchor-x',
+    HTMLInputElement
+  );
+  const gymLaneAnchorYInput = requireElement(
+    debugControls,
+    '#gym-lane-anchor-y',
+    HTMLInputElement
+  );
+  const gymMirrorLaneAnchorButton = requireElement(
+    debugControls,
+    '#gym-mirror-lane-anchor',
+    HTMLButtonElement
+  );
+  const gymApplyLaneAnchorAllButton = requireElement(
+    debugControls,
+    '#gym-apply-lane-anchor-all',
+    HTMLButtonElement
+  );
   const gymSaveStatusElement = requireElement(debugControls, '#gym-save-status', HTMLElement);
   const sceneReadout = requireElement(debugControls, '#scene-readout', HTMLElement);
   const fpsReadout = requireElement(debugControls, '#fps-readout', HTMLElement);
@@ -1075,6 +1216,61 @@ export function createApp(root: HTMLDivElement | null): void {
     );
   };
 
+  const getCurrentProfileHeight = (): number => getProfileById(profileId).height;
+
+  const getLaneControlMaxY = (): number =>
+    Math.max(THREE_LANE_MIN_Y, getCurrentProfileHeight() - THREE_LANE_BOTTOM_INSET);
+
+  const setLaneControlBounds = (): void => {
+    const min = String(THREE_LANE_MIN_Y);
+    const max = String(getLaneControlMaxY());
+
+    [
+      laneUpperYInput,
+      laneMiddleYInput,
+      laneLowerYInput,
+      laneUpperYNumberInput,
+      laneMiddleYNumberInput,
+      laneLowerYNumberInput
+    ].forEach((input) => {
+      input.min = min;
+      input.max = max;
+    });
+  };
+
+  const saveLaneSettingsForCurrentProfile = (
+    settings: SandboxLaneSettings
+  ): SandboxLaneSettings => {
+    const worldHeight = getCurrentProfileHeight();
+    const normalizedSettings = normalizeSandboxLaneSettings(settings, worldHeight);
+
+    try {
+      const savedSettings = saveSandboxLaneSettings(
+        profileId,
+        normalizedSettings,
+        worldHeight
+      );
+      laneEditorSaveStatus = 'Saved local lane settings';
+      return savedSettings;
+    } catch {
+      laneEditorSaveStatus = 'Using unsaved lane settings';
+      return normalizedSettings;
+    }
+  };
+
+  const patchLaneSettings = (patch: Partial<SandboxLaneSettings>): void => {
+    const current = normalizeSandboxLaneSettings(
+      debugStore.get().sandboxLaneSettings,
+      getCurrentProfileHeight()
+    );
+    const nextSettings = saveLaneSettingsForCurrentProfile({
+      ...current,
+      ...patch
+    });
+
+    debugStore.setSandboxLaneSettings(nextSettings);
+  };
+
   const readGameplayTuningInputs = (): GameplayTuning =>
     normalizeGameplayTuning({
       playerSpeed: Number(tuningPlayerSpeedInput.value),
@@ -1160,6 +1356,33 @@ export function createApp(root: HTMLDivElement | null): void {
     tuningRoundMaxReadout.textContent = String(tuning.roundEnemyMaxCount);
     tuningRoundWaitReadout.textContent = String(tuning.roundIntermissionMs);
     tuningSaveStatus.textContent = gameplayTuningSaveStatus;
+  };
+
+  const renderLaneEditorControls = (): void => {
+    const settings = normalizeSandboxLaneSettings(
+      debugStore.get().sandboxLaneSettings,
+      getCurrentProfileHeight()
+    );
+    const activeElement = document.activeElement;
+
+    setLaneControlBounds();
+    showLaneGuidesToggle.checked = debugStore.get().showLaneGuides;
+    laneUpperYInput.value = String(settings.upperY);
+    laneMiddleYInput.value = String(settings.middleY);
+    laneLowerYInput.value = String(settings.lowerY);
+    if (activeElement !== laneUpperYNumberInput) {
+      laneUpperYNumberInput.value = String(settings.upperY);
+    }
+    if (activeElement !== laneMiddleYNumberInput) {
+      laneMiddleYNumberInput.value = String(settings.middleY);
+    }
+    if (activeElement !== laneLowerYNumberInput) {
+      laneLowerYNumberInput.value = String(settings.lowerY);
+    }
+    laneUpperYReadout.textContent = String(settings.upperY);
+    laneMiddleYReadout.textContent = String(settings.middleY);
+    laneLowerYReadout.textContent = String(settings.lowerY);
+    laneSaveStatus.textContent = laneEditorSaveStatus;
   };
 
   const renderBackgroundLabControls = (): void => {
@@ -1263,6 +1486,38 @@ export function createApp(root: HTMLDivElement | null): void {
     scheduleGymControlsRender();
   };
 
+  const updateGymLaneAnchorFromScene = (
+    actorId: NinjaActorId,
+    direction: FacingDirection,
+    actionId: string,
+    anchor: NinjaLaneAnchor
+  ): void => {
+    const currentAnchor = getNinjaLaneAnchor(
+      ninjaBoundsConfig,
+      actorId,
+      direction,
+      actionId
+    );
+    const nextAnchor = clampLaneAnchorToFrame(anchor);
+
+    if (!areNinjaLaneAnchorsEqual(currentAnchor, nextAnchor)) {
+      ninjaBoundsConfig = setNinjaLaneAnchor(
+        ninjaBoundsConfig,
+        actorId,
+        direction,
+        actionId,
+        nextAnchor
+      );
+      gymSaveStatus = `Updated ${actorId} ${direction} ${actionId} lane anchor`;
+    }
+
+    gymSelectedActorId = actorId;
+    gymSelectedDirection = direction;
+    gymSelectedActionId = actionId;
+    syncNinjaGymGlobal();
+    scheduleGymControlsRender();
+  };
+
   const syncNinjaGymGlobal = (): void => {
     const current = globalThis.__NINJA_SLASH_GYM__;
     const actorId = normalizeNinjaActorId(gymSelectedActorId);
@@ -1287,7 +1542,8 @@ export function createApp(root: HTMLDivElement | null): void {
       boundsConfig: ninjaBoundsConfig,
       currentFrame: current?.currentFrame ?? 0,
       zoom: current?.zoom ?? 1.35,
-      updateBounds: updateGymBoundsFromScene
+      updateBounds: updateGymBoundsFromScene,
+      updateLaneAnchor: updateGymLaneAnchorFromScene
     };
   };
 
@@ -1358,6 +1614,12 @@ export function createApp(root: HTMLDivElement | null): void {
       height: Number(gymBoundsHeightInput.value)
     });
 
+  const readGymLaneAnchorInputs = (): NinjaLaneAnchor =>
+    clampLaneAnchorToFrame({
+      x: Number(gymLaneAnchorXInput.value),
+      y: Number(gymLaneAnchorYInput.value)
+    });
+
   const updateSelectedGymBounds = (): void => {
     const selection = getGymSelection();
     ninjaBoundsConfig = setNinjaAnimationBounds(
@@ -1369,6 +1631,19 @@ export function createApp(root: HTMLDivElement | null): void {
       readGymBoundsInputs()
     );
     gymSaveStatus = `Updated ${selection.actorId} ${selection.direction} ${selection.actionId} ${selection.boundsKind}`;
+    patchGymState();
+  };
+
+  const updateSelectedGymLaneAnchor = (): void => {
+    const selection = getGymSelection();
+    ninjaBoundsConfig = setNinjaLaneAnchor(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      readGymLaneAnchorInputs()
+    );
+    gymSaveStatus = `Updated ${selection.actorId} ${selection.direction} ${selection.actionId} lane anchor`;
     patchGymState();
   };
 
@@ -1490,6 +1765,12 @@ export function createApp(root: HTMLDivElement | null): void {
       direction,
       actionId
     )[boundsKind];
+    const activeLaneAnchor = getNinjaLaneAnchor(
+      ninjaBoundsConfig,
+      actorId,
+      direction,
+      actionId
+    );
     const activeHitFrames = getGymActiveHitFrames(
       ninjaBoundsConfig,
       actorId,
@@ -1524,6 +1805,7 @@ export function createApp(root: HTMLDivElement | null): void {
     gymPlaybackReadout.textContent = `${playbackRate.toFixed(2)}x`;
     gymFrameReadout.textContent = `${currentFrame + 1}/${actionDefinition.frameCount}`;
     gymAttackFrameReadout.textContent = `Active: ${formatFrameList(activeHitFrames)}`;
+    gymLaneAnchorReadout.textContent = `X${activeLaneAnchor.x} Y${activeLaneAnchor.y}`;
     gymToggleCurrentHitFrameButton.textContent = currentFrameActive
       ? 'Disable current'
       : 'Enable current';
@@ -1552,6 +1834,12 @@ export function createApp(root: HTMLDivElement | null): void {
     if (document.activeElement !== gymBoundsHeightInput) {
       gymBoundsHeightInput.value = String(activeBounds.height);
     }
+    if (document.activeElement !== gymLaneAnchorXInput) {
+      gymLaneAnchorXInput.value = String(activeLaneAnchor.x);
+    }
+    if (document.activeElement !== gymLaneAnchorYInput) {
+      gymLaneAnchorYInput.value = String(activeLaneAnchor.y);
+    }
 
     gymControls
       .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
@@ -1571,6 +1859,10 @@ export function createApp(root: HTMLDivElement | null): void {
     root.dataset.profile = profileId;
     profileToggle.textContent = formatProfileLabel(profileId);
     profileToggle.title = `${GAME_PROFILES[profileId].label}`;
+    debugStore.setSandboxLaneSettings(
+      loadSandboxLaneSettings(profileId, getCurrentProfileHeight())
+    );
+    laneEditorSaveStatus = 'Loaded local lane settings';
     debugStore.resetRuntime();
     game = createGame({ parent: gameMount, context });
     refreshScale();
@@ -1658,8 +1950,10 @@ export function createApp(root: HTMLDivElement | null): void {
     showOriginsToggle.checked = state.showOrigins;
     showPointerProbeToggle.checked = state.showPointerProbe;
     showEnemyRangesToggle.checked = state.showEnemyRanges;
+    showLaneGuidesToggle.checked = state.showLaneGuides;
     enemyChaseToggle.checked = state.enemyChaseEnabled;
     backgroundFileSelect.value = state.backgroundFileName;
+    setControlGroupHidden(laneEditorControls, state.activeScene !== SceneKeys.LaneEditor);
     setControlGroupHidden(backgroundLabControls, state.activeScene !== SceneKeys.BackgroundLab);
     setControlGroupHidden(runnerControls, state.activeScene !== SceneKeys.RunnerLab);
     setControlGroupHidden(
@@ -1667,6 +1961,7 @@ export function createApp(root: HTMLDivElement | null): void {
       state.activeScene !== SceneKeys.BaselineLevel && state.activeScene !== SceneKeys.LevelProgress
     );
     setControlGroupHidden(elementEditorControls, state.activeScene !== SceneKeys.ElementEditor);
+    renderLaneEditorControls();
     renderGameplayTuningControls();
     renderLevelProgressControls();
     renderBackgroundLabControls();
@@ -1825,6 +2120,10 @@ export function createApp(root: HTMLDivElement | null): void {
     debugStore.setShowEnemyRanges(showEnemyRangesToggle.checked);
   });
 
+  showLaneGuidesToggle.addEventListener('change', () => {
+    debugStore.setShowLaneGuides(showLaneGuidesToggle.checked);
+  });
+
   enemyChaseToggle.addEventListener('change', () => {
     debugStore.setEnemyChaseEnabled(enemyChaseToggle.checked);
   });
@@ -1848,6 +2147,37 @@ export function createApp(root: HTMLDivElement | null): void {
 
     if (sceneKey !== undefined) {
       startGameScene(sceneKey);
+    }
+  });
+
+  laneUpperYInput.addEventListener('input', () => {
+    patchLaneSettings({ upperY: Number(laneUpperYInput.value) });
+  });
+  laneMiddleYInput.addEventListener('input', () => {
+    patchLaneSettings({ middleY: Number(laneMiddleYInput.value) });
+  });
+  laneLowerYInput.addEventListener('input', () => {
+    patchLaneSettings({ lowerY: Number(laneLowerYInput.value) });
+  });
+  laneUpperYNumberInput.addEventListener('change', () => {
+    patchLaneSettings({ upperY: Number(laneUpperYNumberInput.value) });
+  });
+  laneMiddleYNumberInput.addEventListener('change', () => {
+    patchLaneSettings({ middleY: Number(laneMiddleYNumberInput.value) });
+  });
+  laneLowerYNumberInput.addEventListener('change', () => {
+    patchLaneSettings({ lowerY: Number(laneLowerYNumberInput.value) });
+  });
+  laneResetButton.addEventListener('click', () => {
+    const worldHeight = getCurrentProfileHeight();
+
+    try {
+      const resetSettings = resetSandboxLaneSettings(profileId, worldHeight);
+      laneEditorSaveStatus = 'Reset local lane settings';
+      debugStore.setSandboxLaneSettings(resetSettings);
+    } catch {
+      laneEditorSaveStatus = 'Using default lane settings';
+      debugStore.setSandboxLaneSettings(createDefaultSandboxLaneSettings(worldHeight));
     }
   });
 
@@ -2055,6 +2385,8 @@ export function createApp(root: HTMLDivElement | null): void {
   gymBoundsYInput.addEventListener('input', updateSelectedGymBounds);
   gymBoundsWidthInput.addEventListener('input', updateSelectedGymBounds);
   gymBoundsHeightInput.addEventListener('input', updateSelectedGymBounds);
+  gymLaneAnchorXInput.addEventListener('input', updateSelectedGymLaneAnchor);
+  gymLaneAnchorYInput.addEventListener('input', updateSelectedGymLaneAnchor);
   gymToggleCurrentHitFrameButton.addEventListener('click', () => {
     const selection = getGymSelection();
     const frameIndex = clampInteger(
@@ -2225,6 +2557,33 @@ export function createApp(root: HTMLDivElement | null): void {
     syncNinjaGymGlobal();
     renderGymControls();
   });
+  gymMirrorLaneAnchorButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    const targetDirection = getOppositeFacingDirection(selection.direction);
+    const sourceAnchor = readGymLaneAnchorInputs();
+    const mirroredAnchor = mirrorNinjaLaneAnchorHorizontally(sourceAnchor);
+
+    ninjaBoundsConfig = setNinjaLaneAnchor(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      selection.actionId,
+      sourceAnchor
+    );
+    ninjaBoundsConfig = setNinjaLaneAnchor(
+      ninjaBoundsConfig,
+      selection.actorId,
+      targetDirection,
+      selection.actionId,
+      mirroredAnchor
+    );
+    gymSelectedActorId = selection.actorId;
+    gymSelectedDirection = targetDirection;
+    gymSelectedActionId = selection.actionId;
+    gymSaveStatus = `Mirrored lane anchor from ${selection.direction} to ${targetDirection}`;
+    syncNinjaGymGlobal();
+    renderGymControls();
+  });
   gymApplyKindAllButton.addEventListener('click', () => {
     const selection = getGymSelection();
     ninjaBoundsConfig = applyNinjaBoundsKindToAllActions(
@@ -2235,6 +2594,17 @@ export function createApp(root: HTMLDivElement | null): void {
       readGymBoundsInputs()
     );
     gymSaveStatus = `Applied ${selection.boundsKind} to all ${selection.actorId} ${selection.direction} animations`;
+    patchGymState();
+  });
+  gymApplyLaneAnchorAllButton.addEventListener('click', () => {
+    const selection = getGymSelection();
+    ninjaBoundsConfig = applyNinjaLaneAnchorToAllActions(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.direction,
+      readGymLaneAnchorInputs()
+    );
+    gymSaveStatus = `Applied lane anchor to all ${selection.actorId} ${selection.direction} animations`;
     patchGymState();
   });
   gymApplyAllButton.addEventListener('click', () => {

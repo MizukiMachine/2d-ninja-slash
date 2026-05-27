@@ -3,6 +3,7 @@ export const PLAYER_MAX_HEALTH = 5;
 export const ENEMY_MAX_HEALTH = 1;
 
 export type HealthBand = 'healthy' | 'warning' | 'critical';
+export type PlayerCombatAction = 'idle' | 'run' | 'jump' | 'slash' | 'hurt' | 'dead';
 
 export const getHealthRatio = (health: number, maxHealth: number): number => {
   if (maxHealth <= 0) {
@@ -14,6 +15,9 @@ export const getHealthRatio = (health: number, maxHealth: number): number => {
 
 export const applyAttackDamage = (health: number): number =>
   Math.max(0, health - ATTACK_DAMAGE);
+
+export const canPlayerReceiveEnemyAttack = (action: PlayerCombatAction): boolean =>
+  action !== 'jump' && action !== 'dead';
 
 export const getHealthBand = (health: number, maxHealth: number): HealthBand => {
   const ratio = getHealthRatio(health, maxHealth);

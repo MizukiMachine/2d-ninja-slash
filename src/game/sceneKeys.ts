@@ -4,6 +4,7 @@ export const SceneKeys = {
   MainMenu: 'MainMenu',
   Sandbox: 'Sandbox',
   Gym: 'Gym',
+  LaneEditor: 'LaneEditor',
   LevelProgress: 'LevelProgress',
   ElementEditor: 'ElementEditor',
   BackgroundLab: 'BackgroundLab',

@@ -5,6 +5,7 @@ import { BaselineLevelScene } from './scenes/BaselineLevelScene';
 import { BootScene } from './scenes/BootScene';
 import { ElementEditorScene } from './scenes/ElementEditorScene';
 import { GymScene } from './scenes/GymScene';
+import { LaneEditorScene } from './scenes/LaneEditorScene';
 import { LevelProgressScene } from './scenes/LevelProgressScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
 import { RunnerLabScene } from './scenes/RunnerLabScene';
@@ -68,6 +69,7 @@ export function createGame({ parent, context }: CreateGameOptions): Phaser.Game 
       MainMenuScene,
       SandboxScene,
       GymScene,
+      LaneEditorScene,
       LevelProgressScene,
       ElementEditorScene,
       BackgroundLabScene,

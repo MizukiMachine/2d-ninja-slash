@@ -2,12 +2,44 @@ import { describe, expect, it } from 'vitest';
 import {
   DEBUG_LEVELS,
   createDefaultDebugElementsConfig,
+  createDefaultSandboxLaneSettings,
   getDebugLevelElements,
   getEditableDebugLevel,
+  loadSandboxLaneSettings,
   normalizeDebugElementsConfig,
   normalizeRunnerSettings,
+  resetSandboxLaneSettings,
+  saveSandboxLaneSettings,
   setDebugLevelElements
 } from '../src/game/debugFeatures';
+
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>();
+
+  get length(): number {
+    return this.values.size;
+  }
+
+  clear(): void {
+    this.values.clear();
+  }
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  key(index: number): string | null {
+    return Array.from(this.values.keys())[index] ?? null;
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}
 
 describe('debug feature config', () => {
   it('keeps legacy element exports compatible with per-level config', () => {
@@ -62,5 +94,33 @@ describe('debug feature config', () => {
       seed: 8,
       laneCount: 2
     });
+  });
+
+  it('persists sandbox lane y settings per profile', () => {
+    const storage = new MemoryStorage();
+    const saved = saveSandboxLaneSettings(
+      'landscape',
+      {
+        upperY: 320,
+        middleY: 455,
+        lowerY: 610
+      },
+      720,
+      storage
+    );
+
+    expect(saved).toEqual({
+      upperY: 320,
+      middleY: 455,
+      lowerY: 610
+    });
+    expect(loadSandboxLaneSettings('landscape', 720, storage)).toEqual(saved);
+    expect(loadSandboxLaneSettings('portrait', 1280, storage)).toEqual(
+      createDefaultSandboxLaneSettings(1280)
+    );
+
+    expect(resetSandboxLaneSettings('landscape', 720, storage)).toEqual(
+      createDefaultSandboxLaneSettings(720)
+    );
   });
 });
