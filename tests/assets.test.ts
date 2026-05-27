@@ -10,7 +10,7 @@ const SPRITE_SHEET_SIZE = {
   width: 2048,
   height: 1024
 } as const;
-const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'slash2', 'slash3', 'impact'] as const;
+const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'crouching', 'slash', 'impact'] as const;
 const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash'] as const;
 const DIRECTIONS = ['left', 'right'] as const;
 const ACTORS = ['main-ninja', 'enemy-ninja'] as const;

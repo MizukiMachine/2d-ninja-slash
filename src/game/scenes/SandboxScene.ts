@@ -7,16 +7,15 @@ import {
   type DebugBackgroundFileName
 } from '../assets/ninjaAssetCatalog';
 import {
-  DEFAULT_NINJA_COLLISION_RECT,
   getNinjaAnimationBounds,
   isNinjaHitFrameActive,
   type NinjaRect
 } from '../ninjaBounds';
 
 type FacingDirection = 'left' | 'right';
-type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'slash2' | 'slash3' | 'impact';
+type MainNinjaAction = 'idle' | 'run' | 'jump' | 'crouching' | 'slash' | 'impact';
 type ControlledMainNinjaAction = Exclude<MainNinjaAction, 'impact'>;
-type PlayerAttackAction = 'slash' | 'slash2' | 'slash3';
+type PlayerAttackAction = 'slash';
 type PlayerAction = ControlledMainNinjaAction | 'hurt';
 type EnemyNinjaAction = 'idle' | 'run' | 'slash';
 type EnemyAction = EnemyNinjaAction | 'recover';
@@ -31,8 +30,6 @@ interface MoveKeys {
   readonly left: Phaser.Input.Keyboard.Key;
   readonly right: Phaser.Input.Keyboard.Key;
   readonly z: Phaser.Input.Keyboard.Key;
-  readonly shift: Phaser.Input.Keyboard.Key;
-  readonly ctrl: Phaser.Input.Keyboard.Key;
   readonly space: Phaser.Input.Keyboard.Key;
   readonly esc: Phaser.Input.Keyboard.Key;
 }
@@ -64,18 +61,8 @@ const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
 const PLAYER_DEPTH = 10;
 const ENEMY_DEPTH = 9;
-const ACTOR_SHADOW_DEPTH = 8;
 
 const NINJA_SCALE = NINJA_TARGET_SCALE * (NINJA_REFERENCE_FRAME_SIZE / NINJA_FRAME_SIZE);
-const NINJA_SHADOW_WIDTH = Math.round(
-  DEFAULT_NINJA_COLLISION_RECT.width * NINJA_SCALE * 1.3
-);
-const NINJA_SHADOW_HEIGHT = Math.round(
-  DEFAULT_NINJA_COLLISION_RECT.height * NINJA_SCALE * 0.24
-);
-const NINJA_SHADOW_FOOT_LINE_RATIO = 0.35;
-const NINJA_SHADOW_COLOR = 0x03050a;
-const NINJA_SHADOW_ALPHA = 0.32;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -129,7 +116,7 @@ const getEnemyNinjaSpriteSheetUrl = (
 ): string => `${NINJA_ACTOR_ROOT_URL}/enemy-ninja/${action}-${direction}.png`;
 
 const isPlayerAttackAction = (action: PlayerAction): action is PlayerAttackAction =>
-  action === 'slash' || action === 'slash2' || action === 'slash3';
+  action === 'slash';
 
 const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
@@ -175,6 +162,20 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
     repeat: 0
   },
   {
+    action: 'crouching',
+    direction: 'left',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: -1
+  },
+  {
+    action: 'crouching',
+    direction: 'right',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: -1
+  },
+  {
     action: 'slash',
     direction: 'left',
     frameCount: NINJA_FRAME_COUNT,
@@ -186,34 +187,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
     direction: 'right',
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
-    repeat: 0
-  },
-  {
-    action: 'slash2',
-    direction: 'left',
-    frameCount: NINJA_FRAME_COUNT,
-    frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
-    repeat: 0
-  },
-  {
-    action: 'slash2',
-    direction: 'right',
-    frameCount: NINJA_FRAME_COUNT,
-    frameRate: 14 * NINJA_ANIMATION_PLAYBACK_RATE,
-    repeat: 0
-  },
-  {
-    action: 'slash3',
-    direction: 'left',
-    frameCount: NINJA_FRAME_COUNT,
-    frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
-    repeat: 0
-  },
-  {
-    action: 'slash3',
-    direction: 'right',
-    frameCount: NINJA_FRAME_COUNT,
-    frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
   },
   {
@@ -280,8 +253,6 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
 export class SandboxScene extends BaseScene {
   private player: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
   private enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
-  private playerShadow: Phaser.GameObjects.Ellipse | null = null;
-  private enemyShadow: Phaser.GameObjects.Ellipse | null = null;
   private moveKeys: MoveKeys | null = null;
   private background: Phaser.GameObjects.Image | null = null;
   private debugOverlayGraphic: Phaser.GameObjects.Graphics | null = null;
@@ -305,7 +276,6 @@ export class SandboxScene extends BaseScene {
   private attackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private enemyAttackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private visualBoundsRect = new Phaser.Geom.Rectangle();
-  private shadowPosition = new Phaser.Math.Vector2();
 
   constructor() {
     super(SceneKeys.Sandbox);
@@ -339,8 +309,6 @@ export class SandboxScene extends BaseScene {
       .play(getMainNinjaAnimationKey('idle', 'right'));
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
-    this.playerShadow = this.createActorShadow();
-
     this.enemy = this.physics.add.sprite(
       this.getDefaultEnemyX(),
       this.centerY + 108,
@@ -354,9 +322,6 @@ export class SandboxScene extends BaseScene {
       .setDepth(ENEMY_DEPTH)
       .play(getEnemyNinjaAnimationKey('idle', 'left'));
     this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
-
-    this.enemyShadow = this.createActorShadow();
-    this.syncActorShadows();
 
     this.physics.add.collider(this.player, this.enemy);
 
@@ -382,7 +347,6 @@ export class SandboxScene extends BaseScene {
       this.pauseLabel?.setVisible(state.paused);
       this.player?.setAlpha(state.paused ? 0.55 : 1);
       this.enemy?.setAlpha(state.paused ? 0.55 : 1);
-      this.syncActorShadows();
     });
   }
 
@@ -414,7 +378,7 @@ export class SandboxScene extends BaseScene {
     }
 
     if (isPlayerAttackAction(this.currentAction)) {
-      this.player.setVelocity(this.getAttackForwardVelocityX(this.currentAction), 0);
+      this.player.setVelocity(0, 0);
       this.updateAttackHitArea(this.currentAction);
       this.finishDebugFrame(time);
       return;
@@ -422,6 +386,12 @@ export class SandboxScene extends BaseScene {
 
     if (this.currentAction === 'jump') {
       this.player.setVelocity(0, 0);
+      this.finishDebugFrame(time);
+      return;
+    }
+
+    if (this.isCrouchInputDown()) {
+      this.crouchPlayer();
       this.finishDebugFrame(time);
       return;
     }
@@ -452,84 +422,6 @@ export class SandboxScene extends BaseScene {
     const scale = Math.max(width / backgroundFrame.width, height / backgroundFrame.height);
 
     this.background.setScale(scale);
-  }
-
-  private createActorShadow(): Phaser.GameObjects.Ellipse {
-    return this.add
-      .ellipse(
-        0,
-        0,
-        NINJA_SHADOW_WIDTH,
-        NINJA_SHADOW_HEIGHT,
-        NINJA_SHADOW_COLOR,
-        NINJA_SHADOW_ALPHA
-      )
-      .setOrigin(0.5)
-      .setDepth(ACTOR_SHADOW_DEPTH);
-  }
-
-  private syncActorShadows(): void {
-    this.syncActorShadow(
-      this.playerShadow,
-      this.player,
-      'mainNinja',
-      this.facingDirection,
-      this.getPlayerBoundsAction()
-    );
-    this.syncActorShadow(
-      this.enemyShadow,
-      this.enemy,
-      'enemyNinja',
-      this.enemyFacingDirection,
-      this.getEnemyBoundsAction()
-    );
-  }
-
-  private syncActorShadow(
-    shadow: Phaser.GameObjects.Ellipse | null,
-    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
-    actorId: 'mainNinja' | 'enemyNinja',
-    direction: FacingDirection,
-    action: string
-  ): void {
-    if (shadow === null || actor === null) {
-      return;
-    }
-
-    const shadowPosition = this.getActorVisualShadowPosition(
-      actor,
-      actorId,
-      direction,
-      action
-    );
-
-    shadow
-      .setPosition(shadowPosition.x, shadowPosition.y)
-      .setAlpha(actor.alpha)
-      .setVisible(actor.visible);
-  }
-
-  private getActorVisualShadowPosition(
-    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
-    actorId: 'mainNinja' | 'enemyNinja',
-    direction: FacingDirection,
-    action: string
-  ): Phaser.Math.Vector2 {
-    const bounds = getNinjaAnimationBounds(
-      this.app.getNinjaBoundsConfig(),
-      actorId,
-      direction,
-      action
-    ).visual;
-    const frameLeft = actor.x - (NINJA_FRAME_SIZE / 2) * actor.scaleX;
-    const frameTop = actor.y - NINJA_FRAME_SIZE * actor.scaleY;
-    const visualCenterX = frameLeft + (bounds.x + bounds.width / 2) * actor.scaleX;
-    const visualBottomY = frameTop + (bounds.y + bounds.height) * actor.scaleY;
-
-    return this.shadowPosition.set(
-      visualCenterX,
-      visualBottomY + NINJA_SHADOW_HEIGHT * (0.5 - NINJA_SHADOW_FOOT_LINE_RATIO)
-    );
   }
 
   private syncActorCollisionBounds(): void {
@@ -750,8 +642,6 @@ export class SandboxScene extends BaseScene {
       left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
       right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
       z: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
-      shift: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
-      ctrl: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL),
       space: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       esc: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     };
@@ -765,7 +655,7 @@ export class SandboxScene extends BaseScene {
       this.goTo(SceneKeys.MainMenu);
     };
     const startAttack = (): void => {
-      this.startAttack(this.resolveAttackAction());
+      this.startAttack('slash');
     };
     const startJump = (): void => {
       this.startJump();
@@ -802,9 +692,7 @@ export class SandboxScene extends BaseScene {
 
       if (
         isPlayerAttackAction(this.currentAction) &&
-        (animation.key.endsWith('.slash') ||
-          animation.key.endsWith('.slash2') ||
-          animation.key.endsWith('.slash3'))
+        animation.key.endsWith('.slash')
       ) {
         this.finishPlayerAction();
       }
@@ -846,7 +734,7 @@ export class SandboxScene extends BaseScene {
     }
 
     const left = this.moveKeys.a.isDown || this.moveKeys.left.isDown;
-    const right = this.moveKeys.d.isDown || this.moveKeys.right.isDown;
+    const right = this.moveKeys.right.isDown;
     const up = this.moveKeys.w.isDown || this.moveKeys.up.isDown;
     const down = this.moveKeys.s.isDown || this.moveKeys.down.isDown;
 
@@ -900,18 +788,6 @@ export class SandboxScene extends BaseScene {
     this.playNinjaAnimation('run');
   }
 
-  private resolveAttackAction(): PlayerAttackAction {
-    if (this.moveKeys?.ctrl.isDown === true) {
-      return 'slash3';
-    }
-
-    if (this.moveKeys?.shift.isDown === true) {
-      return 'slash2';
-    }
-
-    return 'slash';
-  }
-
   private isPlayerBusy(): boolean {
     return (
       this.currentAction === 'jump' ||
@@ -939,18 +815,8 @@ export class SandboxScene extends BaseScene {
     this.updateForwardVectorFromInput();
     this.currentAction = action;
     this.clearAttackHitArea();
-    this.player.setVelocity(this.getAttackForwardVelocityX(action), 0);
+    this.player.setVelocity(0, 0);
     this.playNinjaAnimation(action, true);
-  }
-
-  private getAttackForwardVelocityX(action: PlayerAttackAction): number {
-    if (action !== 'slash3') {
-      return 0;
-    }
-
-    const attackSpeed = this.debug.get().gameplayTuning.attack3ForwardSpeed;
-
-    return this.facingDirection === 'left' ? -attackSpeed : attackSpeed;
   }
 
   private startJump(): void {
@@ -963,6 +829,19 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
     this.player.setVelocity(0, 0);
     this.playNinjaAnimation('jump', true);
+  }
+
+  private isCrouchInputDown(): boolean {
+    return this.moveKeys?.d.isDown === true;
+  }
+
+  private crouchPlayer(): void {
+    if (this.player === null) {
+      return;
+    }
+
+    this.player.setVelocity(0, 0);
+    this.playNinjaAnimation('crouching');
   }
 
   private finishPlayerAction(): void {
@@ -1363,7 +1242,6 @@ export class SandboxScene extends BaseScene {
 
   private finishDebugFrame(time: number, forceTelemetry = false): void {
     this.syncActorCollisionBounds();
-    this.syncActorShadows();
     this.publishDebugTelemetry(time, forceTelemetry);
     this.renderDebugOverlays();
   }
