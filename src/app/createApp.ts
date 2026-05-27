@@ -373,7 +373,7 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="toggle-row"><input id="show-attack-boxes" type="checkbox" /> Attack boxes</label>
       <label class="toggle-row"><input id="show-origins" type="checkbox" /> Origins</label>
       <label class="toggle-row"><input id="show-pointer-probe" type="checkbox" /> Pointer probe</label>
-      <label class="toggle-row"><input id="show-enemy-ranges" type="checkbox" /> Enemy ranges</label>
+      <label class="toggle-row"><input id="show-enemy-ranges" type="checkbox" /> Enemy attack box</label>
     </div>
     <div class="panel-group">
       <p class="panel-group__title">Gameplay Tuning</p>
@@ -386,11 +386,6 @@ export function createApp(root: HTMLDivElement | null): void {
         <span>Enemy</span>
         <input id="tuning-enemy-speed" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemySpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.enemySpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.enemySpeed.step}" />
         <strong id="tuning-enemy-speed-readout">260</strong>
-      </label>
-      <label class="range-row">
-        <span>Range</span>
-        <input id="tuning-attack-range" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemyAttackRange.min}" max="${GAMEPLAY_TUNING_LIMITS.enemyAttackRange.max}" step="${GAMEPLAY_TUNING_LIMITS.enemyAttackRange.step}" />
-        <strong id="tuning-attack-range-readout">112</strong>
       </label>
       <label class="range-row">
         <span>Recover</span>
@@ -615,16 +610,6 @@ export function createApp(root: HTMLDivElement | null): void {
   const tuningEnemySpeedReadout = requireElement(
     debugControls,
     '#tuning-enemy-speed-readout',
-    HTMLElement
-  );
-  const tuningAttackRangeInput = requireElement(
-    debugControls,
-    '#tuning-attack-range',
-    HTMLInputElement
-  );
-  const tuningAttackRangeReadout = requireElement(
-    debugControls,
-    '#tuning-attack-range-readout',
     HTMLElement
   );
   const tuningRecoveryInput = requireElement(
@@ -1011,7 +996,6 @@ export function createApp(root: HTMLDivElement | null): void {
     normalizeGameplayTuning({
       playerSpeed: Number(tuningPlayerSpeedInput.value),
       enemySpeed: Number(tuningEnemySpeedInput.value),
-      enemyAttackRange: Number(tuningAttackRangeInput.value),
       enemyRecoveryMs: Number(tuningRecoveryInput.value),
       playerKnockbackSpeed: Number(tuningKnockbackInput.value)
     });
@@ -1072,12 +1056,10 @@ export function createApp(root: HTMLDivElement | null): void {
 
     tuningPlayerSpeedInput.value = String(tuning.playerSpeed);
     tuningEnemySpeedInput.value = String(tuning.enemySpeed);
-    tuningAttackRangeInput.value = String(tuning.enemyAttackRange);
     tuningRecoveryInput.value = String(tuning.enemyRecoveryMs);
     tuningKnockbackInput.value = String(tuning.playerKnockbackSpeed);
     tuningPlayerSpeedReadout.textContent = String(tuning.playerSpeed);
     tuningEnemySpeedReadout.textContent = String(tuning.enemySpeed);
-    tuningAttackRangeReadout.textContent = String(tuning.enemyAttackRange);
     tuningRecoveryReadout.textContent = String(tuning.enemyRecoveryMs);
     tuningKnockbackReadout.textContent = String(tuning.playerKnockbackSpeed);
     tuningSaveStatus.textContent = gameplayTuningSaveStatus;
@@ -1768,7 +1750,6 @@ export function createApp(root: HTMLDivElement | null): void {
 
   tuningPlayerSpeedInput.addEventListener('input', setGameplayTuningFromInputs);
   tuningEnemySpeedInput.addEventListener('input', setGameplayTuningFromInputs);
-  tuningAttackRangeInput.addEventListener('input', setGameplayTuningFromInputs);
   tuningRecoveryInput.addEventListener('input', setGameplayTuningFromInputs);
   tuningKnockbackInput.addEventListener('input', setGameplayTuningFromInputs);
   tuningSaveButton.addEventListener('click', async () => {

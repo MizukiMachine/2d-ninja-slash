@@ -62,6 +62,9 @@ const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
 const PLAYER_DEPTH = 10;
 const ENEMY_DEPTH = 9;
+const PLAYER_DAMAGE_KNOCKBACK_DISTANCE = 160;
+const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 48;
+const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 18;
 
 const NINJA_SCALE = NINJA_TARGET_SCALE * (NINJA_REFERENCE_FRAME_SIZE / NINJA_FRAME_SIZE);
 
@@ -260,8 +263,10 @@ export class SandboxScene extends BaseScene {
   private enemyAttackHitCount = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
+  private damageKnockbackOrigin = new Phaser.Math.Vector2(0, 0);
   private attackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private enemyAttackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
+  private enemyAttackProbeArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private visualBoundsRect = new Phaser.Geom.Rectangle();
 
   constructor() {
@@ -358,10 +363,7 @@ export class SandboxScene extends BaseScene {
     this.updateEnemy(time);
 
     if (this.currentAction === 'hurt') {
-      this.player.setVelocity(
-        this.damageKnockbackVector.x * this.debug.get().gameplayTuning.playerKnockbackSpeed,
-        this.damageKnockbackVector.y * this.debug.get().gameplayTuning.playerKnockbackSpeed
-      );
+      this.updatePlayerDamageKnockback();
       this.finishDebugFrame(time);
       return;
     }
@@ -853,8 +855,36 @@ export class SandboxScene extends BaseScene {
 
     this.currentAction = 'idle';
     this.damageKnockbackVector.set(0, 0);
+    this.damageKnockbackOrigin.set(0, 0);
     this.player.setVelocity(0, 0);
     this.movePlayer(this.readMovementInput());
+  }
+
+  private updatePlayerDamageKnockback(): void {
+    if (this.player === null || this.damageKnockbackVector.lengthSq() === 0) {
+      return;
+    }
+
+    const movedX = this.player.x - this.damageKnockbackOrigin.x;
+    const movedY = this.player.y - this.damageKnockbackOrigin.y;
+    const movedDistance = Math.hypot(movedX, movedY);
+
+    if (movedDistance >= PLAYER_DAMAGE_KNOCKBACK_DISTANCE) {
+      this.player.setPosition(
+        this.damageKnockbackOrigin.x +
+          this.damageKnockbackVector.x * PLAYER_DAMAGE_KNOCKBACK_DISTANCE,
+        this.damageKnockbackOrigin.y +
+          this.damageKnockbackVector.y * PLAYER_DAMAGE_KNOCKBACK_DISTANCE
+      );
+      this.player.setVelocity(0, 0);
+      return;
+    }
+
+    const knockbackSpeed = this.debug.get().gameplayTuning.playerKnockbackSpeed;
+    this.player.setVelocity(
+      this.damageKnockbackVector.x * knockbackSpeed,
+      this.damageKnockbackVector.y * knockbackSpeed
+    );
   }
 
   private updateEnemy(time: number): void {
@@ -891,7 +921,12 @@ export class SandboxScene extends BaseScene {
     );
     const distanceToPlayer = toPlayer.length();
 
-    if (distanceToPlayer <= this.debug.get().gameplayTuning.enemyAttackRange) {
+    if (distanceToPlayer > 0) {
+      toPlayer.normalize();
+      this.updateEnemyFacingFromVector(toPlayer);
+    }
+
+    if (this.canEnemySlashReachPlayer()) {
       this.startEnemyAttack();
       return;
     }
@@ -902,8 +937,6 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    toPlayer.normalize();
-    this.updateEnemyFacingFromVector(toPlayer);
     const enemySpeed = this.debug.get().gameplayTuning.enemySpeed;
     this.enemy.setVelocity(toPlayer.x * enemySpeed, toPlayer.y * enemySpeed);
     this.playEnemyAnimation('run');
@@ -969,6 +1002,7 @@ export class SandboxScene extends BaseScene {
 
     knockbackDirection.normalize();
     this.damageKnockbackVector.copy(knockbackDirection);
+    this.damageKnockbackOrigin.set(this.player.x, this.player.y);
     this.currentAction = 'hurt';
     this.clearAttackHitArea();
 
@@ -1075,7 +1109,7 @@ export class SandboxScene extends BaseScene {
   }
 
   private updateEnemyAttackHitArea(): void {
-    if (this.enemy === null) {
+    if (this.player === null || this.enemy === null) {
       return;
     }
 
@@ -1089,7 +1123,46 @@ export class SandboxScene extends BaseScene {
         'slash'
       ).attack
     );
-    this.enemyAttackHitCount = this.getHitCountInArea(this.enemyAttackHitArea, this.enemy);
+    this.enemyAttackHitCount = this.isHitAreaOverlappingActor(
+      this.enemyAttackHitArea,
+      this.player,
+      ENEMY_ATTACK_REQUIRED_OVERLAP_X,
+      ENEMY_ATTACK_REQUIRED_OVERLAP_Y
+    )
+      ? 1
+      : 0;
+  }
+
+  private canEnemySlashReachPlayer(): boolean {
+    if (this.player === null || !this.updateEnemyAttackProbeArea()) {
+      return false;
+    }
+
+    return this.isHitAreaOverlappingActor(
+      this.enemyAttackProbeArea,
+      this.player,
+      ENEMY_ATTACK_REQUIRED_OVERLAP_X,
+      ENEMY_ATTACK_REQUIRED_OVERLAP_Y
+    );
+  }
+
+  private updateEnemyAttackProbeArea(): boolean {
+    if (this.enemy === null) {
+      return false;
+    }
+
+    this.setAttackHitArea(
+      this.enemyAttackProbeArea,
+      this.enemy,
+      getNinjaAnimationBounds(
+        this.app.getNinjaBoundsConfig(),
+        'enemyNinja',
+        this.enemyFacingDirection,
+        'slash'
+      ).attack
+    );
+
+    return true;
   }
 
   private setAttackHitArea(
@@ -1117,6 +1190,21 @@ export class SandboxScene extends BaseScene {
       this.physics.overlapRect(hitArea.x, hitArea.y, hitArea.width, hitArea.height);
 
     return bodies.filter((body) => body.gameObject !== owner).length;
+  }
+
+  private isHitAreaOverlappingActor(
+    hitArea: Phaser.Geom.Rectangle,
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    requiredOverlapX = 1,
+    requiredOverlapY = 1
+  ): boolean {
+    const body = actor.body;
+    const overlapX =
+      Math.min(hitArea.x + hitArea.width, body.x + body.width) - Math.max(hitArea.x, body.x);
+    const overlapY =
+      Math.min(hitArea.y + hitArea.height, body.y + body.height) - Math.max(hitArea.y, body.y);
+
+    return overlapX >= requiredOverlapX && overlapY >= requiredOverlapY;
   }
 
   private clearAttackHitArea(): void {
@@ -1214,6 +1302,7 @@ export class SandboxScene extends BaseScene {
     this.enemyFacingDirection = 'left';
     this.forwardVector.set(1, 0);
     this.damageKnockbackVector.set(0, 0);
+    this.damageKnockbackOrigin.set(0, 0);
     this.currentAction = 'idle';
     this.enemyAction = 'idle';
     this.enemyRecoveryUntil = 0;
@@ -1329,9 +1418,13 @@ export class SandboxScene extends BaseScene {
       graphic.strokeRect(2, 2, this.profile.width - 4, this.profile.height - 4);
     }
 
-    if (state.showEnemyRanges && this.enemy !== null) {
-      graphic.lineStyle(2, 0xff8a65, 0.64);
-      graphic.strokeCircle(this.enemy.x, this.enemy.y, state.gameplayTuning.enemyAttackRange);
+    if (state.showEnemyRanges && this.updateEnemyAttackProbeArea()) {
+      this.renderAttackHitBox(
+        this.enemyAttackProbeArea,
+        this.canEnemySlashReachPlayer() ? 1 : 0,
+        0xff8a65,
+        0xffc857
+      );
     }
 
     if (state.showVisualBounds) {

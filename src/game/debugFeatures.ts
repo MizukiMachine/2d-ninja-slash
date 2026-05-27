@@ -38,7 +38,6 @@ export interface LevelProgressState {
 export interface GameplayTuning {
   readonly playerSpeed: number;
   readonly enemySpeed: number;
-  readonly enemyAttackRange: number;
   readonly enemyRecoveryMs: number;
   readonly playerKnockbackSpeed: number;
 }
@@ -117,7 +116,6 @@ export const BACKGROUND_FIT_MODES: readonly BackgroundFitMode[] = [
 export const GAMEPLAY_TUNING_LIMITS = {
   playerSpeed: { min: 120, max: 520, step: 10 },
   enemySpeed: { min: 80, max: 480, step: 10 },
-  enemyAttackRange: { min: 48, max: 240, step: 4 },
   enemyRecoveryMs: { min: 120, max: 1800, step: 30 },
   playerKnockbackSpeed: { min: 80, max: 760, step: 10 }
 } as const;
@@ -125,7 +123,6 @@ export const GAMEPLAY_TUNING_LIMITS = {
 export const DEFAULT_GAMEPLAY_TUNING: GameplayTuning = {
   playerSpeed: 260,
   enemySpeed: 260,
-  enemyAttackRange: 112,
   enemyRecoveryMs: 900,
   playerKnockbackSpeed: 360
 };
@@ -359,12 +356,6 @@ export function normalizeGameplayTuning(value: unknown): GameplayTuning {
       GAMEPLAY_TUNING_LIMITS.enemySpeed.min,
       GAMEPLAY_TUNING_LIMITS.enemySpeed.max,
       DEFAULT_GAMEPLAY_TUNING.enemySpeed
-    ),
-    enemyAttackRange: clampNumber(
-      candidate?.enemyAttackRange,
-      GAMEPLAY_TUNING_LIMITS.enemyAttackRange.min,
-      GAMEPLAY_TUNING_LIMITS.enemyAttackRange.max,
-      DEFAULT_GAMEPLAY_TUNING.enemyAttackRange
     ),
     enemyRecoveryMs: clampNumber(
       candidate?.enemyRecoveryMs,
