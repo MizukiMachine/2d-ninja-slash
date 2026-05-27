@@ -11,8 +11,8 @@ const SPRITE_SHEET_SIZE = {
   width: 2048,
   height: 1024
 } as const;
-const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'impact'] as const;
-const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash'] as const;
+const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'impact', 'death'] as const;
+const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'death'] as const;
 const DIRECTIONS = ['left', 'right'] as const;
 const ACTORS = ['main-ninja', 'enemy-ninja'] as const;
 const STANDALONE_ANCHOR_FILES = ['anchor-left-native.png', 'anchor-right-native.png'] as const;

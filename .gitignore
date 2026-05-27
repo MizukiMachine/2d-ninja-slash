@@ -11,5 +11,7 @@ public/assets/*
 
 node_modules/
 .vite/
+.tsbuildinfo/
+.mcpheadlessbrowser/
 dist/
 npm-debug.log*
