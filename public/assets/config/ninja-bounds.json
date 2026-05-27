@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "savedAt": "2026-05-26T16:48:57.965Z",
+  "savedAt": "2026-05-27T02:19:50.526Z",
   "boundsByActor": {
     "mainNinja": {
       "left": {
@@ -66,8 +66,8 @@
         },
         "idle": {
           "visual": {
-            "x": 92,
-            "y": 87,
+            "x": 94,
+            "y": 83,
             "width": 68,
             "height": 95
           },
@@ -288,8 +288,8 @@
         },
         "idle": {
           "visual": {
-            "x": 96,
-            "y": 87,
+            "x": 98,
+            "y": 74,
             "width": 68,
             "height": 95
           },
