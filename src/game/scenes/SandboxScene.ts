@@ -12,14 +12,22 @@ import {
   isNinjaHitFrameActive,
   type NinjaRect
 } from '../ninjaBounds';
+import {
+  applyAttackDamage,
+  ENEMY_MAX_HEALTH,
+  getHealthBand,
+  getHealthRatio,
+  PLAYER_MAX_HEALTH
+} from '../combatHealth';
+import { getAnimationFallbackDelayMs } from '../animationTiming';
 
 type FacingDirection = 'left' | 'right';
-type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact';
-type ControlledMainNinjaAction = Exclude<MainNinjaAction, 'impact'>;
+type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact' | 'death';
+type ControlledMainNinjaAction = Exclude<MainNinjaAction, 'impact' | 'death'>;
 type PlayerAttackAction = 'slash';
-type PlayerAction = ControlledMainNinjaAction | 'hurt';
-type EnemyNinjaAction = 'idle' | 'run' | 'slash';
-type EnemyAction = EnemyNinjaAction | 'recover';
+type PlayerAction = ControlledMainNinjaAction | 'hurt' | 'dead';
+type EnemyNinjaAction = 'idle' | 'run' | 'slash' | 'death';
+type EnemyAction = Exclude<EnemyNinjaAction, 'death'> | 'recover' | 'dead';
 
 interface MoveKeys {
   readonly w: Phaser.Input.Keyboard.Key;
@@ -52,6 +60,20 @@ interface MovementInput {
   readonly y: number;
 }
 
+interface EnemyState {
+  readonly sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
+  facingDirection: FacingDirection;
+  action: EnemyAction;
+  health: number;
+  recoveryUntil: number;
+  attackDamageDealt: boolean;
+  attackHitCount: number;
+  readonly attackHitArea: Phaser.Geom.Rectangle;
+  readonly attackProbeArea: Phaser.Geom.Rectangle;
+  corpseTimer: Phaser.Time.TimerEvent | null;
+  corpseTween: Phaser.Tweens.Tween | null;
+}
+
 const NINJA_ACTOR_ROOT_URL = '/assets/actors';
 const NINJA_FRAME_SIZE = 256;
 const NINJA_REFERENCE_FRAME_SIZE = 216;
@@ -62,6 +84,20 @@ const NINJA_DISPLAY_SCALE_MULTIPLIER = 1.5 * 1.4;
 const NINJA_TARGET_SCALE = 0.92 * NINJA_DISPLAY_SCALE_MULTIPLIER;
 const PLAYER_DEPTH = 10;
 const ENEMY_DEPTH = 9;
+const HUD_DEPTH = 120;
+const GAME_OVER_DEPTH = 240;
+const PLAYER_HEALTH_BAR_X = 24;
+const PLAYER_HEALTH_BAR_Y = 24;
+const PLAYER_HEALTH_BAR_WIDTH = 336;
+const PLAYER_HEALTH_BAR_HEIGHT = 30;
+const ENEMY_HEALTH_BAR_WIDTH = 70;
+const ENEMY_HEALTH_BAR_HEIGHT = 8;
+const ENEMY_HEALTH_BAR_OFFSET_Y = 16;
+const PLAYER_DEATH_OVERLAY_FALLBACK_BUFFER_MS = 250;
+const PLAYER_DEATH_OVERLAY_RECHECK_MS = 120;
+const ENEMY_CORPSE_HOLD_MS = 1300;
+const ENEMY_CORPSE_BLINK_DURATION_MS = 90;
+const ENEMY_CORPSE_BLINK_REPEAT = 8;
 const PLAYER_DAMAGE_KNOCKBACK_DISTANCE = 160;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 48;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 18;
@@ -192,6 +228,20 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 16 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
+  },
+  {
+    action: 'death',
+    direction: 'left',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 10 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'death',
+    direction: 'right',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 10 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
   }
 ] as const;
 
@@ -237,16 +287,34 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: 0
+  },
+  {
+    action: 'death',
+    direction: 'left',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 10 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
+  },
+  {
+    action: 'death',
+    direction: 'right',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 10 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: 0
   }
 ] as const;
 
 export class SandboxScene extends BaseScene {
   private player: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
-  private enemy: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null = null;
+  private enemies: EnemyState[] = [];
   private moveKeys: MoveKeys | null = null;
   private background: Phaser.GameObjects.Image | null = null;
   private debugOverlayGraphic: Phaser.GameObjects.Graphics | null = null;
+  private healthGraphic: Phaser.GameObjects.Graphics | null = null;
+  private playerHealthLabel: Phaser.GameObjects.Text | null = null;
   private pauseLabel: Phaser.GameObjects.Text | null = null;
+  private gameOverOverlay: Phaser.GameObjects.Container | null = null;
+  private playerDeathOverlayTimer: Phaser.Time.TimerEvent | null = null;
   private activeBackgroundFileName: DebugBackgroundFileName =
     DEFAULT_DEBUG_BACKGROUND_FILE_NAME;
   private backgroundLoadInProgress = false;
@@ -254,19 +322,15 @@ export class SandboxScene extends BaseScene {
   private lastActorResetRequestId = 0;
   private lastDebugTelemetryAt = Number.NEGATIVE_INFINITY;
   private facingDirection: FacingDirection = 'right';
-  private enemyFacingDirection: FacingDirection = 'left';
   private currentAction: PlayerAction = 'idle';
-  private enemyAction: EnemyAction = 'idle';
-  private enemyRecoveryUntil = 0;
-  private enemyAttackDamageDealt = false;
+  private playerHealth = PLAYER_MAX_HEALTH;
+  private damagedEnemiesThisAttack = new Set<EnemyState>();
+  private gameOver = false;
   private attackHitCount = 0;
-  private enemyAttackHitCount = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
   private damageKnockbackOrigin = new Phaser.Math.Vector2(0, 0);
   private attackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
-  private enemyAttackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
-  private enemyAttackProbeArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private visualBoundsRect = new Phaser.Geom.Rectangle();
 
   constructor() {
@@ -282,6 +346,7 @@ export class SandboxScene extends BaseScene {
     this.cameras.main.setBackgroundColor('#101722');
     const state = this.debug.get();
     this.activeBackgroundFileName = state.backgroundFileName;
+    this.resetSceneState();
 
     this.createAnimations();
     this.createBackground();
@@ -302,22 +367,26 @@ export class SandboxScene extends BaseScene {
     this.player.play(getMainNinjaAnimationKey('idle', 'right'));
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
-    this.enemy = this.physics.add.sprite(
+    const enemySprite = this.physics.add.sprite(
       this.getDefaultEnemyX(),
       this.centerY + 108,
       getEnemyNinjaIdleAnchorTextureKey('left'),
       NINJA_IDLE_ANCHOR_FRAME
     );
-    this.enemy
+    enemySprite
       .setOrigin(0.5, 1)
       .setScale(NINJA_SCALE)
       .setCollideWorldBounds(true)
       .setDepth(ENEMY_DEPTH);
-    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', 'idle');
-    this.enemy.play(getEnemyNinjaAnimationKey('idle', 'left'));
-    this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
+    const enemy = this.createEnemyState(enemySprite, 'left');
+    this.enemies = [enemy];
+    this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'idle');
+    enemy.sprite.play(getEnemyNinjaAnimationKey('idle', 'left'));
+    this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'idle');
 
-    this.physics.add.collider(this.player, this.enemy);
+    for (const enemyState of this.enemies) {
+      this.physics.add.collider(this.player, enemyState.sprite);
+    }
 
     this.debugOverlayGraphic = this.add.graphics().setDepth(100);
     this.lastActorResetRequestId = this.debug.get().actorResetRequestId;
@@ -330,22 +399,87 @@ export class SandboxScene extends BaseScene {
       })
       .setOrigin(0.5)
       .setVisible(false);
+    this.createHealthHud();
 
     this.registerKeyboard();
     this.registerPlayerAnimationEvents();
-    this.registerEnemyAnimationEvents();
+    for (const enemyState of this.enemies) {
+      this.registerEnemyAnimationEvents(enemyState);
+    }
     this.registerPointerDebug();
     this.onStore(this.debug, (state) => {
       this.applyBackground(state.backgroundFileName);
       this.handleActorResetRequest(state.actorResetRequestId);
       this.pauseLabel?.setVisible(state.paused);
-      this.player?.setAlpha(state.paused ? 0.55 : 1);
-      this.enemy?.setAlpha(state.paused ? 0.55 : 1);
+      this.player?.setAlpha(state.paused && this.currentAction !== 'dead' ? 0.55 : 1);
+      for (const enemyState of this.enemies) {
+        if (enemyState.action !== 'dead') {
+          enemyState.sprite.setAlpha(state.paused ? 0.55 : 1);
+        }
+      }
     });
   }
 
+  private createEnemyState(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    facingDirection: FacingDirection
+  ): EnemyState {
+    return {
+      sprite,
+      facingDirection,
+      action: 'idle',
+      health: ENEMY_MAX_HEALTH,
+      recoveryUntil: 0,
+      attackDamageDealt: false,
+      attackHitCount: 0,
+      attackHitArea: new Phaser.Geom.Rectangle(0, 0, 0, 0),
+      attackProbeArea: new Phaser.Geom.Rectangle(0, 0, 0, 0),
+      corpseTimer: null,
+      corpseTween: null
+    };
+  }
+
+  private resetSceneState(): void {
+    for (const enemy of this.enemies) {
+      enemy.corpseTimer?.remove(false);
+      enemy.corpseTween?.stop();
+    }
+
+    this.player = null;
+    this.enemies = [];
+    this.moveKeys = null;
+    this.background = null;
+    this.debugOverlayGraphic = null;
+    this.healthGraphic = null;
+    this.playerHealthLabel = null;
+    this.pauseLabel = null;
+    this.gameOverOverlay = null;
+    this.playerDeathOverlayTimer?.remove(false);
+    this.playerDeathOverlayTimer = null;
+    this.facingDirection = 'right';
+    this.currentAction = 'idle';
+    this.playerHealth = PLAYER_MAX_HEALTH;
+    this.damagedEnemiesThisAttack.clear();
+    this.gameOver = false;
+    this.attackHitCount = 0;
+    this.forwardVector.set(1, 0);
+    this.damageKnockbackVector.set(0, 0);
+    this.damageKnockbackOrigin.set(0, 0);
+    this.attackHitArea.setTo(0, 0, 0, 0);
+  }
+
   update(time: number, _delta: number): void {
-    if (this.player === null || this.moveKeys === null) {
+    if (this.player === null) {
+      return;
+    }
+
+    if (this.playerHealth <= 0 && this.currentAction !== 'dead') {
+      this.startPlayerDeath();
+      this.finishDebugFrame(time);
+      return;
+    }
+
+    if (this.moveKeys === null) {
       return;
     }
 
@@ -353,14 +487,23 @@ export class SandboxScene extends BaseScene {
 
     this.publishMovementInput(movement);
 
-    if (this.debug.get().paused) {
+    if (this.gameOver) {
       this.player.setVelocity(0, 0);
-      this.enemy?.setVelocity(0, 0);
+      this.stopAllEnemyMovement();
       this.finishDebugFrame(time);
       return;
     }
 
-    this.updateEnemy(time);
+    if (this.debug.get().paused) {
+      this.player.setVelocity(0, 0);
+      this.stopAllEnemyMovement();
+      this.finishDebugFrame(time);
+      return;
+    }
+
+    for (const enemy of this.enemies) {
+      this.updateEnemy(enemy, time);
+    }
 
     if (this.currentAction === 'hurt') {
       this.updatePlayerDamageKnockback();
@@ -409,6 +552,25 @@ export class SandboxScene extends BaseScene {
     this.background.setScale(scale);
   }
 
+  private createHealthHud(): void {
+    this.healthGraphic = this.add.graphics().setDepth(HUD_DEPTH);
+    this.playerHealthLabel = this.add
+      .text(
+        PLAYER_HEALTH_BAR_X + 12,
+        PLAYER_HEALTH_BAR_Y + PLAYER_HEALTH_BAR_HEIGHT / 2,
+        '',
+        {
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '17px',
+          fontStyle: '700',
+          color: '#f8fbff'
+        }
+      )
+      .setOrigin(0, 0.5)
+      .setDepth(HUD_DEPTH + 1);
+    this.renderHealthBars(this.time.now);
+  }
+
   private syncActorCollisionBounds(): void {
     this.applyActorCollisionBounds(
       this.player,
@@ -416,17 +578,22 @@ export class SandboxScene extends BaseScene {
       this.facingDirection,
       this.getPlayerBoundsAction()
     );
-    this.applyActorCollisionBounds(
-      this.enemy,
-      'enemyNinja',
-      this.enemyFacingDirection,
-      this.getEnemyBoundsAction()
-    );
+
+    for (const enemy of this.enemies) {
+      this.applyActorCollisionBounds(
+        enemy.sprite,
+        'enemyNinja',
+        enemy.facingDirection,
+        this.getEnemyBoundsAction(enemy)
+      );
+    }
   }
 
   private syncActorPlaybackRates(): void {
     this.applyActorPlaybackRate(this.player, 'mainNinja', this.getPlayerBoundsAction());
-    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', this.getEnemyBoundsAction());
+    for (const enemy of this.enemies) {
+      this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', this.getEnemyBoundsAction(enemy));
+    }
   }
 
   private applyActorPlaybackRate(
@@ -466,11 +633,23 @@ export class SandboxScene extends BaseScene {
   }
 
   private getPlayerBoundsAction(): MainNinjaAction {
-    return this.currentAction === 'hurt' ? 'impact' : this.currentAction;
+    if (this.currentAction === 'hurt') {
+      return 'impact';
+    }
+
+    if (this.currentAction === 'dead') {
+      return 'death';
+    }
+
+    return this.currentAction;
   }
 
-  private getEnemyBoundsAction(): EnemyNinjaAction {
-    return this.enemyAction === 'slash' ? 'slash' : this.enemyAction === 'run' ? 'run' : 'idle';
+  private getEnemyBoundsAction(enemy: EnemyState): EnemyNinjaAction {
+    if (enemy.action === 'dead') {
+      return 'death';
+    }
+
+    return enemy.action === 'slash' ? 'slash' : enemy.action === 'run' ? 'run' : 'idle';
   }
 
   private queueAssets(backgroundFileName: DebugBackgroundFileName): boolean {
@@ -686,6 +865,11 @@ export class SandboxScene extends BaseScene {
     }
 
     const completeAttack = (animation: Phaser.Animations.Animation): void => {
+      if (animation.key.endsWith('.death') && this.currentAction === 'dead') {
+        this.showGameOverOverlay();
+        return;
+      }
+
       if (animation.key.endsWith('.impact') && this.currentAction === 'hurt') {
         this.finishPlayerDamage();
         return;
@@ -710,20 +894,21 @@ export class SandboxScene extends BaseScene {
     });
   }
 
-  private registerEnemyAnimationEvents(): void {
-    if (this.enemy === null) {
-      return;
-    }
-
+  private registerEnemyAnimationEvents(enemy: EnemyState): void {
     const completeAttack = (animation: Phaser.Animations.Animation): void => {
-      if (animation.key.endsWith('.slash') && this.enemyAction === 'slash') {
-        this.startEnemyRecovery();
+      if (animation.key.endsWith('.death') && enemy.action === 'dead') {
+        this.beginEnemyCorpseDecay(enemy);
+        return;
+      }
+
+      if (animation.key.endsWith('.slash') && enemy.action === 'slash') {
+        this.startEnemyRecovery(enemy);
       }
     };
 
-    this.enemy.on('animationcomplete', completeAttack);
+    enemy.sprite.on('animationcomplete', completeAttack);
     this.trackCleanup(() => {
-      this.enemy?.off('animationcomplete', completeAttack);
+      enemy.sprite.off('animationcomplete', completeAttack);
     });
   }
 
@@ -798,6 +983,7 @@ export class SandboxScene extends BaseScene {
     return (
       this.currentAction === 'jump' ||
       this.currentAction === 'hurt' ||
+      this.currentAction === 'dead' ||
       isPlayerAttackAction(this.currentAction)
     );
   }
@@ -814,19 +1000,30 @@ export class SandboxScene extends BaseScene {
   }
 
   private startAttack(action: PlayerAttackAction): void {
-    if (this.player === null || this.isPlayerBusy()) {
+    if (
+      this.player === null ||
+      this.gameOver ||
+      this.currentAction === 'dead' ||
+      this.isPlayerBusy()
+    ) {
       return;
     }
 
     this.updateForwardVectorFromInput();
     this.currentAction = action;
+    this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.player.setVelocity(0, 0);
     this.playNinjaAnimation(action, true);
   }
 
   private startJump(): void {
-    if (this.player === null || this.isPlayerBusy()) {
+    if (
+      this.player === null ||
+      this.gameOver ||
+      this.currentAction === 'dead' ||
+      this.isPlayerBusy()
+    ) {
       return;
     }
 
@@ -842,8 +1039,14 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
+    if (this.playerHealth <= 0 || this.gameOver) {
+      this.startPlayerDeath();
+      return;
+    }
+
     this.currentAction = 'idle';
     this.player.setVelocity(0, 0);
+    this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.movePlayer(this.readMovementInput());
   }
@@ -853,10 +1056,16 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
+    if (this.playerHealth <= 0 || this.gameOver) {
+      this.startPlayerDeath();
+      return;
+    }
+
     this.currentAction = 'idle';
     this.damageKnockbackVector.set(0, 0);
     this.damageKnockbackOrigin.set(0, 0);
     this.player.setVelocity(0, 0);
+    this.damagedEnemiesThisAttack.clear();
     this.movePlayer(this.readMovementInput());
   }
 
@@ -887,117 +1096,142 @@ export class SandboxScene extends BaseScene {
     );
   }
 
-  private updateEnemy(time: number): void {
-    if (this.player === null || this.enemy === null) {
+  private updateEnemy(enemy: EnemyState, time: number): void {
+    if (this.player === null) {
       return;
     }
 
-    if (this.enemyAction === 'slash') {
-      this.enemy.setVelocity(0, 0);
-      this.updateEnemyAttackDamage();
+    if (this.gameOver || enemy.action === 'dead' || !enemy.sprite.active) {
+      enemy.sprite.setVelocity(0, 0);
       return;
     }
 
-    if (this.enemyAction === 'recover') {
-      this.enemy.setVelocity(0, 0);
-      this.playEnemyAnimation('idle');
+    if (enemy.action === 'slash') {
+      enemy.sprite.setVelocity(0, 0);
+      this.updateEnemyAttackDamage(enemy);
+      return;
+    }
 
-      if (time >= this.enemyRecoveryUntil) {
-        this.enemyAction = 'idle';
+    if (enemy.action === 'recover') {
+      enemy.sprite.setVelocity(0, 0);
+      this.playEnemyAnimation(enemy, 'idle');
+
+      if (time >= enemy.recoveryUntil) {
+        enemy.action = 'idle';
       } else {
         return;
       }
     }
 
     if (!this.debug.get().enemyChaseEnabled) {
-      this.enemy.setVelocity(0, 0);
-      this.playEnemyAnimation('idle');
+      enemy.sprite.setVelocity(0, 0);
+      this.playEnemyAnimation(enemy, 'idle');
       return;
     }
 
     const toPlayer = new Phaser.Math.Vector2(
-      this.player.x - this.enemy.x,
-      this.player.y - this.enemy.y
+      this.player.x - enemy.sprite.x,
+      this.player.y - enemy.sprite.y
     );
     const distanceToPlayer = toPlayer.length();
 
     if (distanceToPlayer > 0) {
       toPlayer.normalize();
-      this.updateEnemyFacingFromVector(toPlayer);
+      this.updateEnemyFacingFromVector(enemy, toPlayer);
     }
 
-    if (this.canEnemySlashReachPlayer()) {
-      this.startEnemyAttack();
+    if (this.canEnemySlashReachPlayer(enemy)) {
+      this.startEnemyAttack(enemy);
       return;
     }
 
     if (distanceToPlayer === 0) {
-      this.enemy.setVelocity(0, 0);
-      this.playEnemyAnimation('idle');
+      enemy.sprite.setVelocity(0, 0);
+      this.playEnemyAnimation(enemy, 'idle');
       return;
     }
 
     const enemySpeed = this.debug.get().gameplayTuning.enemySpeed;
-    this.enemy.setVelocity(toPlayer.x * enemySpeed, toPlayer.y * enemySpeed);
-    this.playEnemyAnimation('run');
+    enemy.sprite.setVelocity(toPlayer.x * enemySpeed, toPlayer.y * enemySpeed);
+    this.playEnemyAnimation(enemy, 'run');
   }
 
-  private startEnemyAttack(): void {
-    if (this.player === null || this.enemy === null || this.enemyAction === 'slash') {
+  private startEnemyAttack(enemy: EnemyState): void {
+    if (
+      this.player === null ||
+      this.gameOver ||
+      this.currentAction === 'dead' ||
+      enemy.action === 'slash' ||
+      enemy.action === 'dead'
+    ) {
       return;
     }
 
-    this.enemyAction = 'slash';
-    this.enemyAttackDamageDealt = false;
-    this.clearEnemyAttackHitArea();
-    this.enemy.setVelocity(0, 0);
+    enemy.action = 'slash';
+    enemy.attackDamageDealt = false;
+    this.clearEnemyAttackHitArea(enemy);
+    enemy.sprite.setVelocity(0, 0);
     this.updateEnemyFacingFromVector(
-      new Phaser.Math.Vector2(this.player.x - this.enemy.x, this.player.y - this.enemy.y)
+      enemy,
+      new Phaser.Math.Vector2(this.player.x - enemy.sprite.x, this.player.y - enemy.sprite.y)
     );
-    this.playEnemyAnimation('slash', true);
+    this.playEnemyAnimation(enemy, 'slash', true);
   }
 
-  private startEnemyRecovery(): void {
-    if (this.enemy === null) {
+  private startEnemyRecovery(enemy: EnemyState): void {
+    enemy.action = 'recover';
+    enemy.recoveryUntil = this.time.now + this.debug.get().gameplayTuning.enemyRecoveryMs;
+    enemy.attackDamageDealt = false;
+    this.clearEnemyAttackHitArea(enemy);
+    enemy.sprite.setVelocity(0, 0);
+    this.playEnemyAnimation(enemy, 'idle', true);
+  }
+
+  private updateEnemyAttackDamage(enemy: EnemyState): void {
+    if (this.currentAction === 'dead' || this.gameOver) {
+      this.clearEnemyAttackHitArea(enemy);
       return;
     }
 
-    this.enemyAction = 'recover';
-    this.enemyRecoveryUntil = this.time.now + this.debug.get().gameplayTuning.enemyRecoveryMs;
-    this.enemyAttackDamageDealt = false;
-    this.clearEnemyAttackHitArea();
-    this.enemy.setVelocity(0, 0);
-    this.playEnemyAnimation('idle', true);
-  }
-
-  private updateEnemyAttackDamage(): void {
-    if (!this.isEnemyAttackReachFrame()) {
-      this.clearEnemyAttackHitArea();
+    if (!this.isEnemyAttackReachFrame(enemy)) {
+      this.clearEnemyAttackHitArea(enemy);
       return;
     }
 
-    this.updateEnemyAttackHitArea();
+    this.updateEnemyAttackHitArea(enemy);
 
-    if (this.enemyAttackDamageDealt || this.enemyAttackHitCount === 0) {
+    if (enemy.attackDamageDealt || enemy.attackHitCount === 0) {
       return;
     }
 
-    this.enemyAttackDamageDealt = true;
-    this.damagePlayerFromEnemy();
+    enemy.attackDamageDealt = true;
+    this.damagePlayerFromEnemy(enemy);
   }
 
-  private damagePlayerFromEnemy(): void {
-    if (this.player === null || this.enemy === null) {
+  private damagePlayerFromEnemy(enemy: EnemyState): void {
+    if (
+      this.player === null ||
+      this.currentAction === 'dead' ||
+      this.gameOver
+    ) {
+      return;
+    }
+
+    this.playerHealth = applyAttackDamage(this.playerHealth);
+    this.renderHealthBars(this.time.now);
+
+    if (this.playerHealth <= 0) {
+      this.startPlayerDeath();
       return;
     }
 
     const knockbackDirection = new Phaser.Math.Vector2(
-      this.player.x - this.enemy.x,
-      this.player.y - this.enemy.y
+      this.player.x - enemy.sprite.x,
+      this.player.y - enemy.sprite.y
     );
 
     if (knockbackDirection.lengthSq() === 0) {
-      knockbackDirection.set(this.enemyFacingDirection === 'left' ? -1 : 1, 0);
+      knockbackDirection.set(enemy.facingDirection === 'left' ? -1 : 1, 0);
     }
 
     knockbackDirection.normalize();
@@ -1007,8 +1241,8 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
 
     const towardEnemy = new Phaser.Math.Vector2(
-      this.enemy.x - this.player.x,
-      this.enemy.y - this.player.y
+      enemy.sprite.x - this.player.x,
+      enemy.sprite.y - this.player.y
     );
     this.updateFacingFromVector(towardEnemy);
     const knockbackSpeed = this.debug.get().gameplayTuning.playerKnockbackSpeed;
@@ -1022,6 +1256,172 @@ export class SandboxScene extends BaseScene {
       false
     );
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'impact');
+  }
+
+  private startPlayerDeath(): void {
+    if (this.player === null) {
+      return;
+    }
+
+    this.gameOver = true;
+
+    if (this.currentAction === 'dead') {
+      this.stopAllEnemiesForGameOver();
+      this.scheduleGameOverOverlay(this.getPlayerDeathOverlayFallbackDelay());
+      return;
+    }
+
+    this.currentAction = 'dead';
+    this.playerHealth = 0;
+    this.clearAttackHitArea();
+    this.clearAllEnemyAttackHitAreas();
+    this.stopAllEnemiesForGameOver();
+    this.player.disableBody(false, false);
+    this.player.setVelocity(0, 0).setAlpha(1);
+    this.player.anims.resume();
+    this.applyActorPlaybackRate(this.player, 'mainNinja', 'death');
+    this.player.play(getMainNinjaAnimationKey('death', this.facingDirection), false);
+    this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'death');
+    this.scheduleGameOverOverlay(this.getPlayerDeathOverlayFallbackDelay());
+    this.renderHealthBars(this.time.now);
+  }
+
+  private scheduleGameOverOverlay(delayMs: number): void {
+    this.playerDeathOverlayTimer?.remove(false);
+    this.playerDeathOverlayTimer = this.time.delayedCall(delayMs, () => {
+      this.playerDeathOverlayTimer = null;
+
+      if (!this.gameOver || this.currentAction !== 'dead') {
+        return;
+      }
+
+      if (this.isPlayerDeathAnimationStillPlaying()) {
+        this.scheduleGameOverOverlay(PLAYER_DEATH_OVERLAY_RECHECK_MS);
+        return;
+      }
+
+      this.showGameOverOverlay();
+    });
+  }
+
+  private getPlayerDeathOverlayFallbackDelay(): number {
+    const animationState = this.player?.anims;
+
+    return getAnimationFallbackDelayMs({
+      durationMs: animationState?.duration ?? 0,
+      localTimeScale: animationState?.timeScale ?? 1,
+      globalTimeScale: animationState?.animationManager.globalTimeScale ?? 1,
+      bufferMs: PLAYER_DEATH_OVERLAY_FALLBACK_BUFFER_MS
+    });
+  }
+
+  private isPlayerDeathAnimationStillPlaying(): boolean {
+    const animationState = this.player?.anims;
+
+    return (
+      animationState?.currentAnim?.key.endsWith('.death') === true &&
+      animationState.isPlaying
+    );
+  }
+
+  private stopAllEnemiesForGameOver(): void {
+    for (const enemy of this.enemies) {
+      enemy.sprite.setVelocity(0, 0);
+      enemy.sprite.anims.pause();
+      enemy.corpseTimer?.remove(false);
+      enemy.corpseTimer = null;
+      enemy.corpseTween?.pause();
+      this.clearEnemyAttackHitArea(enemy);
+    }
+  }
+
+  private stopAllEnemyMovement(): void {
+    for (const enemy of this.enemies) {
+      enemy.sprite.setVelocity(0, 0);
+    }
+  }
+
+  private showGameOverOverlay(): void {
+    this.playerDeathOverlayTimer?.remove(false);
+    this.playerDeathOverlayTimer = null;
+
+    if (this.gameOverOverlay !== null) {
+      return;
+    }
+
+    const overlay = this.add.container(0, 0).setDepth(GAME_OVER_DEPTH);
+    const backdrop = this.add
+      .rectangle(0, 0, this.profile.width, this.profile.height, 0x050910, 0.74)
+      .setOrigin(0)
+      .setInteractive();
+    const title = this.add
+      .text(this.centerX, this.centerY - 118, 'GAME OVER', {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '48px',
+        fontStyle: '700',
+        color: '#f8fbff'
+      })
+      .setOrigin(0.5);
+    const detail = this.add
+      .text(this.centerX, this.centerY - 64, 'The ninja has fallen', {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '20px',
+        color: '#cbd7e6'
+      })
+      .setOrigin(0.5);
+    const restartButton = this.createGameOverButton(
+      this.centerX - 92,
+      this.centerY + 14,
+      'Restart',
+      () => this.scene.restart()
+    );
+    const menuButton = this.createGameOverButton(
+      this.centerX + 92,
+      this.centerY + 14,
+      'Menu',
+      () => this.goTo(SceneKeys.MainMenu)
+    );
+
+    overlay.add([backdrop, title, detail, restartButton, menuButton]);
+    this.gameOverOverlay = overlay;
+  }
+
+  private createGameOverButton(
+    x: number,
+    y: number,
+    label: string,
+    onClick: () => void
+  ): Phaser.GameObjects.Container {
+    const width = 152;
+    const height = 48;
+    const button = this.add.container(x, y);
+    const background = this.add
+      .rectangle(0, 0, width, height, 0x182235, 1)
+      .setStrokeStyle(2, 0x7ed7ff, 0.92);
+    const text = this.add
+      .text(0, 0, label, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '20px',
+        fontStyle: '700',
+        color: '#f8fbff'
+      })
+      .setOrigin(0.5);
+
+    button.add([background, text]);
+    button.setSize(width, height);
+    button.setInteractive(
+      new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height),
+      Phaser.Geom.Rectangle.Contains
+    );
+    button.on('pointerover', () => background.setFillStyle(0x223150, 1));
+    button.on('pointerout', () => background.setFillStyle(0x182235, 1));
+    button.on('pointerdown', () => background.setFillStyle(0x2d5f91, 1));
+    button.on('pointerup', () => {
+      background.setFillStyle(0x223150, 1);
+      onClick();
+    });
+
+    return button;
   }
 
   private updateFacingFromVector(vector: Phaser.Math.Vector2): void {
@@ -1053,36 +1453,38 @@ export class SandboxScene extends BaseScene {
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, action);
   }
 
-  private updateEnemyFacingFromVector(vector: Phaser.Math.Vector2): void {
+  private updateEnemyFacingFromVector(enemy: EnemyState, vector: Phaser.Math.Vector2): void {
     if (vector.x < 0) {
-      this.enemyFacingDirection = 'left';
+      enemy.facingDirection = 'left';
       return;
     }
 
     if (vector.x > 0) {
-      this.enemyFacingDirection = 'right';
+      enemy.facingDirection = 'right';
     }
   }
 
-  private playEnemyAnimation(action: EnemyNinjaAction, restart = false): void {
-    if (this.enemy === null) {
+  private playEnemyAnimation(
+    enemy: EnemyState,
+    action: EnemyNinjaAction,
+    restart = false
+  ): void {
+    const animationKey = getEnemyNinjaAnimationKey(action, enemy.facingDirection);
+
+    this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', action);
+
+    if (!restart && enemy.sprite.anims.currentAnim?.key === animationKey) {
       return;
     }
 
-    const animationKey = getEnemyNinjaAnimationKey(action, this.enemyFacingDirection);
-
-    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', action);
-
-    if (!restart && this.enemy.anims.currentAnim?.key === animationKey) {
-      return;
+    if (action === 'death') {
+      enemy.action = 'dead';
+    } else if (action !== 'idle' || enemy.action !== 'recover') {
+      enemy.action = action;
     }
 
-    if (action !== 'idle' || this.enemyAction !== 'recover') {
-      this.enemyAction = action;
-    }
-
-    this.enemy.play(animationKey, !restart);
-    this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, action);
+    enemy.sprite.play(animationKey, !restart);
+    this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, action);
   }
 
   private updateAttackHitArea(action: PlayerAttackAction): void {
@@ -1105,26 +1507,107 @@ export class SandboxScene extends BaseScene {
         action
       ).attack
     );
-    this.attackHitCount = this.getHitCountInArea(this.attackHitArea, this.player);
+    const hitEnemies = this.enemies.filter(
+      (enemy) =>
+        enemy.health > 0 &&
+        enemy.action !== 'dead' &&
+        enemy.sprite.active &&
+        this.isHitAreaOverlappingActor(this.attackHitArea, enemy.sprite)
+    );
+
+    this.attackHitCount = hitEnemies.length;
+
+    for (const enemy of hitEnemies) {
+      if (!this.damagedEnemiesThisAttack.has(enemy)) {
+        this.damagedEnemiesThisAttack.add(enemy);
+        this.damageEnemyFromPlayer(enemy);
+      }
+    }
   }
 
-  private updateEnemyAttackHitArea(): void {
-    if (this.player === null || this.enemy === null) {
+  private damageEnemyFromPlayer(enemy: EnemyState): void {
+    if (enemy.health <= 0 || enemy.action === 'dead') {
+      return;
+    }
+
+    enemy.health = applyAttackDamage(enemy.health);
+    this.renderHealthBars(this.time.now);
+
+    if (enemy.health <= 0) {
+      this.startEnemyDeath(enemy);
+    }
+  }
+
+  private startEnemyDeath(enemy: EnemyState): void {
+    if (enemy.action === 'dead') {
+      return;
+    }
+
+    enemy.health = 0;
+    enemy.action = 'dead';
+    enemy.recoveryUntil = 0;
+    enemy.attackDamageDealt = false;
+    this.clearEnemyAttackHitArea(enemy);
+    enemy.corpseTimer?.remove(false);
+    enemy.corpseTimer = null;
+    enemy.corpseTween?.stop();
+    enemy.corpseTween = null;
+    enemy.sprite.disableBody(false, false);
+    enemy.sprite.setVelocity(0, 0).setAlpha(1).setActive(true).setVisible(true);
+    enemy.sprite.anims.resume();
+    this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'death');
+    enemy.sprite.play(getEnemyNinjaAnimationKey('death', enemy.facingDirection), false);
+    this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'death');
+    this.renderHealthBars(this.time.now);
+  }
+
+  private beginEnemyCorpseDecay(enemy: EnemyState): void {
+    if (this.gameOver) {
+      return;
+    }
+
+    enemy.corpseTimer?.remove(false);
+    enemy.corpseTimer = this.time.delayedCall(ENEMY_CORPSE_HOLD_MS, () => {
+      if (this.gameOver || enemy.action !== 'dead') {
+        return;
+      }
+
+      enemy.corpseTween = this.tweens.add({
+        targets: enemy.sprite,
+        alpha: 0.18,
+        duration: ENEMY_CORPSE_BLINK_DURATION_MS,
+        yoyo: true,
+        repeat: ENEMY_CORPSE_BLINK_REPEAT,
+        onComplete: () => {
+          if (enemy.action !== 'dead') {
+            return;
+          }
+
+          enemy.sprite.setVisible(false).setActive(false).setAlpha(1);
+          enemy.corpseTween = null;
+          this.renderHealthBars(this.time.now);
+        }
+      });
+    });
+  }
+
+  private updateEnemyAttackHitArea(enemy: EnemyState): void {
+    if (this.player === null) {
       return;
     }
 
     this.setAttackHitArea(
-      this.enemyAttackHitArea,
-      this.enemy,
+      enemy.attackHitArea,
+      enemy.sprite,
       getNinjaAnimationBounds(
         this.app.getNinjaBoundsConfig(),
         'enemyNinja',
-        this.enemyFacingDirection,
+        enemy.facingDirection,
         'slash'
       ).attack
     );
-    this.enemyAttackHitCount = this.isHitAreaOverlappingActor(
-      this.enemyAttackHitArea,
+    enemy.attackHitCount = this.isHitAreaOverlappingActor(
+      enemy.attackHitArea,
       this.player,
       ENEMY_ATTACK_REQUIRED_OVERLAP_X,
       ENEMY_ATTACK_REQUIRED_OVERLAP_Y
@@ -1133,31 +1616,31 @@ export class SandboxScene extends BaseScene {
       : 0;
   }
 
-  private canEnemySlashReachPlayer(): boolean {
-    if (this.player === null || !this.updateEnemyAttackProbeArea()) {
+  private canEnemySlashReachPlayer(enemy: EnemyState): boolean {
+    if (this.gameOver || this.currentAction === 'dead' || enemy.action === 'dead') {
+      return false;
+    }
+
+    if (this.player === null || !this.updateEnemyAttackProbeArea(enemy)) {
       return false;
     }
 
     return this.isHitAreaOverlappingActor(
-      this.enemyAttackProbeArea,
+      enemy.attackProbeArea,
       this.player,
       ENEMY_ATTACK_REQUIRED_OVERLAP_X,
       ENEMY_ATTACK_REQUIRED_OVERLAP_Y
     );
   }
 
-  private updateEnemyAttackProbeArea(): boolean {
-    if (this.enemy === null) {
-      return false;
-    }
-
+  private updateEnemyAttackProbeArea(enemy: EnemyState): boolean {
     this.setAttackHitArea(
-      this.enemyAttackProbeArea,
-      this.enemy,
+      enemy.attackProbeArea,
+      enemy.sprite,
       getNinjaAnimationBounds(
         this.app.getNinjaBoundsConfig(),
         'enemyNinja',
-        this.enemyFacingDirection,
+        enemy.facingDirection,
         'slash'
       ).attack
     );
@@ -1182,16 +1665,6 @@ export class SandboxScene extends BaseScene {
     );
   }
 
-  private getHitCountInArea(
-    hitArea: Phaser.Geom.Rectangle,
-    owner: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-  ): number {
-    const bodies: readonly (Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody)[] =
-      this.physics.overlapRect(hitArea.x, hitArea.y, hitArea.width, hitArea.height);
-
-    return bodies.filter((body) => body.gameObject !== owner).length;
-  }
-
   private isHitAreaOverlappingActor(
     hitArea: Phaser.Geom.Rectangle,
     actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
@@ -1213,9 +1686,15 @@ export class SandboxScene extends BaseScene {
     this.renderDebugOverlays();
   }
 
-  private clearEnemyAttackHitArea(): void {
-    this.enemyAttackHitCount = 0;
-    this.enemyAttackHitArea.setTo(0, 0, 0, 0);
+  private clearEnemyAttackHitArea(enemy: EnemyState): void {
+    enemy.attackHitCount = 0;
+    enemy.attackHitArea.setTo(0, 0, 0, 0);
+  }
+
+  private clearAllEnemyAttackHitAreas(): void {
+    for (const enemy of this.enemies) {
+      this.clearEnemyAttackHitArea(enemy);
+    }
   }
 
   private getAnimationFrameIndex(
@@ -1243,15 +1722,15 @@ export class SandboxScene extends BaseScene {
     );
   }
 
-  private isEnemyAttackReachFrame(): boolean {
+  private isEnemyAttackReachFrame(enemy: EnemyState): boolean {
     return (
-      this.enemyAction === 'slash' &&
+      enemy.action === 'slash' &&
       isNinjaHitFrameActive(
         this.app.getNinjaBoundsConfig(),
         'enemyNinja',
-        this.enemyFacingDirection,
+        enemy.facingDirection,
         'slash',
-        this.getAnimationFrameZeroIndex(this.enemy)
+        this.getAnimationFrameZeroIndex(enemy.sprite)
       )
     );
   }
@@ -1294,35 +1773,57 @@ export class SandboxScene extends BaseScene {
   }
 
   private resetActors(): void {
-    if (this.player === null || this.enemy === null) {
+    if (this.player === null || this.enemies.length === 0) {
       return;
     }
 
     this.facingDirection = 'right';
-    this.enemyFacingDirection = 'left';
     this.forwardVector.set(1, 0);
     this.damageKnockbackVector.set(0, 0);
     this.damageKnockbackOrigin.set(0, 0);
     this.currentAction = 'idle';
-    this.enemyAction = 'idle';
-    this.enemyRecoveryUntil = 0;
-    this.enemyAttackDamageDealt = false;
+    this.playerHealth = PLAYER_MAX_HEALTH;
+    this.damagedEnemiesThisAttack.clear();
+    this.gameOver = false;
+    this.gameOverOverlay?.destroy(true);
+    this.gameOverOverlay = null;
+    this.playerDeathOverlayTimer?.remove(false);
+    this.playerDeathOverlayTimer = null;
     this.clearAttackHitArea();
-    this.clearEnemyAttackHitArea();
+    this.clearAllEnemyAttackHitAreas();
 
     this.player
+      .enableBody(true, this.centerX, this.centerY + 108, true, true)
       .setPosition(this.centerX, this.centerY + 108)
-      .setVelocity(0, 0);
+      .setVelocity(0, 0)
+      .setAlpha(1);
+    this.player.anims.resume();
     this.applyActorPlaybackRate(this.player, 'mainNinja', 'idle');
     this.player.play(getMainNinjaAnimationKey('idle', 'right'), false);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
-    this.enemy
-      .setPosition(this.getDefaultEnemyX(), this.centerY + 108)
-      .setVelocity(0, 0);
-    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', 'idle');
-    this.enemy.play(getEnemyNinjaAnimationKey('idle', 'left'), false);
-    this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
+    this.enemies.forEach((enemy, index) => {
+      const x = Phaser.Math.Clamp(this.getDefaultEnemyX() + index * 160, 120, this.profile.width - 120);
+      enemy.facingDirection = 'left';
+      enemy.action = 'idle';
+      enemy.health = ENEMY_MAX_HEALTH;
+      enemy.recoveryUntil = 0;
+      enemy.attackDamageDealt = false;
+      enemy.corpseTimer?.remove(false);
+      enemy.corpseTimer = null;
+      enemy.corpseTween?.stop();
+      enemy.corpseTween = null;
+      enemy.sprite
+        .enableBody(true, x, this.centerY + 108, true, true)
+        .setPosition(x, this.centerY + 108)
+        .setVelocity(0, 0)
+        .setAlpha(1);
+      enemy.sprite.anims.resume();
+      this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'idle');
+      enemy.sprite.play(getEnemyNinjaAnimationKey('idle', 'left'), false);
+      this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'idle');
+    });
+    this.renderHealthBars(this.time.now);
 
     this.finishDebugFrame(this.time.now, true);
   }
@@ -1331,6 +1832,7 @@ export class SandboxScene extends BaseScene {
     this.syncActorCollisionBounds();
     this.syncActorPlaybackRates();
     this.publishDebugTelemetry(time, forceTelemetry);
+    this.renderHealthBars(time);
     this.renderDebugOverlays();
   }
 
@@ -1341,11 +1843,12 @@ export class SandboxScene extends BaseScene {
 
     this.lastDebugTelemetryAt = time;
     const attackActive = this.isPlayerAttackReachFrame();
+    const primaryEnemy = this.enemies[0] ?? null;
 
     this.debug.update((state) => ({
       ...state,
       player: this.createActorDebugState(this.player, this.currentAction),
-      enemy: this.createActorDebugState(this.enemy, this.enemyAction),
+      enemy: this.createActorDebugState(primaryEnemy?.sprite ?? null, primaryEnemy?.action ?? 'none'),
       attack: {
         active: attackActive,
         action: attackActive ? this.currentAction : 'none',
@@ -1403,6 +1906,112 @@ export class SandboxScene extends BaseScene {
     };
   }
 
+  private renderHealthBars(time: number): void {
+    const graphic = this.healthGraphic;
+
+    if (graphic === null) {
+      return;
+    }
+
+    graphic.clear();
+    this.renderPlayerHealthBar(graphic, time);
+    this.renderEnemyHealthBars(graphic);
+  }
+
+  private renderPlayerHealthBar(graphic: Phaser.GameObjects.Graphics, time: number): void {
+    const ratio = getHealthRatio(this.playerHealth, PLAYER_MAX_HEALTH);
+    const fillWidth = Math.round((PLAYER_HEALTH_BAR_WIDTH - 6) * ratio);
+    const color = this.getPlayerHealthColor();
+    const fillAlpha = ratio <= 0.25 && Math.floor(time / 130) % 2 === 0 ? 0.32 : 1;
+
+    graphic.fillStyle(0x050910, 0.82);
+    graphic.fillRect(
+      PLAYER_HEALTH_BAR_X,
+      PLAYER_HEALTH_BAR_Y,
+      PLAYER_HEALTH_BAR_WIDTH,
+      PLAYER_HEALTH_BAR_HEIGHT
+    );
+    graphic.lineStyle(3, 0xf8fbff, 0.86);
+    graphic.strokeRect(
+      PLAYER_HEALTH_BAR_X,
+      PLAYER_HEALTH_BAR_Y,
+      PLAYER_HEALTH_BAR_WIDTH,
+      PLAYER_HEALTH_BAR_HEIGHT
+    );
+
+    if (fillWidth > 0) {
+      graphic.fillStyle(color, fillAlpha);
+      graphic.fillRect(
+        PLAYER_HEALTH_BAR_X + 3,
+        PLAYER_HEALTH_BAR_Y + 3,
+        fillWidth,
+        PLAYER_HEALTH_BAR_HEIGHT - 6
+      );
+    }
+
+    this.playerHealthLabel?.setText(`HP ${this.playerHealth}/${PLAYER_MAX_HEALTH}`);
+  }
+
+  private getPlayerHealthColor(): number {
+    switch (getHealthBand(this.playerHealth, PLAYER_MAX_HEALTH)) {
+      case 'healthy':
+        return 0x35d08f;
+      case 'warning':
+        return 0xf6c961;
+      case 'critical':
+        return 0xe94b5f;
+    }
+  }
+
+  private renderEnemyHealthBars(graphic: Phaser.GameObjects.Graphics): void {
+    for (const enemy of this.enemies) {
+      this.renderEnemyHealthBar(graphic, enemy);
+    }
+  }
+
+  private renderEnemyHealthBar(
+    graphic: Phaser.GameObjects.Graphics,
+    enemy: EnemyState
+  ): void {
+    if (
+      !enemy.sprite.active ||
+      enemy.health <= 0 ||
+      enemy.action === 'dead'
+    ) {
+      return;
+    }
+
+    const ratio = getHealthRatio(enemy.health, ENEMY_MAX_HEALTH);
+    const visualBounds = this.getWorldRectFromFrameRect(
+      enemy.sprite,
+      getNinjaAnimationBounds(
+        this.app.getNinjaBoundsConfig(),
+        'enemyNinja',
+        enemy.facingDirection,
+        this.getEnemyBoundsAction(enemy)
+      ).visual,
+      this.visualBoundsRect
+    );
+    const x = Math.round(
+      visualBounds.x + visualBounds.width / 2 - ENEMY_HEALTH_BAR_WIDTH / 2
+    );
+    const y = Math.round(
+      visualBounds.y - ENEMY_HEALTH_BAR_OFFSET_Y - ENEMY_HEALTH_BAR_HEIGHT
+    );
+
+    graphic.fillStyle(0x050910, 0.76);
+    graphic.fillRect(x, y, ENEMY_HEALTH_BAR_WIDTH, ENEMY_HEALTH_BAR_HEIGHT);
+    graphic.lineStyle(2, 0xf8fbff, 0.78);
+    graphic.strokeRect(x, y, ENEMY_HEALTH_BAR_WIDTH, ENEMY_HEALTH_BAR_HEIGHT);
+    graphic.fillStyle(0xe94b5f, 0.96);
+    graphic.fillRect(
+      x + 2,
+      y + 2,
+      Math.round((ENEMY_HEALTH_BAR_WIDTH - 4) * ratio),
+      ENEMY_HEALTH_BAR_HEIGHT - 4
+    );
+  }
+
   private renderDebugOverlays(): void {
     const graphic = this.debugOverlayGraphic;
 
@@ -1418,13 +2027,17 @@ export class SandboxScene extends BaseScene {
       graphic.strokeRect(2, 2, this.profile.width - 4, this.profile.height - 4);
     }
 
-    if (state.showEnemyRanges && this.updateEnemyAttackProbeArea()) {
-      this.renderAttackHitBox(
-        this.enemyAttackProbeArea,
-        this.canEnemySlashReachPlayer() ? 1 : 0,
-        0xff8a65,
-        0xffc857
-      );
+    if (state.showEnemyRanges) {
+      for (const enemy of this.enemies) {
+        if (this.updateEnemyAttackProbeArea(enemy)) {
+          this.renderAttackHitBox(
+            enemy.attackProbeArea,
+            this.canEnemySlashReachPlayer(enemy) ? 1 : 0,
+            0xff8a65,
+            0xffc857
+          );
+        }
+      }
     }
 
     if (state.showVisualBounds) {
@@ -1435,18 +2048,22 @@ export class SandboxScene extends BaseScene {
         this.getPlayerBoundsAction(),
         0x8fffad
       );
-      this.renderVisualBounds(
-        this.enemy,
-        'enemyNinja',
-        this.enemyFacingDirection,
-        this.getEnemyBoundsAction(),
-        0xff91d0
-      );
+      for (const enemy of this.enemies) {
+        this.renderVisualBounds(
+          enemy.sprite,
+          'enemyNinja',
+          enemy.facingDirection,
+          this.getEnemyBoundsAction(enemy),
+          0xff91d0
+        );
+      }
     }
 
     if (state.showHitBoxes) {
       this.renderPhysicsBody(this.player, 0x35d08f);
-      this.renderPhysicsBody(this.enemy, 0xe56b6f);
+      for (const enemy of this.enemies) {
+        this.renderPhysicsBody(enemy.sprite, 0xe56b6f);
+      }
     }
 
     if (state.showAttackBoxes) {
@@ -1454,19 +2071,23 @@ export class SandboxScene extends BaseScene {
         this.renderAttackHitBox(this.attackHitArea, this.attackHitCount, 0x7ed7ff, 0xffc857);
       }
 
-      if (this.isEnemyAttackReachFrame()) {
-        this.renderAttackHitBox(
-          this.enemyAttackHitArea,
-          this.enemyAttackHitCount,
-          0xff91d0,
-          0xffc857
-        );
+      for (const enemy of this.enemies) {
+        if (this.isEnemyAttackReachFrame(enemy)) {
+          this.renderAttackHitBox(
+            enemy.attackHitArea,
+            enemy.attackHitCount,
+            0xff91d0,
+            0xffc857
+          );
+        }
       }
     }
 
     if (state.showOrigins) {
       this.renderOrigin(this.player, 0x8fffad);
-      this.renderOrigin(this.enemy, 0xff91d0);
+      for (const enemy of this.enemies) {
+        this.renderOrigin(enemy.sprite, 0xff91d0);
+      }
     }
 
     if (state.showPointerProbe) {
