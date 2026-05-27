@@ -59,6 +59,12 @@ describe('settingsStore', () => {
 });
 
 describe('debugStore', () => {
+  it('defaults enemy chase to disabled', () => {
+    const store = createDebugStore();
+
+    expect(store.get().enemyChaseEnabled).toBe(false);
+  });
+
   it('tracks scene, pause, world bounds, pointer, and input state', () => {
     const store = createDebugStore();
 

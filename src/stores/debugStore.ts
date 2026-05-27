@@ -160,7 +160,7 @@ function createInitialDebugState(): DebugState {
     showOrigins: false,
     showPointerProbe: false,
     showEnemyRanges: false,
-    enemyChaseEnabled: true,
+    enemyChaseEnabled: false,
     backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
     gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
     levelProgress: DEFAULT_LEVEL_PROGRESS,
