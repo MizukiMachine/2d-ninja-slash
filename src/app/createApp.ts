@@ -47,6 +47,7 @@ import {
   NINJA_ACTORS,
   NINJA_BOUNDS_CONFIG_URL,
   NINJA_BOUNDS_SAVE_ENDPOINT,
+  NINJA_PLAYBACK_RATE_LIMITS,
   areNinjaRectsEqual,
   applyAllNinjaBoundsToAllActions,
   applyNinjaBoundsKindToAllActions,
@@ -55,6 +56,7 @@ import {
   getDefaultNinjaActionId,
   getNinjaAction,
   getNinjaAnimationBounds,
+  getNinjaAnimationPlaybackRate,
   getNinjaAnimationsForActor,
   getOppositeFacingDirection,
   isNinjaHitFrameActive,
@@ -64,8 +66,10 @@ import {
   normalizeNinjaActorId,
   normalizeNinjaBoundsConfig,
   normalizeNinjaBoundsKind,
+  normalizeNinjaPlaybackRate,
   resetNinjaAnimationConfig,
   setNinjaAnimationBounds,
+  setNinjaAnimationPlaybackRate,
   setNinjaHitFrame,
   type FacingDirection,
   type NinjaActorId,
@@ -142,14 +146,6 @@ function formatFrameStripButtons(
       active ? 'ON' : 'off'
     }</span></button>`;
   }).join('');
-}
-
-function normalizePlaybackRate(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 1;
-  }
-
-  return Math.min(2, Math.max(0.25, Math.round(value * 100) / 100));
 }
 
 function clampRectToFrame(rect: NinjaRect): NinjaRect {
@@ -522,8 +518,8 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="toggle-row"><input id="gym-show-collision" type="checkbox" /> Collision bounds</label>
       <label class="toggle-row"><input id="gym-show-attack" type="checkbox" /> Attack bounds</label>
       <label class="range-row">
-        <span>Playback</span>
-        <input id="gym-playback-rate" type="range" min="0.25" max="2" step="0.05" />
+        <span>Action speed</span>
+        <input id="gym-playback-rate" type="range" min="${NINJA_PLAYBACK_RATE_LIMITS.min}" max="${NINJA_PLAYBACK_RATE_LIMITS.max}" step="${NINJA_PLAYBACK_RATE_LIMITS.step}" />
         <strong id="gym-playback-readout">1.00x</strong>
       </label>
       <div class="frame-control">
@@ -555,7 +551,7 @@ export function createApp(root: HTMLDivElement | null): void {
         <label class="number-row"><span>H</span><input id="gym-bounds-height" type="number" min="1" max="256" step="1" /></label>
       </div>
       <div class="panel-group__row">
-        <button id="gym-save-bounds" class="shell-button" data-variant="primary" type="button">Save</button>
+        <button id="gym-save-bounds" class="shell-button" data-variant="primary" type="button">Save config</button>
         <button id="gym-reset-bounds" class="shell-button" type="button">Reset</button>
         <button id="gym-mirror-direction" class="shell-button" type="button">Mirror selected</button>
         <button id="gym-apply-kind-all" class="shell-button" type="button">Apply selected</button>
@@ -1193,6 +1189,11 @@ export function createApp(root: HTMLDivElement | null): void {
     const actorId = normalizeNinjaActorId(gymSelectedActorId);
     const direction = normalizeFacingDirection(gymSelectedDirection);
     const actionId = normalizeNinjaActionId(actorId, gymSelectedActionId);
+    const playbackRate = getNinjaAnimationPlaybackRate(
+      ninjaBoundsConfig,
+      actorId,
+      actionId
+    );
 
     globalThis.__NINJA_SLASH_GYM__ = {
       active: debugStore.get().activeScene === SceneKeys.Gym,
@@ -1203,7 +1204,7 @@ export function createApp(root: HTMLDivElement | null): void {
       showVisualBounds: gymShowVisualBounds,
       showCollisionBounds: gymShowCollisionBounds,
       showAttackBounds: gymShowAttackBounds,
-      playbackRate: gymPlaybackRate,
+      playbackRate,
       boundsConfig: ninjaBoundsConfig,
       currentFrame: current?.currentFrame ?? 0,
       zoom: current?.zoom ?? 1.35,
@@ -1239,7 +1240,33 @@ export function createApp(root: HTMLDivElement | null): void {
     gymShowVisualBounds = gymShowVisualToggle.checked;
     gymShowCollisionBounds = gymShowCollisionToggle.checked;
     gymShowAttackBounds = gymShowAttackToggle.checked;
-    gymPlaybackRate = normalizePlaybackRate(Number(gymPlaybackRateInput.value));
+    gymPlaybackRate = getNinjaAnimationPlaybackRate(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.actionId
+    );
+    syncNinjaGymGlobal();
+    renderGymControls();
+  };
+
+  const updateSelectedGymPlaybackRate = (): void => {
+    const selection = getGymSelection();
+    const playbackRate = normalizeNinjaPlaybackRate(Number(gymPlaybackRateInput.value));
+
+    ninjaBoundsConfig = setNinjaAnimationPlaybackRate(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.actionId,
+      playbackRate
+    );
+    gymPlaybackRate = getNinjaAnimationPlaybackRate(
+      ninjaBoundsConfig,
+      selection.actorId,
+      selection.actionId
+    );
+    gymSaveStatus = `Updated ${selection.actorId} ${selection.actionId} playback to ${gymPlaybackRate.toFixed(
+      2
+    )}x`;
     syncNinjaGymGlobal();
     renderGymControls();
   };
@@ -1364,6 +1391,11 @@ export function createApp(root: HTMLDivElement | null): void {
     const actionId = normalizeNinjaActionId(actorId, gymSelectedActionId);
     const boundsKind = normalizeNinjaBoundsKind(gymSelectedBoundsKind);
     const actionDefinition = getNinjaAction(actorId, actionId);
+    const playbackRate = getNinjaAnimationPlaybackRate(
+      ninjaBoundsConfig,
+      actorId,
+      actionId
+    );
     const actionOptionsSignature = `${actorId}:${getNinjaAnimationsForActor(actorId)
       .map((actionDefinitionItem) => actionDefinitionItem.id)
       .join('|')}`;
@@ -1408,8 +1440,9 @@ export function createApp(root: HTMLDivElement | null): void {
     gymShowVisualToggle.checked = gymShowVisualBounds;
     gymShowCollisionToggle.checked = gymShowCollisionBounds;
     gymShowAttackToggle.checked = gymShowAttackBounds;
-    gymPlaybackRateInput.value = String(gymPlaybackRate);
-    gymPlaybackReadout.textContent = `${gymPlaybackRate.toFixed(2)}x`;
+    gymPlaybackRate = playbackRate;
+    gymPlaybackRateInput.value = String(playbackRate);
+    gymPlaybackReadout.textContent = `${playbackRate.toFixed(2)}x`;
     gymFrameReadout.textContent = `${currentFrame + 1}/${actionDefinition.frameCount}`;
     gymAttackFrameReadout.textContent = `Active: ${formatFrameList(activeHitFrames)}`;
     gymToggleCurrentHitFrameButton.textContent = currentFrameActive
@@ -1928,7 +1961,7 @@ export function createApp(root: HTMLDivElement | null): void {
   gymShowVisualToggle.addEventListener('change', patchGymState);
   gymShowCollisionToggle.addEventListener('change', patchGymState);
   gymShowAttackToggle.addEventListener('change', patchGymState);
-  gymPlaybackRateInput.addEventListener('input', patchGymState);
+  gymPlaybackRateInput.addEventListener('input', updateSelectedGymPlaybackRate);
   gymBoundsXInput.addEventListener('input', updateSelectedGymBounds);
   gymBoundsYInput.addEventListener('input', updateSelectedGymBounds);
   gymBoundsWidthInput.addEventListener('input', updateSelectedGymBounds);
@@ -2038,7 +2071,7 @@ export function createApp(root: HTMLDivElement | null): void {
     patchGymState();
   });
   gymSaveBoundsButton.addEventListener('click', async () => {
-    gymSaveStatus = 'Saving bounds...';
+    gymSaveStatus = 'Saving gym config...';
     renderGymControls();
 
     const payload = buildNinjaBoundsExport(ninjaBoundsConfig);

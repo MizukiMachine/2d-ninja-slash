@@ -16,6 +16,12 @@ export const DEFAULT_NINJA_COLLISION_RECT = {
 
 export const NINJA_BOUNDS_CONFIG_URL = '/assets/config/ninja-bounds.json';
 export const NINJA_BOUNDS_SAVE_ENDPOINT = '/__debug/ninja-bounds';
+export const NINJA_PLAYBACK_RATE_LIMITS = {
+  min: 0.25,
+  max: 2,
+  step: 0.05,
+  default: 1
+} as const;
 
 export type FacingDirection = 'left' | 'right';
 export type NinjaActorId = 'mainNinja' | 'enemyNinja';
@@ -74,12 +80,15 @@ export type NinjaActorHitFramesMap = Record<
   FacingDirection,
   Record<string, NinjaAnimationHitFrames>
 >;
+export type NinjaActorPlaybackRatesMap = Record<string, number>;
 export type NinjaBoundsByActor = Record<NinjaActorId, NinjaActorBoundsMap>;
 export type NinjaHitFramesByActor = Record<NinjaActorId, NinjaActorHitFramesMap>;
+export type NinjaPlaybackRatesByActor = Record<NinjaActorId, NinjaActorPlaybackRatesMap>;
 
 export interface NinjaBoundsConfig {
   readonly boundsByActor: NinjaBoundsByActor;
   readonly hitFramesByActor: NinjaHitFramesByActor;
+  readonly playbackRatesByActor: NinjaPlaybackRatesByActor;
 }
 
 export interface NinjaBoundsExport extends NinjaBoundsConfig {
@@ -147,7 +156,6 @@ const PLAYBACK_RATE_MULTIPLIER = 3;
 
 const MAIN_NINJA_ACTIONS: readonly NinjaActionDefinition[] = [
   action('attack', 'Attack (preview only)', 12 * PLAYBACK_RATE_MULTIPLIER, 0),
-  action('crouching', 'Crouching', 8 * PLAYBACK_RATE_MULTIPLIER, -1),
   action('death', 'Death', 10 * PLAYBACK_RATE_MULTIPLIER, 0),
   action('idle', 'Idle', 8 * PLAYBACK_RATE_MULTIPLIER, -1),
   action('impact', 'Impact', 16 * PLAYBACK_RATE_MULTIPLIER, 0),
@@ -275,6 +283,22 @@ export function normalizeNinjaActionId(
   return getNinjaAction(actorId, actionId).id;
 }
 
+export function normalizeNinjaPlaybackRate(
+  value: number | undefined,
+  fallback: number = NINJA_PLAYBACK_RATE_LIMITS.default
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  const clamped = Math.min(
+    NINJA_PLAYBACK_RATE_LIMITS.max,
+    Math.max(NINJA_PLAYBACK_RATE_LIMITS.min, value)
+  );
+
+  return Math.round(clamped * 100) / 100;
+}
+
 export function normalizeNinjaBoundsKind(value: string | undefined): NinjaBoundsKind {
   return value === 'visual' || value === 'collision' || value === 'attack'
     ? value
@@ -362,6 +386,10 @@ export function normalizeNinjaBoundsConfig(config: unknown): NinjaBoundsConfig {
     hitFramesByActor: normalizeHitFramesByActor(
       candidate.hitFramesByActor,
       defaults.hitFramesByActor
+    ),
+    playbackRatesByActor: normalizePlaybackRatesByActor(
+      candidate.playbackRatesByActor,
+      defaults.playbackRatesByActor
     )
   };
 }
@@ -374,10 +402,11 @@ export function buildNinjaBoundsExport(config: NinjaBoundsConfig): NinjaBoundsEx
   const normalized = normalizeNinjaBoundsConfig(config);
 
   return {
-    version: 1,
+    version: 2,
     savedAt: new Date().toISOString(),
     boundsByActor: normalized.boundsByActor,
-    hitFramesByActor: normalized.hitFramesByActor
+    hitFramesByActor: normalized.hitFramesByActor,
+    playbackRatesByActor: normalized.playbackRatesByActor
   };
 }
 
@@ -420,6 +449,22 @@ export function isNinjaHitFrameActive(
     ][normalizedActionId].attack;
 
   return hitFrames[frameIndex] === true;
+}
+
+export function getNinjaAnimationPlaybackRate(
+  config: NinjaBoundsConfig,
+  actorId: string,
+  actionId: string
+): number {
+  const normalizedActorId = normalizeNinjaActorId(actorId);
+  const normalizedActionId = normalizeNinjaActionId(normalizedActorId, actionId);
+
+  return normalizeNinjaPlaybackRate(
+    config.playbackRatesByActor[normalizedActorId]?.[normalizedActionId],
+    DEFAULT_NINJA_BOUNDS_CONFIG.playbackRatesByActor[normalizedActorId][
+      normalizedActionId
+    ]
+  );
 }
 
 export function setNinjaAnimationBounds(
@@ -477,6 +522,22 @@ export function setNinjaHitFrame(
   return next;
 }
 
+export function setNinjaAnimationPlaybackRate(
+  config: NinjaBoundsConfig,
+  actorId: string,
+  actionId: string,
+  playbackRate: number
+): NinjaBoundsConfig {
+  const next = cloneNinjaBoundsConfig(config);
+  const normalizedActorId = normalizeNinjaActorId(actorId);
+  const normalizedActionId = normalizeNinjaActionId(normalizedActorId, actionId);
+
+  next.playbackRatesByActor[normalizedActorId][normalizedActionId] =
+    normalizeNinjaPlaybackRate(playbackRate);
+
+  return next;
+}
+
 export function resetNinjaAnimationConfig(
   config: NinjaBoundsConfig,
   actorId: string,
@@ -501,6 +562,10 @@ export function resetNinjaAnimationConfig(
       ][normalizedActionId].attack
     ]
   };
+  next.playbackRatesByActor[normalizedActorId][normalizedActionId] =
+    DEFAULT_NINJA_BOUNDS_CONFIG.playbackRatesByActor[normalizedActorId][
+      normalizedActionId
+    ];
 
   return next;
 }
@@ -596,7 +661,18 @@ function createDefaultNinjaBoundsConfig(): NinjaBoundsConfig {
           ])
         )
       ])
-    ) as unknown as NinjaHitFramesByActor
+    ) as unknown as NinjaHitFramesByActor,
+    playbackRatesByActor: Object.fromEntries(
+      NINJA_ACTORS.map((actorDefinition) => [
+        actorDefinition.id,
+        Object.fromEntries(
+          actorDefinition.actions.map((actionDefinition) => [
+            actionDefinition.id,
+            NINJA_PLAYBACK_RATE_LIMITS.default
+          ])
+        )
+      ])
+    ) as NinjaPlaybackRatesByActor
   };
 }
 
@@ -753,6 +829,26 @@ function normalizeHitFramesByActor(
       )
     ])
   ) as unknown as NinjaHitFramesByActor;
+}
+
+function normalizePlaybackRatesByActor(
+  playbackRatesByActor: Partial<NinjaPlaybackRatesByActor> | undefined,
+  defaults: NinjaPlaybackRatesByActor
+): NinjaPlaybackRatesByActor {
+  return Object.fromEntries(
+    NINJA_ACTORS.map((actorDefinition) => [
+      actorDefinition.id,
+      Object.fromEntries(
+        actorDefinition.actions.map((actionDefinition) => [
+          actionDefinition.id,
+          normalizeNinjaPlaybackRate(
+            playbackRatesByActor?.[actorDefinition.id]?.[actionDefinition.id],
+            defaults[actorDefinition.id][actionDefinition.id]
+          )
+        ])
+      )
+    ])
+  ) as NinjaPlaybackRatesByActor;
 }
 
 function normalizeRect(rect: Partial<NinjaRect> | undefined, fallback: NinjaRect): NinjaRect {
