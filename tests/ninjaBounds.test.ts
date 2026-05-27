@@ -7,11 +7,14 @@ import {
   getDefaultNinjaActionId,
   getNinjaAction,
   getNinjaAnimationBounds,
+  getNinjaAnimationPlaybackRate,
   getOppositeFacingDirection,
   isNinjaHitFrameActive,
   mirrorNinjaRectHorizontally,
   normalizeNinjaBoundsConfig,
+  resetNinjaAnimationConfig,
   setNinjaAnimationBounds,
+  setNinjaAnimationPlaybackRate,
   setNinjaHitFrame
 } from '../src/game/ninjaBounds';
 
@@ -26,6 +29,7 @@ describe('ninja bounds config', () => {
 
           expect(bounds.collision.width).toBeGreaterThan(0);
           expect(bounds.collision.height).toBeGreaterThan(0);
+          expect(getNinjaAnimationPlaybackRate(config, actor.id, action.id)).toBe(1);
         }
       }
     }
@@ -35,6 +39,12 @@ describe('ninja bounds config', () => {
     expect(getDefaultNinjaActionId('mainNinja')).toBe('idle');
     expect(getDefaultNinjaActionId('enemyNinja')).toBe('idle');
     expect(getNinjaAction('mainNinja', 'missing').id).toBe('idle');
+  });
+
+  it('does not expose crouching as a main ninja action', () => {
+    const mainNinja = NINJA_ACTORS.find((actor) => actor.id === 'mainNinja');
+
+    expect(mainNinja?.actions.map((action) => action.id)).not.toContain('crouching');
   });
 
   it('clamps edited bounds to the 256px source frame', () => {
@@ -76,11 +86,57 @@ describe('ninja bounds config', () => {
     expect(isNinjaHitFrameActive(config, 'enemyNinja', 'right', 'slash', 5)).toBe(false);
   });
 
+  it('stores playback rates per actor action', () => {
+    const config = setNinjaAnimationPlaybackRate(
+      DEFAULT_NINJA_BOUNDS_CONFIG,
+      'mainNinja',
+      'run',
+      1.45
+    );
+
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja', 'run')).toBe(1.45);
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja', 'idle')).toBe(1);
+    expect(getNinjaAnimationPlaybackRate(config, 'enemyNinja', 'run')).toBe(1);
+  });
+
+  it('normalizes playback rates from saved configs', () => {
+    const config = normalizeNinjaBoundsConfig({
+      playbackRatesByActor: {
+        mainNinja: {
+          idle: 9,
+          run: 0.1,
+          slash: 1.333
+        }
+      }
+    });
+
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja', 'idle')).toBe(2);
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja', 'run')).toBe(0.25);
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja', 'slash')).toBe(1.33);
+  });
+
+  it('resets playback rate with the selected animation config', () => {
+    const config = resetNinjaAnimationConfig(
+      setNinjaAnimationPlaybackRate(
+        DEFAULT_NINJA_BOUNDS_CONFIG,
+        'mainNinja',
+        'slash',
+        1.75
+      ),
+      'mainNinja',
+      'right',
+      'slash'
+    );
+
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja', 'slash')).toBe(1);
+  });
+
   it('exports a versioned payload', () => {
     expect(buildNinjaBoundsExport(DEFAULT_NINJA_BOUNDS_CONFIG)).toMatchObject({
-      version: 1,
+      version: 2,
       boundsByActor: expect.any(Object),
-      hitFramesByActor: expect.any(Object)
+      hitFramesByActor: expect.any(Object),
+      playbackRatesByActor: expect.any(Object)
     });
   });
 });

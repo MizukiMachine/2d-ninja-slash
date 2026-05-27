@@ -360,176 +360,6 @@
       }
     },
     {
-      "key": "character.mainNinja.left.crouching.spritesheet",
-      "type": "character-spritesheet",
-      "label": "mainNinja.left.crouching",
-      "filePath": "public/assets/actors/main-ninja/crouching-left.png",
-      "path": "/assets/actors/main-ninja/crouching-left.png",
-      "actor": "mainNinja",
-      "role": "player",
-      "action": "crouching",
-      "direction": "left",
-      "width": 2048,
-      "height": 1024,
-      "frameSize": {
-        "width": 256,
-        "height": 256
-      },
-      "frameCount": 32,
-      "grid": {
-        "columns": 8,
-        "rows": 4,
-        "order": "row-major",
-        "nonEmptyFrameCount": 32,
-        "allFramesNonEmpty": true
-      },
-      "offset": {
-        "x": 0,
-        "y": 0
-      },
-      "margin": 0,
-      "spacing": 0,
-      "animationUse": "crouch or low stance loop",
-      "animation": {
-        "key": "anim.mainNinja.left.crouching",
-        "frameRate": 24,
-        "repeat": -1,
-        "loop": true,
-        "frames": {
-          "start": 0,
-          "end": 31
-        }
-      },
-      "phaser": {
-        "loader": "spritesheet",
-        "textureKey": "character.mainNinja.left.crouching.spritesheet",
-        "url": "/assets/actors/main-ninja/crouching-left.png",
-        "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
-          "margin": 0,
-          "spacing": 0,
-          "startFrame": 0,
-          "endFrame": 31
-        },
-        "animationKey": "anim.mainNinja.left.crouching",
-        "generateFrameNumbers": {
-          "start": 0,
-          "end": 31
-        },
-        "display": {
-          "origin": {
-            "x": 0.5,
-            "y": 0.5
-          },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
-        },
-        "physicsBody": {
-          "width": 67,
-          "height": 74,
-          "offset": {
-            "x": 95,
-            "y": 163
-          }
-        }
-      },
-      "metadata": {
-        "currentSandboxSceneLoad": false,
-        "source": "filename inference and PNG probe",
-        "recommendedFor": [
-          "player",
-          "crouching",
-          "left"
-        ]
-      }
-    },
-    {
-      "key": "character.mainNinja.right.crouching.spritesheet",
-      "type": "character-spritesheet",
-      "label": "mainNinja.right.crouching",
-      "filePath": "public/assets/actors/main-ninja/crouching-right.png",
-      "path": "/assets/actors/main-ninja/crouching-right.png",
-      "actor": "mainNinja",
-      "role": "player",
-      "action": "crouching",
-      "direction": "right",
-      "width": 2048,
-      "height": 1024,
-      "frameSize": {
-        "width": 256,
-        "height": 256
-      },
-      "frameCount": 32,
-      "grid": {
-        "columns": 8,
-        "rows": 4,
-        "order": "row-major",
-        "nonEmptyFrameCount": 32,
-        "allFramesNonEmpty": true
-      },
-      "offset": {
-        "x": 0,
-        "y": 0
-      },
-      "margin": 0,
-      "spacing": 0,
-      "animationUse": "crouch or low stance loop",
-      "animation": {
-        "key": "anim.mainNinja.right.crouching",
-        "frameRate": 24,
-        "repeat": -1,
-        "loop": true,
-        "frames": {
-          "start": 0,
-          "end": 31
-        }
-      },
-      "phaser": {
-        "loader": "spritesheet",
-        "textureKey": "character.mainNinja.right.crouching.spritesheet",
-        "url": "/assets/actors/main-ninja/crouching-right.png",
-        "loadConfig": {
-          "frameWidth": 256,
-          "frameHeight": 256,
-          "margin": 0,
-          "spacing": 0,
-          "startFrame": 0,
-          "endFrame": 31
-        },
-        "animationKey": "anim.mainNinja.right.crouching",
-        "generateFrameNumbers": {
-          "start": 0,
-          "end": 31
-        },
-        "display": {
-          "origin": {
-            "x": 0.5,
-            "y": 0.5
-          },
-          "currentSandboxScale": 1.630125,
-          "referenceFrameSize": 216
-        },
-        "physicsBody": {
-          "width": 67,
-          "height": 74,
-          "offset": {
-            "x": 95,
-            "y": 163
-          }
-        }
-      },
-      "metadata": {
-        "currentSandboxSceneLoad": false,
-        "source": "filename inference and PNG probe",
-        "recommendedFor": [
-          "player",
-          "crouching",
-          "right"
-        ]
-      }
-    },
-    {
       "key": "character.mainNinja.left.death.spritesheet",
       "type": "character-spritesheet",
       "label": "mainNinja.left.death",
@@ -3405,8 +3235,6 @@
       "mainNinja": [
         "character.mainNinja.left.attack.spritesheet",
         "character.mainNinja.right.attack.spritesheet",
-        "character.mainNinja.left.crouching.spritesheet",
-        "character.mainNinja.right.crouching.spritesheet",
         "character.mainNinja.left.death.spritesheet",
         "character.mainNinja.right.death.spritesheet",
         "character.mainNinja.left.idle.spritesheet",
@@ -3445,9 +3273,9 @@
     }
   },
   "validation": {
-    "pngAssetCount": 40,
+    "pngAssetCount": 38,
     "backgroundCount": 4,
-    "characterSpritesheetCount": 36,
+    "characterSpritesheetCount": 34,
     "spriteSheetProbe": {
       "frameSize": {
         "width": 256,

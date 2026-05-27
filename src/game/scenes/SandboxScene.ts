@@ -8,12 +8,13 @@ import {
 } from '../assets/ninjaAssetCatalog';
 import {
   getNinjaAnimationBounds,
+  getNinjaAnimationPlaybackRate,
   isNinjaHitFrameActive,
   type NinjaRect
 } from '../ninjaBounds';
 
 type FacingDirection = 'left' | 'right';
-type MainNinjaAction = 'idle' | 'run' | 'jump' | 'crouching' | 'slash' | 'impact';
+type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact';
 type ControlledMainNinjaAction = Exclude<MainNinjaAction, 'impact'>;
 type PlayerAttackAction = 'slash';
 type PlayerAction = ControlledMainNinjaAction | 'hurt';
@@ -162,20 +163,6 @@ const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
     repeat: 0
   },
   {
-    action: 'crouching',
-    direction: 'left',
-    frameCount: NINJA_FRAME_COUNT,
-    frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
-    repeat: -1
-  },
-  {
-    action: 'crouching',
-    direction: 'right',
-    frameCount: NINJA_FRAME_COUNT,
-    frameRate: 8 * NINJA_ANIMATION_PLAYBACK_RATE,
-    repeat: -1
-  },
-  {
     action: 'slash',
     direction: 'left',
     frameCount: NINJA_FRAME_COUNT,
@@ -305,8 +292,9 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5, 1)
       .setScale(NINJA_SCALE)
       .setCollideWorldBounds(true)
-      .setDepth(PLAYER_DEPTH)
-      .play(getMainNinjaAnimationKey('idle', 'right'));
+      .setDepth(PLAYER_DEPTH);
+    this.applyActorPlaybackRate(this.player, 'mainNinja', 'idle');
+    this.player.play(getMainNinjaAnimationKey('idle', 'right'));
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
     this.enemy = this.physics.add.sprite(
@@ -319,8 +307,9 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5, 1)
       .setScale(NINJA_SCALE)
       .setCollideWorldBounds(true)
-      .setDepth(ENEMY_DEPTH)
-      .play(getEnemyNinjaAnimationKey('idle', 'left'));
+      .setDepth(ENEMY_DEPTH);
+    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', 'idle');
+    this.enemy.play(getEnemyNinjaAnimationKey('idle', 'left'));
     this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
 
     this.physics.add.collider(this.player, this.enemy);
@@ -390,12 +379,6 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    if (this.isCrouchInputDown()) {
-      this.crouchPlayer();
-      this.finishDebugFrame(time);
-      return;
-    }
-
     this.movePlayer(movement);
     this.finishDebugFrame(time);
   }
@@ -436,6 +419,27 @@ export class SandboxScene extends BaseScene {
       'enemyNinja',
       this.enemyFacingDirection,
       this.getEnemyBoundsAction()
+    );
+  }
+
+  private syncActorPlaybackRates(): void {
+    this.applyActorPlaybackRate(this.player, 'mainNinja', this.getPlayerBoundsAction());
+    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', this.getEnemyBoundsAction());
+  }
+
+  private applyActorPlaybackRate(
+    actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null,
+    actorId: 'mainNinja' | 'enemyNinja',
+    action: string
+  ): void {
+    if (actor === null) {
+      return;
+    }
+
+    actor.anims.timeScale = getNinjaAnimationPlaybackRate(
+      this.app.getNinjaBoundsConfig(),
+      actorId,
+      action
     );
   }
 
@@ -734,7 +738,7 @@ export class SandboxScene extends BaseScene {
     }
 
     const left = this.moveKeys.a.isDown || this.moveKeys.left.isDown;
-    const right = this.moveKeys.right.isDown;
+    const right = this.moveKeys.d.isDown || this.moveKeys.right.isDown;
     const up = this.moveKeys.w.isDown || this.moveKeys.up.isDown;
     const down = this.moveKeys.s.isDown || this.moveKeys.down.isDown;
 
@@ -829,19 +833,6 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
     this.player.setVelocity(0, 0);
     this.playNinjaAnimation('jump', true);
-  }
-
-  private isCrouchInputDown(): boolean {
-    return this.moveKeys?.d.isDown === true;
-  }
-
-  private crouchPlayer(): void {
-    if (this.player === null) {
-      return;
-    }
-
-    this.player.setVelocity(0, 0);
-    this.playNinjaAnimation('crouching');
   }
 
   private finishPlayerAction(): void {
@@ -991,6 +982,7 @@ export class SandboxScene extends BaseScene {
       knockbackDirection.x * knockbackSpeed,
       knockbackDirection.y * knockbackSpeed
     );
+    this.applyActorPlaybackRate(this.player, 'mainNinja', 'impact');
     this.player.play(
       getMainNinjaAnimationKey('impact', this.facingDirection),
       false
@@ -1015,6 +1007,8 @@ export class SandboxScene extends BaseScene {
     }
 
     const animationKey = getMainNinjaAnimationKey(action, this.facingDirection);
+
+    this.applyActorPlaybackRate(this.player, 'mainNinja', action);
 
     if (!restart && this.player.anims.currentAnim?.key === animationKey) {
       return;
@@ -1042,6 +1036,8 @@ export class SandboxScene extends BaseScene {
     }
 
     const animationKey = getEnemyNinjaAnimationKey(action, this.enemyFacingDirection);
+
+    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', action);
 
     if (!restart && this.enemy.anims.currentAnim?.key === animationKey) {
       return;
@@ -1227,14 +1223,16 @@ export class SandboxScene extends BaseScene {
 
     this.player
       .setPosition(this.centerX, this.centerY + 108)
-      .setVelocity(0, 0)
-      .play(getMainNinjaAnimationKey('idle', 'right'), false);
+      .setVelocity(0, 0);
+    this.applyActorPlaybackRate(this.player, 'mainNinja', 'idle');
+    this.player.play(getMainNinjaAnimationKey('idle', 'right'), false);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
     this.enemy
       .setPosition(this.getDefaultEnemyX(), this.centerY + 108)
-      .setVelocity(0, 0)
-      .play(getEnemyNinjaAnimationKey('idle', 'left'), false);
+      .setVelocity(0, 0);
+    this.applyActorPlaybackRate(this.enemy, 'enemyNinja', 'idle');
+    this.enemy.play(getEnemyNinjaAnimationKey('idle', 'left'), false);
     this.applyActorCollisionBounds(this.enemy, 'enemyNinja', this.enemyFacingDirection, 'idle');
 
     this.finishDebugFrame(this.time.now, true);
@@ -1242,6 +1240,7 @@ export class SandboxScene extends BaseScene {
 
   private finishDebugFrame(time: number, forceTelemetry = false): void {
     this.syncActorCollisionBounds();
+    this.syncActorPlaybackRates();
     this.publishDebugTelemetry(time, forceTelemetry);
     this.renderDebugOverlays();
   }

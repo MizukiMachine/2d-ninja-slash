@@ -5,16 +5,32 @@ import {
   BACKGROUND_URLS,
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME
 } from '../src/game/assets/ninjaAssetCatalog';
+import assetIndex from '../public/assets/index.json';
 
 const SPRITE_SHEET_SIZE = {
   width: 2048,
   height: 1024
 } as const;
-const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'crouching', 'slash', 'impact'] as const;
+const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'impact'] as const;
 const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash'] as const;
 const DIRECTIONS = ['left', 'right'] as const;
 const ACTORS = ['main-ninja', 'enemy-ninja'] as const;
 const STANDALONE_ANCHOR_FILES = ['anchor-left-native.png', 'anchor-right-native.png'] as const;
+
+interface AssetIndexEntry {
+  readonly key: string;
+  readonly actor?: string;
+  readonly action?: string;
+}
+
+interface AssetIndex {
+  readonly assets: readonly AssetIndexEntry[];
+  readonly collections: {
+    readonly actors?: {
+      readonly mainNinja?: readonly string[];
+    };
+  };
+}
 
 function getPngSize(filePath: URL): { width: number; height: number } {
   const png = readFileSync(filePath);
@@ -29,6 +45,10 @@ function getPngSize(filePath: URL): { width: number; height: number } {
 
 function getPublicFilePath(publicUrl: string): URL {
   return new URL(`../public/${publicUrl.replace(/^\//u, '')}`, import.meta.url);
+}
+
+function getAssetIndex(): AssetIndex {
+  return assetIndex as AssetIndex;
 }
 
 function getBackgroundFileNamesFromDirectory(directory: URL): readonly string[] {
@@ -59,6 +79,31 @@ describe('ninja sprite sheet assets', () => {
 
         expect(getPngSize(filePath)).toEqual(SPRITE_SHEET_SIZE);
       }
+    }
+  });
+
+  it('does not expose main ninja crouching assets', () => {
+    const index = getAssetIndex();
+    const mainNinjaCrouchingAssets = index.assets.filter(
+      (asset) => asset.actor === 'mainNinja' && asset.action === 'crouching'
+    );
+    const mainNinjaCollection = index.collections.actors?.mainNinja ?? [];
+
+    expect(mainNinjaCrouchingAssets).toEqual([]);
+    expect(mainNinjaCollection).not.toContain(
+      'character.mainNinja.left.crouching.spritesheet'
+    );
+    expect(mainNinjaCollection).not.toContain(
+      'character.mainNinja.right.crouching.spritesheet'
+    );
+
+    for (const direction of DIRECTIONS) {
+      const filePath = new URL(
+        `../public/assets/actors/main-ninja/crouching-${direction}.png`,
+        import.meta.url
+      );
+
+      expect(() => readFileSync(filePath)).toThrow();
     }
   });
 

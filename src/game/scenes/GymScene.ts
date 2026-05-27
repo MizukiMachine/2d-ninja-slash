@@ -282,7 +282,11 @@ export class GymScene extends BaseScene {
       this.input.off('pointerup', stopBoundsEdit);
       this.input.off('pointerupoutside', stopBoundsEdit);
       this.flushPendingBoundsUpdate();
-      this.input.setDefaultCursor('default');
+      try {
+        this.input.setDefaultCursor('default');
+      } catch {
+        // HMR shutdown can tear down the input manager before scene cleanup runs.
+      }
     });
   }
 
