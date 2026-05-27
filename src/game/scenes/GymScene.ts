@@ -11,6 +11,7 @@ import {
   getNinjaAnimationBounds,
   getNinjaAnimationKey,
   getDefaultNinjaActionId,
+  getNinjaLaneAnchor,
   getNinjaTextureKey,
   isNinjaHitFrameActive,
   normalizeFacingDirection,
@@ -19,10 +20,12 @@ import {
   preloadNinjaAnimationAssets,
   registerNinjaAnimations,
   setNinjaAnimationBounds,
+  setNinjaLaneAnchor,
   type FacingDirection,
   type NinjaActorId,
   type NinjaBoundsConfig,
   type NinjaBoundsKind,
+  type NinjaLaneAnchor,
   type NinjaRect
 } from '../ninjaBounds';
 
@@ -33,6 +36,7 @@ const MAX_ZOOM = 4;
 const EDIT_HANDLE_SIZE = 10;
 const EDIT_HANDLE_HIT_PADDING = 7;
 const EDIT_MIN_RECT_SIZE = 1;
+const LANE_ANCHOR_HIT_RADIUS = 13;
 
 function clampPreviewZoom(value: number): number {
   return Phaser.Math.Clamp(Math.round(value * 100) / 100, MIN_ZOOM, MAX_ZOOM);
@@ -61,6 +65,13 @@ interface PendingBoundsUpdate {
   readonly rect: NinjaRect;
 }
 
+interface PendingLaneAnchorUpdate {
+  readonly actorId: NinjaActorId;
+  readonly direction: FacingDirection;
+  readonly actionId: string;
+  readonly anchor: NinjaLaneAnchor;
+}
+
 export class GymScene extends BaseScene {
   private actor: Phaser.GameObjects.Sprite | null = null;
   private overlay: Phaser.GameObjects.Graphics | null = null;
@@ -78,8 +89,11 @@ export class GymScene extends BaseScene {
   private previewZoom = 1.35;
   private lastTelemetryAt = Number.NEGATIVE_INFINITY;
   private boundsEditState: BoundsEditState | null = null;
+  private laneAnchorEditPointerId: number | null = null;
   private pendingBoundsUpdate: PendingBoundsUpdate | null = null;
+  private pendingLaneAnchorUpdate: PendingLaneAnchorUpdate | null = null;
   private boundsUpdateFrame: number | null = null;
+  private laneAnchorUpdateFrame: number | null = null;
   private readonly screenRect = new Phaser.Geom.Rectangle();
 
   constructor() {
@@ -201,7 +215,7 @@ export class GymScene extends BaseScene {
       .setScrollFactor(0);
 
     this.add
-      .text(this.centerX, this.profile.height - 26, 'Esc / Backspace: menu  |  Mouse wheel: zoom', {
+      .text(this.centerX, this.profile.height - 26, 'Esc / Backspace: menu  |  Mouse wheel: zoom  |  Drag lane anchor', {
         backgroundColor: 'rgba(2, 6, 23, 0.42)',
         color: '#cbd5e1',
         fontFamily: 'Consolas, monospace',
@@ -242,7 +256,24 @@ export class GymScene extends BaseScene {
       };
       this.input.setDefaultCursor(this.getCursorForHandle(handle));
     };
-    const updateBoundsEdit = (pointer: Phaser.Input.Pointer): void => {
+    const startEdit = (pointer: Phaser.Input.Pointer): void => {
+      if (this.isLaneAnchorHit(pointer)) {
+        this.laneAnchorEditPointerId = pointer.id;
+        this.applyLaneAnchorEdit(pointer);
+        this.input.setDefaultCursor('crosshair');
+        return;
+      }
+
+      startBoundsEdit(pointer);
+    };
+    const updateEdit = (pointer: Phaser.Input.Pointer): void => {
+      if (this.laneAnchorEditPointerId !== null) {
+        if (pointer.id === this.laneAnchorEditPointerId) {
+          this.applyLaneAnchorEdit(pointer);
+        }
+        return;
+      }
+
       if (this.boundsEditState !== null) {
         if (pointer.id === this.boundsEditState.pointerId) {
           this.applyBoundsEdit(pointer);
@@ -251,9 +282,26 @@ export class GymScene extends BaseScene {
       }
 
       const handle = this.getBoundsEditHandle(pointer);
-      this.input.setDefaultCursor(handle === null ? 'default' : this.getCursorForHandle(handle));
+      this.input.setDefaultCursor(
+        this.isLaneAnchorHit(pointer)
+          ? 'crosshair'
+          : handle === null
+            ? 'default'
+            : this.getCursorForHandle(handle)
+      );
     };
-    const stopBoundsEdit = (pointer: Phaser.Input.Pointer): void => {
+    const stopEdit = (pointer: Phaser.Input.Pointer): void => {
+      if (
+        this.laneAnchorEditPointerId !== null &&
+        pointer.id === this.laneAnchorEditPointerId
+      ) {
+        this.applyLaneAnchorEdit(pointer);
+        this.flushPendingLaneAnchorUpdate();
+        this.laneAnchorEditPointerId = null;
+        this.input.setDefaultCursor('default');
+        return;
+      }
+
       if (
         this.boundsEditState !== null &&
         pointer.id === this.boundsEditState.pointerId
@@ -268,20 +316,21 @@ export class GymScene extends BaseScene {
     escape?.on('down', goBack);
     backspace?.on('down', goBack);
     this.input.on('wheel', adjustZoom);
-    this.input.on('pointerdown', startBoundsEdit);
-    this.input.on('pointermove', updateBoundsEdit);
-    this.input.on('pointerup', stopBoundsEdit);
-    this.input.on('pointerupoutside', stopBoundsEdit);
+    this.input.on('pointerdown', startEdit);
+    this.input.on('pointermove', updateEdit);
+    this.input.on('pointerup', stopEdit);
+    this.input.on('pointerupoutside', stopEdit);
 
     this.trackCleanup(() => {
       escape?.off('down', goBack);
       backspace?.off('down', goBack);
       this.input.off('wheel', adjustZoom);
-      this.input.off('pointerdown', startBoundsEdit);
-      this.input.off('pointermove', updateBoundsEdit);
-      this.input.off('pointerup', stopBoundsEdit);
-      this.input.off('pointerupoutside', stopBoundsEdit);
+      this.input.off('pointerdown', startEdit);
+      this.input.off('pointermove', updateEdit);
+      this.input.off('pointerup', stopEdit);
+      this.input.off('pointerupoutside', stopEdit);
       this.flushPendingBoundsUpdate();
+      this.flushPendingLaneAnchorUpdate();
       try {
         this.input.setDefaultCursor('default');
       } catch {
@@ -296,7 +345,12 @@ export class GymScene extends BaseScene {
     const nextDirection = normalizeFacingDirection(gymState?.selectedDirection);
     const nextActionId = normalizeNinjaActionId(nextActorId, gymState?.selectedActionId);
 
-    if (this.boundsEditState === null && this.pendingBoundsUpdate === null) {
+    if (
+      this.boundsEditState === null &&
+      this.pendingBoundsUpdate === null &&
+      this.laneAnchorEditPointerId === null &&
+      this.pendingLaneAnchorUpdate === null
+    ) {
       this.boundsConfig = gymState?.boundsConfig ?? this.app.getNinjaBoundsConfig();
     }
     this.selectedBoundsKind = gymState?.selectedBoundsKind ?? this.selectedBoundsKind;
@@ -394,6 +448,12 @@ export class GymScene extends BaseScene {
       this.selectedDirection,
       this.selectedActionId
     );
+    const activeLaneAnchor = getNinjaLaneAnchor(
+      this.boundsConfig,
+      this.selectedActorId,
+      this.selectedDirection,
+      this.selectedActionId
+    );
     const currentFrame = this.getCurrentFrameIndex();
     const attackActive = isNinjaHitFrameActive(
       this.boundsConfig,
@@ -418,6 +478,7 @@ export class GymScene extends BaseScene {
       0xf6c961,
       0.8
     );
+    this.drawLaneAnchor(frame.left, frame.top, activeLaneAnchor);
 
     if (this.showVisualBounds) {
       this.drawRect(frame.left, frame.top, activeBounds.visual, 0x64b5ff, 0.08, true);
@@ -465,6 +526,29 @@ export class GymScene extends BaseScene {
       rect.width * this.previewZoom,
       rect.height * this.previewZoom
     );
+  }
+
+  private drawLaneAnchor(
+    frameLeft: number,
+    frameTop: number,
+    anchor: NinjaLaneAnchor
+  ): void {
+    if (this.overlay === null) {
+      return;
+    }
+
+    const x = frameLeft + anchor.x * this.previewZoom;
+    const y = frameTop + anchor.y * this.previewZoom;
+    const lineLeft = frameLeft;
+    const lineRight = frameLeft + NINJA_FRAME_SIZE * this.previewZoom;
+
+    this.overlay.lineStyle(2, 0xffd447, 0.78);
+    this.overlay.lineBetween(lineLeft, y, lineRight, y);
+    this.renderCrosshair(x, y, 13, 0xffd447, 1);
+    this.overlay.fillStyle(0x020617, 0.9);
+    this.overlay.fillCircle(x, y, 5);
+    this.overlay.lineStyle(2, 0xffd447, 1);
+    this.overlay.strokeCircle(x, y, LANE_ANCHOR_HIT_RADIUS * 0.5);
   }
 
   private drawEditableRect(
@@ -592,6 +676,62 @@ export class GymScene extends BaseScene {
     );
   }
 
+  private isLaneAnchorHit(pointer: Phaser.Input.Pointer): boolean {
+    const anchorPoint = this.getScreenLaneAnchor();
+
+    return (
+      Math.abs(pointer.x - anchorPoint.x) <= LANE_ANCHOR_HIT_RADIUS &&
+      Math.abs(pointer.y - anchorPoint.y) <= LANE_ANCHOR_HIT_RADIUS
+    );
+  }
+
+  private getScreenLaneAnchor(): Phaser.Math.Vector2 {
+    const frame = this.getFramePlacement();
+    const anchor = getNinjaLaneAnchor(
+      this.boundsConfig,
+      this.selectedActorId,
+      this.selectedDirection,
+      this.selectedActionId
+    );
+
+    return new Phaser.Math.Vector2(
+      frame.left + anchor.x * this.previewZoom,
+      frame.top + anchor.y * this.previewZoom
+    );
+  }
+
+  private applyLaneAnchorEdit(pointer: Phaser.Input.Pointer): void {
+    const framePoint = this.getPointerFramePoint(pointer);
+
+    this.updateSelectedLaneAnchor({
+      x: Phaser.Math.Clamp(Math.round(framePoint.x), 0, NINJA_FRAME_SIZE - 1),
+      y: Phaser.Math.Clamp(Math.round(framePoint.y), 0, NINJA_FRAME_SIZE - 1)
+    });
+  }
+
+  private updateSelectedLaneAnchor(anchor: NinjaLaneAnchor): void {
+    const currentAnchor = getNinjaLaneAnchor(
+      this.boundsConfig,
+      this.selectedActorId,
+      this.selectedDirection,
+      this.selectedActionId
+    );
+
+    if (currentAnchor.x === anchor.x && currentAnchor.y === anchor.y) {
+      return;
+    }
+
+    this.boundsConfig = setNinjaLaneAnchor(
+      this.boundsConfig,
+      this.selectedActorId,
+      this.selectedDirection,
+      this.selectedActionId,
+      anchor
+    );
+    this.updateGymMarker();
+    this.queueLaneAnchorUpdate(anchor);
+  }
+
   private applyBoundsEdit(pointer: Phaser.Input.Pointer): void {
     if (this.boundsEditState === null) {
       return;
@@ -705,6 +845,24 @@ export class GymScene extends BaseScene {
     });
   }
 
+  private queueLaneAnchorUpdate(anchor: NinjaLaneAnchor): void {
+    this.pendingLaneAnchorUpdate = {
+      actorId: this.selectedActorId,
+      direction: this.selectedDirection,
+      actionId: this.selectedActionId,
+      anchor: { ...anchor }
+    };
+
+    if (this.laneAnchorUpdateFrame !== null) {
+      return;
+    }
+
+    this.laneAnchorUpdateFrame = window.requestAnimationFrame(() => {
+      this.laneAnchorUpdateFrame = null;
+      this.flushPendingLaneAnchorUpdate();
+    });
+  }
+
   private flushPendingBoundsUpdate(): void {
     const pendingUpdate = this.pendingBoundsUpdate;
 
@@ -725,6 +883,28 @@ export class GymScene extends BaseScene {
       pendingUpdate.actionId,
       pendingUpdate.boundsKind,
       pendingUpdate.rect
+    );
+  }
+
+  private flushPendingLaneAnchorUpdate(): void {
+    const pendingUpdate = this.pendingLaneAnchorUpdate;
+
+    if (pendingUpdate === null) {
+      return;
+    }
+
+    this.pendingLaneAnchorUpdate = null;
+
+    if (this.laneAnchorUpdateFrame !== null) {
+      window.cancelAnimationFrame(this.laneAnchorUpdateFrame);
+      this.laneAnchorUpdateFrame = null;
+    }
+
+    globalThis.__NINJA_SLASH_GYM__?.updateLaneAnchor?.(
+      pendingUpdate.actorId,
+      pendingUpdate.direction,
+      pendingUpdate.actionId,
+      pendingUpdate.anchor
     );
   }
 
@@ -756,12 +936,18 @@ export class GymScene extends BaseScene {
       this.selectedActionId,
       currentFrame
     );
+    const laneAnchor = getNinjaLaneAnchor(
+      this.boundsConfig,
+      this.selectedActorId,
+      this.selectedDirection,
+      this.selectedActionId
+    );
 
     this.titleText?.setText('Ninja Gym');
     this.detailText?.setText(
       `${actor.label} • ${this.selectedDirection} • ${actionDefinition.label} • frame ${
         currentFrame + 1
-      }/${frameCount} • hit ${hitFrameActive ? 'ON' : 'off'} • ${actionDefinition.frameRate}fps • ${this.playbackRate.toFixed(
+      }/${frameCount} • anchor ${laneAnchor.x},${laneAnchor.y} • hit ${hitFrameActive ? 'ON' : 'off'} • ${actionDefinition.frameRate}fps • ${this.playbackRate.toFixed(
         2
       )}x • zoom ${this.previewZoom.toFixed(2)}x`
     );
@@ -783,7 +969,8 @@ export class GymScene extends BaseScene {
       boundsConfig: this.boundsConfig,
       currentFrame: this.getCurrentFrameIndex(),
       zoom: this.previewZoom || current?.zoom || 1,
-      updateBounds: current?.updateBounds
+      updateBounds: current?.updateBounds,
+      updateLaneAnchor: current?.updateLaneAnchor
     };
   }
 
