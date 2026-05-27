@@ -19,6 +19,10 @@ import {
   getHealthRatio,
   PLAYER_MAX_HEALTH
 } from '../combatHealth';
+import {
+  getRoundEnemyCount,
+  normalizeGameplayTuning
+} from '../debugFeatures';
 import { getAnimationFallbackDelayMs } from '../animationTiming';
 
 type FacingDirection = 'left' | 'right';
@@ -28,6 +32,7 @@ type PlayerAttackAction = 'slash';
 type PlayerAction = ControlledMainNinjaAction | 'hurt' | 'dead';
 type EnemyNinjaAction = 'idle' | 'run' | 'slash' | 'death';
 type EnemyAction = Exclude<EnemyNinjaAction, 'death'> | 'recover' | 'dead';
+type RoundPhase = 'fighting' | 'cleared';
 
 interface MoveKeys {
   readonly w: Phaser.Input.Keyboard.Key;
@@ -65,6 +70,8 @@ interface EnemyState {
   facingDirection: FacingDirection;
   action: EnemyAction;
   health: number;
+  roundActive: boolean;
+  defeated: boolean;
   recoveryUntil: number;
   attackDamageDealt: boolean;
   attackHitCount: number;
@@ -90,6 +97,9 @@ const PLAYER_HEALTH_BAR_X = 24;
 const PLAYER_HEALTH_BAR_Y = 24;
 const PLAYER_HEALTH_BAR_WIDTH = 336;
 const PLAYER_HEALTH_BAR_HEIGHT = 30;
+const PROGRESSION_HUD_X_OFFSET = 24;
+const PROGRESSION_HUD_Y = 24;
+const ROUND_BANNER_Y = 72;
 const ENEMY_HEALTH_BAR_WIDTH = 70;
 const ENEMY_HEALTH_BAR_HEIGHT = 8;
 const ENEMY_HEALTH_BAR_OFFSET_Y = 16;
@@ -157,6 +167,14 @@ const getEnemyNinjaSpriteSheetUrl = (
 
 const isPlayerAttackAction = (action: PlayerAction): action is PlayerAttackAction =>
   action === 'slash';
+
+const formatElapsedTime = (elapsedMs: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
 
 const NINJA_ANIMATIONS: readonly NinjaAnimationConfig<MainNinjaAction>[] = [
   {
@@ -312,6 +330,8 @@ export class SandboxScene extends BaseScene {
   private debugOverlayGraphic: Phaser.GameObjects.Graphics | null = null;
   private healthGraphic: Phaser.GameObjects.Graphics | null = null;
   private playerHealthLabel: Phaser.GameObjects.Text | null = null;
+  private progressionLabel: Phaser.GameObjects.Text | null = null;
+  private roundBannerLabel: Phaser.GameObjects.Text | null = null;
   private pauseLabel: Phaser.GameObjects.Text | null = null;
   private gameOverOverlay: Phaser.GameObjects.Container | null = null;
   private playerDeathOverlayTimer: Phaser.Time.TimerEvent | null = null;
@@ -326,6 +346,13 @@ export class SandboxScene extends BaseScene {
   private playerHealth = PLAYER_MAX_HEALTH;
   private damagedEnemiesThisAttack = new Set<EnemyState>();
   private gameOver = false;
+  private roundPhase: RoundPhase = 'fighting';
+  private currentRound = 1;
+  private currentRoundEnemyCount = 0;
+  private defeatedThisRound = 0;
+  private totalDefeatedCount = 0;
+  private elapsedMs = 0;
+  private roundTransitionRemainingMs = 0;
   private attackHitCount = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
@@ -367,27 +394,6 @@ export class SandboxScene extends BaseScene {
     this.player.play(getMainNinjaAnimationKey('idle', 'right'));
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
-    const enemySprite = this.physics.add.sprite(
-      this.getDefaultEnemyX(),
-      this.centerY + 108,
-      getEnemyNinjaIdleAnchorTextureKey('left'),
-      NINJA_IDLE_ANCHOR_FRAME
-    );
-    enemySprite
-      .setOrigin(0.5, 1)
-      .setScale(NINJA_SCALE)
-      .setCollideWorldBounds(true)
-      .setDepth(ENEMY_DEPTH);
-    const enemy = this.createEnemyState(enemySprite, 'left');
-    this.enemies = [enemy];
-    this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'idle');
-    enemy.sprite.play(getEnemyNinjaAnimationKey('idle', 'left'));
-    this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'idle');
-
-    for (const enemyState of this.enemies) {
-      this.physics.add.collider(this.player, enemyState.sprite);
-    }
-
     this.debugOverlayGraphic = this.add.graphics().setDepth(100);
     this.lastActorResetRequestId = this.debug.get().actorResetRequestId;
     this.pauseLabel = this.add
@@ -400,12 +406,10 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5)
       .setVisible(false);
     this.createHealthHud();
+    this.startRound(1);
 
     this.registerKeyboard();
     this.registerPlayerAnimationEvents();
-    for (const enemyState of this.enemies) {
-      this.registerEnemyAnimationEvents(enemyState);
-    }
     this.registerPointerDebug();
     this.onStore(this.debug, (state) => {
       this.applyBackground(state.backgroundFileName);
@@ -429,6 +433,8 @@ export class SandboxScene extends BaseScene {
       facingDirection,
       action: 'idle',
       health: ENEMY_MAX_HEALTH,
+      roundActive: false,
+      defeated: false,
       recoveryUntil: 0,
       attackDamageDealt: false,
       attackHitCount: 0,
@@ -437,6 +443,156 @@ export class SandboxScene extends BaseScene {
       corpseTimer: null,
       corpseTween: null
     };
+  }
+
+  private createEnemy(index: number): EnemyState | null {
+    if (this.player === null) {
+      return null;
+    }
+
+    const enemySprite = this.physics.add.sprite(
+      this.getDefaultEnemyX() + index * 120,
+      this.centerY + 108,
+      getEnemyNinjaIdleAnchorTextureKey('left'),
+      NINJA_IDLE_ANCHOR_FRAME
+    );
+    enemySprite
+      .setOrigin(0.5, 1)
+      .setScale(NINJA_SCALE)
+      .setCollideWorldBounds(true)
+      .setDepth(ENEMY_DEPTH);
+    const enemy = this.createEnemyState(enemySprite, 'left');
+    this.physics.add.collider(this.player, enemy.sprite);
+    this.registerEnemyAnimationEvents(enemy);
+    this.deactivateEnemy(enemy);
+
+    return enemy;
+  }
+
+  private ensureEnemyPoolSize(enemyCount: number): void {
+    while (this.enemies.length < enemyCount) {
+      const enemy = this.createEnemy(this.enemies.length);
+
+      if (enemy === null) {
+        return;
+      }
+
+      this.enemies.push(enemy);
+    }
+  }
+
+  private startRound(round: number): void {
+    const enemyCount = getRoundEnemyCount(this.debug.get().gameplayTuning, round);
+
+    this.ensureEnemyPoolSize(enemyCount);
+    this.currentRound = round;
+    this.currentRoundEnemyCount = enemyCount;
+    this.defeatedThisRound = 0;
+    this.roundPhase = 'fighting';
+    this.roundTransitionRemainingMs = 0;
+    this.damagedEnemiesThisAttack.clear();
+    this.clearAttackHitArea();
+    this.clearAllEnemyAttackHitAreas();
+
+    this.enemies.forEach((enemy, index) => {
+      if (index < enemyCount) {
+        this.activateEnemyForRound(enemy, index, enemyCount);
+        return;
+      }
+
+      this.deactivateEnemy(enemy);
+    });
+
+    this.renderHealthBars(this.time.now);
+    this.renderProgressionHud();
+    this.publishDebugTelemetry(this.time.now, true);
+  }
+
+  private activateEnemyForRound(
+    enemy: EnemyState,
+    index: number,
+    enemyCount: number
+  ): void {
+    const spawn = this.getEnemySpawnPoint(index, enemyCount);
+
+    enemy.facingDirection = spawn.facingDirection;
+    enemy.action = 'idle';
+    enemy.health = ENEMY_MAX_HEALTH;
+    enemy.roundActive = true;
+    enemy.defeated = false;
+    enemy.recoveryUntil = 0;
+    enemy.attackDamageDealt = false;
+    enemy.corpseTimer?.remove(false);
+    enemy.corpseTimer = null;
+    enemy.corpseTween?.stop();
+    enemy.corpseTween = null;
+    this.clearEnemyAttackHitArea(enemy);
+    enemy.sprite
+      .enableBody(true, spawn.x, spawn.y, true, true)
+      .setPosition(spawn.x, spawn.y)
+      .setVelocity(0, 0)
+      .setAlpha(1)
+      .setDepth(ENEMY_DEPTH);
+    enemy.sprite.anims.resume();
+    this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'idle');
+    enemy.sprite.play(getEnemyNinjaAnimationKey('idle', enemy.facingDirection), false);
+    this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'idle');
+  }
+
+  private deactivateEnemy(enemy: EnemyState): void {
+    enemy.roundActive = false;
+    enemy.defeated = false;
+    enemy.action = 'idle';
+    enemy.health = ENEMY_MAX_HEALTH;
+    enemy.recoveryUntil = 0;
+    enemy.attackDamageDealt = false;
+    enemy.corpseTimer?.remove(false);
+    enemy.corpseTimer = null;
+    enemy.corpseTween?.stop();
+    enemy.corpseTween = null;
+    this.clearEnemyAttackHitArea(enemy);
+    enemy.sprite.setVelocity(0, 0).setAlpha(1);
+    enemy.sprite.disableBody(true, true);
+  }
+
+  private getEnemySpawnPoint(
+    index: number,
+    enemyCount: number
+  ): { readonly x: number; readonly y: number; readonly facingDirection: FacingDirection } {
+    const side = index % 2 === 0 ? 1 : -1;
+    const rank = Math.floor(index / 2);
+    const edgeInset = 150;
+    const spacing = enemyCount <= 4 ? 148 : 112;
+    const x =
+      side > 0
+        ? this.profile.width - edgeInset - rank * spacing
+        : edgeInset + rank * spacing;
+    const laneOffsets = [0, -96, 96, -176, 176, -48, 48] as const;
+    const y = this.centerY + 108 + laneOffsets[index % laneOffsets.length];
+
+    return {
+      x: Phaser.Math.Clamp(x, 120, this.profile.width - 120),
+      y: Phaser.Math.Clamp(y, 140, this.profile.height - 72),
+      facingDirection: side > 0 ? 'left' : 'right'
+    };
+  }
+
+  private updateRoundTransition(delta: number): void {
+    if (this.roundPhase !== 'cleared') {
+      return;
+    }
+
+    this.roundTransitionRemainingMs = Math.max(
+      0,
+      this.roundTransitionRemainingMs - delta
+    );
+
+    if (this.roundTransitionRemainingMs <= 0 && !this.isPlayerBusy()) {
+      this.startRound(this.currentRound + 1);
+      return;
+    }
+
+    this.renderProgressionHud();
   }
 
   private resetSceneState(): void {
@@ -452,6 +608,8 @@ export class SandboxScene extends BaseScene {
     this.debugOverlayGraphic = null;
     this.healthGraphic = null;
     this.playerHealthLabel = null;
+    this.progressionLabel = null;
+    this.roundBannerLabel = null;
     this.pauseLabel = null;
     this.gameOverOverlay = null;
     this.playerDeathOverlayTimer?.remove(false);
@@ -461,6 +619,13 @@ export class SandboxScene extends BaseScene {
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.damagedEnemiesThisAttack.clear();
     this.gameOver = false;
+    this.roundPhase = 'fighting';
+    this.currentRound = 1;
+    this.currentRoundEnemyCount = 0;
+    this.defeatedThisRound = 0;
+    this.totalDefeatedCount = 0;
+    this.elapsedMs = 0;
+    this.roundTransitionRemainingMs = 0;
     this.attackHitCount = 0;
     this.forwardVector.set(1, 0);
     this.damageKnockbackVector.set(0, 0);
@@ -468,7 +633,7 @@ export class SandboxScene extends BaseScene {
     this.attackHitArea.setTo(0, 0, 0, 0);
   }
 
-  update(time: number, _delta: number): void {
+  update(time: number, delta: number): void {
     if (this.player === null) {
       return;
     }
@@ -500,6 +665,9 @@ export class SandboxScene extends BaseScene {
       this.finishDebugFrame(time);
       return;
     }
+
+    this.elapsedMs += delta;
+    this.updateRoundTransition(delta);
 
     for (const enemy of this.enemies) {
       this.updateEnemy(enemy, time);
@@ -568,7 +736,27 @@ export class SandboxScene extends BaseScene {
       )
       .setOrigin(0, 0.5)
       .setDepth(HUD_DEPTH + 1);
+    this.progressionLabel = this.add
+      .text(this.profile.width - PROGRESSION_HUD_X_OFFSET, PROGRESSION_HUD_Y, '', {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '17px',
+        fontStyle: '700',
+        color: '#f8fbff',
+        align: 'right'
+      })
+      .setOrigin(1, 0)
+      .setDepth(HUD_DEPTH + 1);
+    this.roundBannerLabel = this.add
+      .text(this.centerX, ROUND_BANNER_Y, '', {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '24px',
+        fontStyle: '700',
+        color: '#f6c961'
+      })
+      .setOrigin(0.5)
+      .setDepth(HUD_DEPTH + 1);
     this.renderHealthBars(this.time.now);
+    this.renderProgressionHud();
   }
 
   private syncActorCollisionBounds(): void {
@@ -1101,7 +1289,12 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    if (this.gameOver || enemy.action === 'dead' || !enemy.sprite.active) {
+    if (
+      this.gameOver ||
+      !enemy.roundActive ||
+      enemy.action === 'dead' ||
+      !enemy.sprite.active
+    ) {
       enemy.sprite.setVelocity(0, 0);
       return;
     }
@@ -1161,6 +1354,7 @@ export class SandboxScene extends BaseScene {
       this.player === null ||
       this.gameOver ||
       this.currentAction === 'dead' ||
+      !enemy.roundActive ||
       enemy.action === 'slash' ||
       enemy.action === 'dead'
     ) {
@@ -1264,9 +1458,11 @@ export class SandboxScene extends BaseScene {
     }
 
     this.gameOver = true;
+    this.roundTransitionRemainingMs = 0;
 
     if (this.currentAction === 'dead') {
       this.stopAllEnemiesForGameOver();
+      this.renderProgressionHud();
       this.scheduleGameOverOverlay(this.getPlayerDeathOverlayFallbackDelay());
       return;
     }
@@ -1283,6 +1479,7 @@ export class SandboxScene extends BaseScene {
     this.player.play(getMainNinjaAnimationKey('death', this.facingDirection), false);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'death');
     this.scheduleGameOverOverlay(this.getPlayerDeathOverlayFallbackDelay());
+    this.renderProgressionHud();
     this.renderHealthBars(this.time.now);
   }
 
@@ -1363,11 +1560,18 @@ export class SandboxScene extends BaseScene {
       })
       .setOrigin(0.5);
     const detail = this.add
-      .text(this.centerX, this.centerY - 64, 'The ninja has fallen', {
-        fontFamily: 'Arial, Helvetica, sans-serif',
-        fontSize: '20px',
-        color: '#cbd7e6'
-      })
+      .text(
+        this.centerX,
+        this.centerY - 64,
+        `Round ${this.currentRound} | KO ${this.totalDefeatedCount} | ${formatElapsedTime(
+          this.elapsedMs
+        )}`,
+        {
+          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontSize: '20px',
+          color: '#cbd7e6'
+        }
+      )
       .setOrigin(0.5);
     const restartButton = this.createGameOverButton(
       this.centerX - 92,
@@ -1509,6 +1713,7 @@ export class SandboxScene extends BaseScene {
     );
     const hitEnemies = this.enemies.filter(
       (enemy) =>
+        enemy.roundActive &&
         enemy.health > 0 &&
         enemy.action !== 'dead' &&
         enemy.sprite.active &&
@@ -1526,7 +1731,7 @@ export class SandboxScene extends BaseScene {
   }
 
   private damageEnemyFromPlayer(enemy: EnemyState): void {
-    if (enemy.health <= 0 || enemy.action === 'dead') {
+    if (!enemy.roundActive || enemy.health <= 0 || enemy.action === 'dead') {
       return;
     }
 
@@ -1558,7 +1763,44 @@ export class SandboxScene extends BaseScene {
     this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'death');
     enemy.sprite.play(getEnemyNinjaAnimationKey('death', enemy.facingDirection), false);
     this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'death');
+    this.recordEnemyDefeat(enemy);
     this.renderHealthBars(this.time.now);
+  }
+
+  private recordEnemyDefeat(enemy: EnemyState): void {
+    if (!enemy.roundActive || enemy.defeated) {
+      return;
+    }
+
+    enemy.defeated = true;
+    this.defeatedThisRound = Math.min(
+      this.currentRoundEnemyCount,
+      this.defeatedThisRound + 1
+    );
+    this.totalDefeatedCount += 1;
+    this.renderProgressionHud();
+
+    if (this.defeatedThisRound >= this.currentRoundEnemyCount) {
+      this.completeRound();
+    } else {
+      this.publishDebugTelemetry(this.time.now, true);
+    }
+  }
+
+  private completeRound(): void {
+    if (this.gameOver || this.roundPhase !== 'fighting') {
+      return;
+    }
+
+    this.roundPhase = 'cleared';
+    this.roundTransitionRemainingMs = normalizeGameplayTuning(
+      this.debug.get().gameplayTuning
+    ).roundIntermissionMs;
+    this.clearAttackHitArea();
+    this.clearAllEnemyAttackHitAreas();
+    this.stopAllEnemyMovement();
+    this.renderProgressionHud();
+    this.publishDebugTelemetry(this.time.now, true);
   }
 
   private beginEnemyCorpseDecay(enemy: EnemyState): void {
@@ -1617,7 +1859,12 @@ export class SandboxScene extends BaseScene {
   }
 
   private canEnemySlashReachPlayer(enemy: EnemyState): boolean {
-    if (this.gameOver || this.currentAction === 'dead' || enemy.action === 'dead') {
+    if (
+      this.gameOver ||
+      this.currentAction === 'dead' ||
+      !enemy.roundActive ||
+      enemy.action === 'dead'
+    ) {
       return false;
     }
 
@@ -1773,7 +2020,7 @@ export class SandboxScene extends BaseScene {
   }
 
   private resetActors(): void {
-    if (this.player === null || this.enemies.length === 0) {
+    if (this.player === null) {
       return;
     }
 
@@ -1785,6 +2032,13 @@ export class SandboxScene extends BaseScene {
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.damagedEnemiesThisAttack.clear();
     this.gameOver = false;
+    this.roundPhase = 'fighting';
+    this.currentRound = 1;
+    this.currentRoundEnemyCount = 0;
+    this.defeatedThisRound = 0;
+    this.totalDefeatedCount = 0;
+    this.elapsedMs = 0;
+    this.roundTransitionRemainingMs = 0;
     this.gameOverOverlay?.destroy(true);
     this.gameOverOverlay = null;
     this.playerDeathOverlayTimer?.remove(false);
@@ -1802,29 +2056,7 @@ export class SandboxScene extends BaseScene {
     this.player.play(getMainNinjaAnimationKey('idle', 'right'), false);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
 
-    this.enemies.forEach((enemy, index) => {
-      const x = Phaser.Math.Clamp(this.getDefaultEnemyX() + index * 160, 120, this.profile.width - 120);
-      enemy.facingDirection = 'left';
-      enemy.action = 'idle';
-      enemy.health = ENEMY_MAX_HEALTH;
-      enemy.recoveryUntil = 0;
-      enemy.attackDamageDealt = false;
-      enemy.corpseTimer?.remove(false);
-      enemy.corpseTimer = null;
-      enemy.corpseTween?.stop();
-      enemy.corpseTween = null;
-      enemy.sprite
-        .enableBody(true, x, this.centerY + 108, true, true)
-        .setPosition(x, this.centerY + 108)
-        .setVelocity(0, 0)
-        .setAlpha(1);
-      enemy.sprite.anims.resume();
-      this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'idle');
-      enemy.sprite.play(getEnemyNinjaAnimationKey('idle', 'left'), false);
-      this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'idle');
-    });
-    this.renderHealthBars(this.time.now);
-
+    this.startRound(1);
     this.finishDebugFrame(this.time.now, true);
   }
 
@@ -1833,6 +2065,7 @@ export class SandboxScene extends BaseScene {
     this.syncActorPlaybackRates();
     this.publishDebugTelemetry(time, forceTelemetry);
     this.renderHealthBars(time);
+    this.renderProgressionHud();
     this.renderDebugOverlays();
   }
 
@@ -1861,6 +2094,15 @@ export class SandboxScene extends BaseScene {
         width: attackActive ? Math.round(this.attackHitArea.width) : 0,
         height: attackActive ? Math.round(this.attackHitArea.height) : 0,
         hitCount: attackActive ? this.attackHitCount : 0
+      },
+      round: {
+        status: this.gameOver ? 'gameOver' : this.roundPhase,
+        round: this.currentRound,
+        enemies: this.currentRoundEnemyCount,
+        defeated: this.defeatedThisRound,
+        totalDefeated: this.totalDefeatedCount,
+        elapsedMs: Math.round(this.elapsedMs),
+        nextRoundInMs: Math.round(this.roundTransitionRemainingMs)
       },
       performance: {
         fps: this.game.loop.actualFps,
@@ -1916,6 +2158,29 @@ export class SandboxScene extends BaseScene {
     graphic.clear();
     this.renderPlayerHealthBar(graphic, time);
     this.renderEnemyHealthBars(graphic);
+  }
+
+  private renderProgressionHud(): void {
+    const nextRoundSeconds = Math.ceil(this.roundTransitionRemainingMs / 1000);
+    const suffix =
+      this.gameOver
+        ? 'GAME OVER'
+        : this.roundPhase === 'cleared'
+          ? `NEXT ${nextRoundSeconds}`
+          : formatElapsedTime(this.elapsedMs);
+
+    this.progressionLabel?.setText(
+      `R${this.currentRound} ${this.defeatedThisRound}/${this.currentRoundEnemyCount} | KO ${this.totalDefeatedCount} | ${suffix}`
+    );
+    this.roundBannerLabel
+      ?.setText(
+        this.gameOver
+          ? ''
+          : this.roundPhase === 'cleared'
+            ? 'ROUND CLEAR'
+            : `ROUND ${this.currentRound}`
+      )
+      .setVisible(!this.gameOver);
   }
 
   private renderPlayerHealthBar(graphic: Phaser.GameObjects.Graphics, time: number): void {
@@ -1975,6 +2240,7 @@ export class SandboxScene extends BaseScene {
   ): void {
     if (
       !enemy.sprite.active ||
+      !enemy.roundActive ||
       enemy.health <= 0 ||
       enemy.action === 'dead'
     ) {
@@ -2029,7 +2295,7 @@ export class SandboxScene extends BaseScene {
 
     if (state.showEnemyRanges) {
       for (const enemy of this.enemies) {
-        if (this.updateEnemyAttackProbeArea(enemy)) {
+        if (enemy.roundActive && this.updateEnemyAttackProbeArea(enemy)) {
           this.renderAttackHitBox(
             enemy.attackProbeArea,
             this.canEnemySlashReachPlayer(enemy) ? 1 : 0,
@@ -2049,6 +2315,10 @@ export class SandboxScene extends BaseScene {
         0x8fffad
       );
       for (const enemy of this.enemies) {
+        if (!enemy.roundActive || !enemy.sprite.active) {
+          continue;
+        }
+
         this.renderVisualBounds(
           enemy.sprite,
           'enemyNinja',
@@ -2062,6 +2332,10 @@ export class SandboxScene extends BaseScene {
     if (state.showHitBoxes) {
       this.renderPhysicsBody(this.player, 0x35d08f);
       for (const enemy of this.enemies) {
+        if (!enemy.roundActive || !enemy.sprite.active) {
+          continue;
+        }
+
         this.renderPhysicsBody(enemy.sprite, 0xe56b6f);
       }
     }
@@ -2072,7 +2346,7 @@ export class SandboxScene extends BaseScene {
       }
 
       for (const enemy of this.enemies) {
-        if (this.isEnemyAttackReachFrame(enemy)) {
+        if (enemy.roundActive && this.isEnemyAttackReachFrame(enemy)) {
           this.renderAttackHitBox(
             enemy.attackHitArea,
             enemy.attackHitCount,
@@ -2086,6 +2360,10 @@ export class SandboxScene extends BaseScene {
     if (state.showOrigins) {
       this.renderOrigin(this.player, 0x8fffad);
       for (const enemy of this.enemies) {
+        if (!enemy.roundActive || !enemy.sprite.active) {
+          continue;
+        }
+
         this.renderOrigin(enemy.sprite, 0xff91d0);
       }
     }

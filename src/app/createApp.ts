@@ -20,6 +20,7 @@ import {
   GAMEPLAY_TUNING_CONFIG_URL,
   GAMEPLAY_TUNING_LIMITS,
   GAMEPLAY_TUNING_SAVE_ENDPOINT,
+  ROUND_ENEMY_GROWTH_MODES,
   buildDebugElementsExport,
   createDefaultDebugElementsConfig,
   formatElementKind,
@@ -39,7 +40,8 @@ import {
   type BackgroundFitMode,
   type DebugElementKind,
   type DebugElementsConfig,
-  type GameplayTuning
+  type GameplayTuning,
+  type RoundEnemyGrowthMode
 } from '../game/debugFeatures';
 import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
@@ -108,6 +110,14 @@ function formatProfileLabel(profileId: ProfileId): string {
 
 function formatNumber(value: number): string {
   return String(Math.round(value));
+}
+
+function formatElapsedMs(elapsedMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 function formatVector(x: number, y: number): string {
@@ -397,6 +407,32 @@ export function createApp(root: HTMLDivElement | null): void {
         <input id="tuning-knockback" type="range" min="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.step}" />
         <strong id="tuning-knockback-readout">360</strong>
       </label>
+      <label class="range-row">
+        <span>Round base</span>
+        <input id="tuning-round-base" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.min}" max="${GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.max}" step="${GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.step}" />
+        <strong id="tuning-round-base-readout">1</strong>
+      </label>
+      <label class="range-row">
+        <span>Round step</span>
+        <input id="tuning-round-step" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.min}" max="${GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.max}" step="${GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.step}" />
+        <strong id="tuning-round-step-readout">1</strong>
+      </label>
+      <label class="range-row">
+        <span>Round max</span>
+        <input id="tuning-round-max" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.min}" max="${GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.max}" step="${GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.step}" />
+        <strong id="tuning-round-max-readout">9</strong>
+      </label>
+      <label class="range-row">
+        <span>Wait</span>
+        <input id="tuning-round-wait" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.min}" max="${GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.max}" step="${GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.step}" />
+        <strong id="tuning-round-wait-readout">1200</strong>
+      </label>
+      <label class="select-row" for="tuning-round-growth">
+        <span>Round growth</span>
+        <select id="tuning-round-growth">
+          ${ROUND_ENEMY_GROWTH_MODES.map((mode) => `<option value="${mode}">${mode}</option>`).join('')}
+        </select>
+      </label>
       <div class="panel-group__row">
         <button id="tuning-save" class="shell-button" data-variant="primary" type="button">Save</button>
         <button id="tuning-reset" class="shell-button" type="button">Reset</button>
@@ -562,6 +598,7 @@ export function createApp(root: HTMLDivElement | null): void {
       <div class="metrics__row"><span>Player</span><strong id="player-readout">none</strong></div>
       <div class="metrics__row"><span>Enemy</span><strong id="enemy-readout">none</strong></div>
       <div class="metrics__row"><span>Attack</span><strong id="attack-readout">inactive</strong></div>
+      <div class="metrics__row"><span>Round</span><strong id="round-readout">ready</strong></div>
     </div>
   `;
 
@@ -631,6 +668,51 @@ export function createApp(root: HTMLDivElement | null): void {
     debugControls,
     '#tuning-knockback-readout',
     HTMLElement
+  );
+  const tuningRoundBaseInput = requireElement(
+    debugControls,
+    '#tuning-round-base',
+    HTMLInputElement
+  );
+  const tuningRoundBaseReadout = requireElement(
+    debugControls,
+    '#tuning-round-base-readout',
+    HTMLElement
+  );
+  const tuningRoundStepInput = requireElement(
+    debugControls,
+    '#tuning-round-step',
+    HTMLInputElement
+  );
+  const tuningRoundStepReadout = requireElement(
+    debugControls,
+    '#tuning-round-step-readout',
+    HTMLElement
+  );
+  const tuningRoundMaxInput = requireElement(
+    debugControls,
+    '#tuning-round-max',
+    HTMLInputElement
+  );
+  const tuningRoundMaxReadout = requireElement(
+    debugControls,
+    '#tuning-round-max-readout',
+    HTMLElement
+  );
+  const tuningRoundWaitInput = requireElement(
+    debugControls,
+    '#tuning-round-wait',
+    HTMLInputElement
+  );
+  const tuningRoundWaitReadout = requireElement(
+    debugControls,
+    '#tuning-round-wait-readout',
+    HTMLElement
+  );
+  const tuningRoundGrowthSelect = requireElement(
+    debugControls,
+    '#tuning-round-growth',
+    HTMLSelectElement
   );
   const tuningSaveButton = requireElement(debugControls, '#tuning-save', HTMLButtonElement);
   const tuningResetButton = requireElement(debugControls, '#tuning-reset', HTMLButtonElement);
@@ -870,6 +952,7 @@ export function createApp(root: HTMLDivElement | null): void {
   const playerReadout = requireElement(debugControls, '#player-readout', HTMLElement);
   const enemyReadout = requireElement(debugControls, '#enemy-readout', HTMLElement);
   const attackReadout = requireElement(debugControls, '#attack-readout', HTMLElement);
+  const roundReadout = requireElement(debugControls, '#round-readout', HTMLElement);
 
   const setControlGroupHidden = (group: HTMLElement, hidden: boolean): void => {
     group.hidden = hidden;
@@ -997,7 +1080,12 @@ export function createApp(root: HTMLDivElement | null): void {
       playerSpeed: Number(tuningPlayerSpeedInput.value),
       enemySpeed: Number(tuningEnemySpeedInput.value),
       enemyRecoveryMs: Number(tuningRecoveryInput.value),
-      playerKnockbackSpeed: Number(tuningKnockbackInput.value)
+      playerKnockbackSpeed: Number(tuningKnockbackInput.value),
+      roundEnemyBaseCount: Number(tuningRoundBaseInput.value),
+      roundEnemyIncrease: Number(tuningRoundStepInput.value),
+      roundEnemyMaxCount: Number(tuningRoundMaxInput.value),
+      roundEnemyGrowthMode: tuningRoundGrowthSelect.value as RoundEnemyGrowthMode,
+      roundIntermissionMs: Number(tuningRoundWaitInput.value)
     });
 
   const setGameplayTuningFromInputs = (): void => {
@@ -1058,10 +1146,19 @@ export function createApp(root: HTMLDivElement | null): void {
     tuningEnemySpeedInput.value = String(tuning.enemySpeed);
     tuningRecoveryInput.value = String(tuning.enemyRecoveryMs);
     tuningKnockbackInput.value = String(tuning.playerKnockbackSpeed);
+    tuningRoundBaseInput.value = String(tuning.roundEnemyBaseCount);
+    tuningRoundStepInput.value = String(tuning.roundEnemyIncrease);
+    tuningRoundMaxInput.value = String(tuning.roundEnemyMaxCount);
+    tuningRoundWaitInput.value = String(tuning.roundIntermissionMs);
+    tuningRoundGrowthSelect.value = tuning.roundEnemyGrowthMode;
     tuningPlayerSpeedReadout.textContent = String(tuning.playerSpeed);
     tuningEnemySpeedReadout.textContent = String(tuning.enemySpeed);
     tuningRecoveryReadout.textContent = String(tuning.enemyRecoveryMs);
     tuningKnockbackReadout.textContent = String(tuning.playerKnockbackSpeed);
+    tuningRoundBaseReadout.textContent = String(tuning.roundEnemyBaseCount);
+    tuningRoundStepReadout.textContent = String(tuning.roundEnemyIncrease);
+    tuningRoundMaxReadout.textContent = String(tuning.roundEnemyMaxCount);
+    tuningRoundWaitReadout.textContent = String(tuning.roundIntermissionMs);
     tuningSaveStatus.textContent = gameplayTuningSaveStatus;
   };
 
@@ -1543,6 +1640,10 @@ export function createApp(root: HTMLDivElement | null): void {
       state.input.left ? 'left' : '',
       state.input.right ? 'right' : ''
     ].filter(Boolean);
+    const roundTime =
+      state.round.status === 'cleared'
+        ? `next ${Math.ceil(state.round.nextRoundInMs / 1000)}`
+        : formatElapsedMs(state.round.elapsedMs);
 
     sceneBadge.textContent = state.activeScene;
     sceneReadout.textContent = state.activeScene;
@@ -1594,6 +1695,8 @@ export function createApp(root: HTMLDivElement | null): void {
           state.attack.y
         )} hits ${state.attack.hitCount}`
       : 'inactive';
+    roundReadout.textContent =
+      `R${state.round.round} ${state.round.defeated}/${state.round.enemies} KO ${state.round.totalDefeated} ${roundTime}`;
     renderGymControls();
   };
 
@@ -1752,6 +1855,11 @@ export function createApp(root: HTMLDivElement | null): void {
   tuningEnemySpeedInput.addEventListener('input', setGameplayTuningFromInputs);
   tuningRecoveryInput.addEventListener('input', setGameplayTuningFromInputs);
   tuningKnockbackInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningRoundBaseInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningRoundStepInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningRoundMaxInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningRoundWaitInput.addEventListener('input', setGameplayTuningFromInputs);
+  tuningRoundGrowthSelect.addEventListener('change', setGameplayTuningFromInputs);
   tuningSaveButton.addEventListener('click', async () => {
     gameplayTuningSaveStatus = 'Saving tuning...';
     renderGameplayTuningControls();
