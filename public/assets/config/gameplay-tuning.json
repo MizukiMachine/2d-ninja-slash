@@ -1,0 +1,11 @@
+{
+  "playerSpeed": 260,
+  "enemySpeed": 260,
+  "enemyRecoveryMs": 900,
+  "playerKnockbackSpeed": 360,
+  "roundEnemyBaseCount": 1,
+  "roundEnemyIncrease": 1,
+  "roundEnemyMaxCount": 9,
+  "roundEnemyGrowthMode": "fibonacci",
+  "roundIntermissionMs": 1200
+}

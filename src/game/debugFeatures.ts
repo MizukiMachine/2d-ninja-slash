@@ -6,6 +6,7 @@ import {
 export type DebugElementKind = 'platform' | 'hazard' | 'pickup' | 'spawn' | 'goal' | 'enemy';
 export type BackgroundFitMode = 'cover' | 'contain' | 'native';
 export type ElementEditorCommandKind = 'none' | 'add' | 'delete' | 'duplicate' | 'nudge';
+export type RoundEnemyGrowthMode = 'linear' | 'fibonacci';
 
 export interface DebugRect {
   readonly x: number;
@@ -40,6 +41,11 @@ export interface GameplayTuning {
   readonly enemySpeed: number;
   readonly enemyRecoveryMs: number;
   readonly playerKnockbackSpeed: number;
+  readonly roundEnemyBaseCount: number;
+  readonly roundEnemyIncrease: number;
+  readonly roundEnemyMaxCount: number;
+  readonly roundEnemyGrowthMode: RoundEnemyGrowthMode;
+  readonly roundIntermissionMs: number;
 }
 
 export interface RunnerGenerationSettings {
@@ -113,18 +119,32 @@ export const BACKGROUND_FIT_MODES: readonly BackgroundFitMode[] = [
   'native'
 ];
 
+export const ROUND_ENEMY_GROWTH_MODES: readonly RoundEnemyGrowthMode[] = [
+  'linear',
+  'fibonacci'
+];
+
 export const GAMEPLAY_TUNING_LIMITS = {
   playerSpeed: { min: 120, max: 520, step: 10 },
   enemySpeed: { min: 80, max: 480, step: 10 },
   enemyRecoveryMs: { min: 120, max: 1800, step: 30 },
-  playerKnockbackSpeed: { min: 80, max: 760, step: 10 }
+  playerKnockbackSpeed: { min: 80, max: 760, step: 10 },
+  roundEnemyBaseCount: { min: 1, max: 6, step: 1 },
+  roundEnemyIncrease: { min: 1, max: 4, step: 1 },
+  roundEnemyMaxCount: { min: 2, max: 12, step: 1 },
+  roundIntermissionMs: { min: 500, max: 3000, step: 100 }
 } as const;
 
 export const DEFAULT_GAMEPLAY_TUNING: GameplayTuning = {
   playerSpeed: 260,
   enemySpeed: 260,
   enemyRecoveryMs: 900,
-  playerKnockbackSpeed: 360
+  playerKnockbackSpeed: 360,
+  roundEnemyBaseCount: 1,
+  roundEnemyIncrease: 1,
+  roundEnemyMaxCount: 9,
+  roundEnemyGrowthMode: 'fibonacci',
+  roundIntermissionMs: 1200
 };
 
 export const DEFAULT_RUNNER_SETTINGS: RunnerGenerationSettings = {
@@ -343,6 +363,18 @@ export function setDebugLevelElements(
 
 export function normalizeGameplayTuning(value: unknown): GameplayTuning {
   const candidate = value as Partial<GameplayTuning> | null;
+  const roundEnemyBaseCount = clampInteger(
+    candidate?.roundEnemyBaseCount,
+    GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.min,
+    GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.max,
+    DEFAULT_GAMEPLAY_TUNING.roundEnemyBaseCount
+  );
+  const roundEnemyMaxCount = clampInteger(
+    candidate?.roundEnemyMaxCount,
+    GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.min,
+    GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.max,
+    DEFAULT_GAMEPLAY_TUNING.roundEnemyMaxCount
+  );
 
   return {
     playerSpeed: clampNumber(
@@ -368,8 +400,43 @@ export function normalizeGameplayTuning(value: unknown): GameplayTuning {
       GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.min,
       GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.max,
       DEFAULT_GAMEPLAY_TUNING.playerKnockbackSpeed
+    ),
+    roundEnemyBaseCount,
+    roundEnemyIncrease: clampInteger(
+      candidate?.roundEnemyIncrease,
+      GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.min,
+      GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.max,
+      DEFAULT_GAMEPLAY_TUNING.roundEnemyIncrease
+    ),
+    roundEnemyMaxCount: Math.max(roundEnemyBaseCount, roundEnemyMaxCount),
+    roundEnemyGrowthMode:
+      typeof candidate?.roundEnemyGrowthMode === 'string' &&
+      ROUND_ENEMY_GROWTH_MODES.includes(candidate.roundEnemyGrowthMode as RoundEnemyGrowthMode)
+        ? (candidate.roundEnemyGrowthMode as RoundEnemyGrowthMode)
+        : DEFAULT_GAMEPLAY_TUNING.roundEnemyGrowthMode,
+    roundIntermissionMs: clampInteger(
+      candidate?.roundIntermissionMs,
+      GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.min,
+      GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.max,
+      DEFAULT_GAMEPLAY_TUNING.roundIntermissionMs
     )
   };
+}
+
+export function getRoundEnemyCount(
+  gameplayTuning: GameplayTuning,
+  round: number
+): number {
+  const tuning = normalizeGameplayTuning(gameplayTuning);
+  const roundIndex = Math.max(0, clampInteger(round, 1, 999, 1) - 1);
+  const growthStep =
+    tuning.roundEnemyGrowthMode === 'fibonacci'
+      ? getFibonacciGrowthStep(roundIndex)
+      : roundIndex;
+  const enemyCount =
+    tuning.roundEnemyBaseCount + growthStep * tuning.roundEnemyIncrease;
+
+  return clampInteger(enemyCount, 1, tuning.roundEnemyMaxCount, tuning.roundEnemyBaseCount);
 }
 
 export function normalizeRunnerSettings(value: unknown): RunnerGenerationSettings {
@@ -711,6 +778,23 @@ function clampNumber(
   }
 
   return Math.min(max, Math.max(min, Math.round(value * 100) / 100));
+}
+
+function getFibonacciGrowthStep(index: number): number {
+  if (index <= 0) {
+    return 0;
+  }
+
+  let previous = 0;
+  let current = 1;
+
+  for (let step = 1; step < index; step += 1) {
+    const next = previous + current;
+    previous = current;
+    current = next;
+  }
+
+  return current;
 }
 
 function clampInteger(

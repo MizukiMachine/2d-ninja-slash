@@ -87,6 +87,15 @@ describe('debugStore', () => {
       height: 34,
       hitCount: 1
     });
+    store.setRound({
+      status: 'fighting',
+      round: 3,
+      enemies: 4,
+      defeated: 2,
+      totalDefeated: 7,
+      elapsedMs: 92000,
+      nextRoundInMs: 0
+    });
     store.setPerformance({ fps: 59.8, physicsBodies: 2 });
 
     expect(store.get()).toMatchObject({
@@ -134,6 +143,15 @@ describe('debugStore', () => {
         height: 34,
         hitCount: 1
       },
+      round: {
+        status: 'fighting',
+        round: 3,
+        enemies: 4,
+        defeated: 2,
+        totalDefeated: 7,
+        elapsedMs: 92000,
+        nextRoundInMs: 0
+      },
       performance: {
         fps: 59.8,
         physicsBodies: 2
@@ -156,6 +174,14 @@ describe('debugStore', () => {
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
     store.requestActorReset();
     store.setPlayer({ action: 'run', x: 100 });
+    store.setRound({
+      status: 'fighting',
+      round: 3,
+      enemies: 4,
+      defeated: 2,
+      totalDefeated: 7,
+      elapsedMs: 92000
+    });
     store.setPerformance({ fps: 60, physicsBodies: 2 });
 
     store.resetRuntime();
@@ -175,6 +201,14 @@ describe('debugStore', () => {
       player: {
         action: 'none',
         x: 0
+      },
+      round: {
+        status: 'ready',
+        round: 1,
+        enemies: 0,
+        defeated: 0,
+        totalDefeated: 0,
+        elapsedMs: 0
       },
       performance: {
         fps: 0,

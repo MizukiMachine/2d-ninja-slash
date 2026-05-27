@@ -63,6 +63,16 @@ export interface DebugPerformanceState {
   readonly physicsBodies: number;
 }
 
+export interface DebugRoundState {
+  readonly status: 'ready' | 'fighting' | 'cleared' | 'gameOver';
+  readonly round: number;
+  readonly enemies: number;
+  readonly defeated: number;
+  readonly totalDefeated: number;
+  readonly elapsedMs: number;
+  readonly nextRoundInMs: number;
+}
+
 export interface DebugState {
   readonly activeScene: string;
   readonly paused: boolean;
@@ -87,6 +97,7 @@ export interface DebugState {
   readonly player: DebugActorState;
   readonly enemy: DebugActorState;
   readonly attack: DebugAttackState;
+  readonly round: DebugRoundState;
   readonly performance: DebugPerformanceState;
 }
 
@@ -117,6 +128,7 @@ export interface DebugStore extends WritableStore<DebugState> {
   setPlayer(player: Partial<DebugActorState>): void;
   setEnemy(enemy: Partial<DebugActorState>): void;
   setAttack(attack: Partial<DebugAttackState>): void;
+  setRound(round: Partial<DebugRoundState>): void;
   setPerformance(performance: Partial<DebugPerformanceState>): void;
   resetRuntime(): void;
 }
@@ -181,6 +193,15 @@ function createInitialDebugState(): DebugState {
       width: 0,
       height: 0,
       hitCount: 0
+    },
+    round: {
+      status: 'ready',
+      round: 1,
+      enemies: 0,
+      defeated: 0,
+      totalDefeated: 0,
+      elapsedMs: 0,
+      nextRoundInMs: 0
     },
     performance: {
       fps: 0,
@@ -274,6 +295,9 @@ export function createDebugStore(): DebugStore {
     },
     setAttack: (attack) => {
       store.update((state) => ({ ...state, attack: { ...state.attack, ...attack } }));
+    },
+    setRound: (round) => {
+      store.update((state) => ({ ...state, round: { ...state.round, ...round } }));
     },
     setPerformance: (performance) => {
       store.update((state) => ({
