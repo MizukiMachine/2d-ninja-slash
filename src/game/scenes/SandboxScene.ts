@@ -305,6 +305,7 @@ export class SandboxScene extends BaseScene {
   private attackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private enemyAttackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private visualBoundsRect = new Phaser.Geom.Rectangle();
+  private shadowPosition = new Phaser.Math.Vector2();
 
   constructor() {
     super(SceneKeys.Sandbox);
@@ -495,31 +496,40 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const visualBottomY = this.getActorVisualBottomY(actor, actorId, direction, action);
-    const shadowCenterY =
-      visualBottomY + NINJA_SHADOW_HEIGHT * (0.5 - NINJA_SHADOW_FOOT_LINE_RATIO);
+    const shadowPosition = this.getActorVisualShadowPosition(
+      actor,
+      actorId,
+      direction,
+      action
+    );
 
     shadow
-      .setPosition(actor.x, shadowCenterY)
+      .setPosition(shadowPosition.x, shadowPosition.y)
       .setAlpha(actor.alpha)
       .setVisible(actor.visible);
   }
 
-  private getActorVisualBottomY(
+  private getActorVisualShadowPosition(
     actor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
     actorId: 'mainNinja' | 'enemyNinja',
     direction: FacingDirection,
     action: string
-  ): number {
+  ): Phaser.Math.Vector2 {
     const bounds = getNinjaAnimationBounds(
       this.app.getNinjaBoundsConfig(),
       actorId,
       direction,
       action
     ).visual;
+    const frameLeft = actor.x - (NINJA_FRAME_SIZE / 2) * actor.scaleX;
     const frameTop = actor.y - NINJA_FRAME_SIZE * actor.scaleY;
+    const visualCenterX = frameLeft + (bounds.x + bounds.width / 2) * actor.scaleX;
+    const visualBottomY = frameTop + (bounds.y + bounds.height) * actor.scaleY;
 
-    return frameTop + (bounds.y + bounds.height) * actor.scaleY;
+    return this.shadowPosition.set(
+      visualCenterX,
+      visualBottomY + NINJA_SHADOW_HEIGHT * (0.5 - NINJA_SHADOW_FOOT_LINE_RATIO)
+    );
   }
 
   private syncActorCollisionBounds(): void {
