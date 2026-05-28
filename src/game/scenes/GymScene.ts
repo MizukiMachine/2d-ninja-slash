@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
+import { GAME_UI_FONT_FAMILY } from '../gameFonts';
 import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
   NINJA_CENTER,
@@ -184,7 +185,7 @@ export class GymScene extends BaseScene {
       .text(24, 24, 'Ninja Gym', {
         backgroundColor: 'rgba(2, 6, 23, 0.54)',
         color: '#f8fafc',
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '20px',
         fontStyle: '700',
         padding: { x: 12, y: 8 }

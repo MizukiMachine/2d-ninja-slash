@@ -21,7 +21,7 @@ export interface SfxCue {
 }
 
 export const COMBAT_BGM_VOLUME = 0.08;
-export const GAME_OVER_BGM_VOLUME = 0.44;
+export const GAME_OVER_BGM_VOLUME = 1;
 
 export const BGM_TRACKS = [
   {
@@ -41,8 +41,8 @@ export const GAME_OVER_BGM_TRACK = {
   id: 'game-over-lament',
   key: 'bgm.gameOverLament',
   label: 'Game Over Lament',
-  path: '/assets/bgm/game-over-lament.mp3',
-  filePath: 'public/assets/bgm/game-over-lament.mp3',
+  path: '/assets/bgm/game-over-lament-loud.mp3',
+  filePath: 'public/assets/bgm/game-over-lament-loud.mp3',
   volume: GAME_OVER_BGM_VOLUME,
   loop: true,
   durationMs: 60_000,

@@ -55,6 +55,7 @@ import {
   type EnemyPatrolDirection
 } from '../enemyBehavior';
 import { GAME_OVER_BGM_TRACK_ID } from '../assets/audioAssetCatalog';
+import { GAME_DISPLAY_FONT_FAMILY, GAME_UI_FONT_FAMILY } from '../gameFonts';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact' | 'death';
@@ -467,10 +468,13 @@ export class SandboxScene extends BaseScene {
     this.lastActorResetRequestId = this.debug.get().actorResetRequestId;
     this.pauseLabel = this.add
       .text(this.centerX, 58, 'Paused', {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_DISPLAY_FONT_FAMILY,
         fontSize: '28px',
         fontStyle: '700',
-        color: '#f6c961'
+        color: '#f6c961',
+        stroke: '#281604',
+        strokeThickness: 4,
+        shadow: { offsetX: 0, offsetY: 2, color: '#05080d', blur: 4, fill: true }
       })
       .setOrigin(0.5)
       .setVisible(false);
@@ -886,16 +890,21 @@ export class SandboxScene extends BaseScene {
         fontSize: '17px',
         fontStyle: '700',
         color: '#f8fbff',
-        align: 'right'
+        align: 'right',
+        stroke: '#05080d',
+        strokeThickness: 3
       })
       .setOrigin(1, 0)
       .setDepth(HUD_DEPTH + 1);
     this.roundBannerLabel = this.add
       .text(this.centerX, ROUND_BANNER_Y, '', {
-        fontFamily: 'Arial, Helvetica, sans-serif',
-        fontSize: '24px',
+        fontFamily: GAME_DISPLAY_FONT_FAMILY,
+        fontSize: '30px',
         fontStyle: '700',
-        color: '#f6c961'
+        color: '#ffd36d',
+        stroke: '#2a1306',
+        strokeThickness: 5,
+        shadow: { offsetX: 0, offsetY: 3, color: '#05080d', blur: 5, fill: true }
       })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
@@ -2125,23 +2134,28 @@ export class SandboxScene extends BaseScene {
       .setInteractive();
     const title = this.add
       .text(this.centerX, this.centerY - 118, 'GAME OVER', {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_DISPLAY_FONT_FAMILY,
         fontSize: '48px',
         fontStyle: '700',
-        color: '#f8fbff'
+        color: '#f8fbff',
+        stroke: '#2a1306',
+        strokeThickness: 6,
+        shadow: { offsetX: 0, offsetY: 4, color: '#05080d', blur: 6, fill: true }
       })
       .setOrigin(0.5);
     const detail = this.add
       .text(
         this.centerX,
         this.centerY - 64,
-        `Round ${this.currentRound} | KO ${this.totalDefeatedCount} | ${formatElapsedTime(
+        `ラウンド${this.currentRound} | 倒した敵 ${this.totalDefeatedCount} | ${formatElapsedTime(
           this.elapsedMs
         )}`,
         {
           fontFamily: 'Arial, Helvetica, sans-serif',
           fontSize: '20px',
-          color: '#cbd7e6'
+          color: '#cbd7e6',
+          stroke: '#05080d',
+          strokeThickness: 3
         }
       )
       .setOrigin(0.5);
@@ -2177,7 +2191,7 @@ export class SandboxScene extends BaseScene {
       .setStrokeStyle(2, 0x7ed7ff, 0.92);
     const text = this.add
       .text(0, 0, label, {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '20px',
         fontStyle: '700',
         color: '#f8fbff'
@@ -2826,7 +2840,7 @@ export class SandboxScene extends BaseScene {
           : formatElapsedTime(this.elapsedMs);
 
     this.progressionLabel?.setText(
-      `R${this.currentRound} ${this.defeatedThisRound}/${this.currentRoundEnemyCount} | KO ${this.totalDefeatedCount} | ${suffix}`
+      `ラウンド${this.currentRound} ${this.defeatedThisRound}/${this.currentRoundEnemyCount} | 倒した敵 ${this.totalDefeatedCount} | ${suffix}`
     );
     this.roundBannerLabel
       ?.setText(

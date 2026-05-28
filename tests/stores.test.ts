@@ -64,7 +64,10 @@ describe('debugStore', () => {
     const store = createDebugStore();
 
     expect(store.get().enemyAiEnabled).toBe(true);
-    expect(store.get().showLaneGuides).toBe(true);
+    expect(store.get().showLaneGuides).toBe(false);
+    expect(store.get().backgroundFileName).toBe(
+      'three-lane-rough-castle-courtyard.png'
+    );
     expect(store.get().bgmTrackId).toBe('boss-duel');
     expect(store.get().sandboxLaneSettings).toEqual(
       createDefaultThreeLaneYSettings({ worldHeight: 720 })
@@ -85,7 +88,7 @@ describe('debugStore', () => {
     store.setShowEnemyRanges(true);
     store.setShowLaneGuides(false);
     store.setEnemyAiEnabled(false);
-    store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.setBackgroundFileName('three-lane-rough-castle-courtyard.png');
     store.setBgmTrackId('boss-duel');
     store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
@@ -125,7 +128,7 @@ describe('debugStore', () => {
       showEnemyRanges: true,
       showLaneGuides: false,
       enemyAiEnabled: false,
-      backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      backgroundFileName: 'three-lane-rough-castle-courtyard.png',
       bgmTrackId: 'boss-duel',
       sandboxLaneSettings: {
         upperY: 320,
@@ -194,7 +197,7 @@ describe('debugStore', () => {
     store.setShowEnemyRanges(true);
     store.setShowLaneGuides(false);
     store.setEnemyAiEnabled(false);
-    store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.setBackgroundFileName('three-lane-rough-castle-courtyard.png');
     store.setBgmTrackId('boss-duel');
     store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
@@ -222,7 +225,7 @@ describe('debugStore', () => {
       showEnemyRanges: true,
       showLaneGuides: false,
       enemyAiEnabled: false,
-      backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      backgroundFileName: 'three-lane-rough-castle-courtyard.png',
       bgmTrackId: 'boss-duel',
       sandboxLaneSettings: {
         upperY: 320,
