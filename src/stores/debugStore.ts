@@ -172,7 +172,7 @@ function createInitialDebugState(): DebugState {
     showOrigins: false,
     showPointerProbe: false,
     showEnemyRanges: false,
-    showLaneGuides: true,
+    showLaneGuides: false,
     enemyAiEnabled: true,
     backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
     bgmTrackId: DEFAULT_BGM_TRACK_ID,

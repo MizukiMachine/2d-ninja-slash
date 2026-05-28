@@ -139,7 +139,10 @@ describe('ninja sprite sheet assets', () => {
     expect(BACKGROUND_FILE_NAMES).toEqual(expectedFileNames);
   });
 
-  it('uses a valid default background', () => {
+  it('uses the adopted castle courtyard default background', () => {
+    expect(DEFAULT_DEBUG_BACKGROUND_FILE_NAME).toBe(
+      'three-lane-rough-castle-courtyard.png'
+    );
     expect(BACKGROUND_FILE_NAMES).toContain(DEFAULT_DEBUG_BACKGROUND_FILE_NAME);
   });
 });

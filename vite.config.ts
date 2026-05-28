@@ -4,6 +4,7 @@ import { defineConfig, type Plugin } from 'vite';
 
 const debugBackgroundsModuleId = 'virtual:debug-backgrounds';
 const resolvedDebugBackgroundsModuleId = `\0${debugBackgroundsModuleId}`;
+const defaultDebugBackgroundFileName = 'three-lane-rough-castle-courtyard.png';
 const ninjaBoundsDirectory = resolve(process.cwd(), 'public', 'assets', 'config');
 const ninjaBoundsPath = join(ninjaBoundsDirectory, 'ninja-bounds.json');
 const gameplayTuningPath = join(ninjaBoundsDirectory, 'gameplay-tuning.json');
@@ -78,6 +79,12 @@ function createBackgroundManifest(): {
 function createBackgroundManifestCode(): string {
   const manifest = createBackgroundManifest();
 
+  if (!manifest.fileNames.includes(defaultDebugBackgroundFileName)) {
+    throw new Error(`Default background not found: ${defaultDebugBackgroundFileName}`);
+  }
+
+  const defaultBackgroundCode = JSON.stringify(defaultDebugBackgroundFileName);
+
   return `const backgroundFileNames = ${JSON.stringify(
     manifest.fileNames,
     null,
@@ -88,7 +95,7 @@ const backgroundUrls = ${JSON.stringify(manifest.urls, null, 2)};
 export const BACKGROUND_FILE_NAMES = backgroundFileNames;
 export const BACKGROUND_URLS = backgroundUrls;
 
-export const DEFAULT_DEBUG_BACKGROUND_FILE_NAME = backgroundFileNames[0];
+export const DEFAULT_DEBUG_BACKGROUND_FILE_NAME = ${defaultBackgroundCode};
 `;
 }
 
