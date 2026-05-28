@@ -6,6 +6,10 @@ export class BootScene extends BaseScene {
     super(SceneKeys.Boot);
   }
 
+  preload(): void {
+    this.preloadAudioAssets();
+  }
+
   create(): void {
     this.debug.resetRuntime();
     this.cameras.main.setBackgroundColor('#101520');

@@ -40,9 +40,12 @@ import {
   type ThreeLaneYSettings
 } from '../playerLaneMovement';
 import {
+  getNinjaLanePointFromSprite,
+  getNinjaLaneXFromSprite,
   getNinjaLaneYFromSprite,
-  getNinjaSpriteYForLane
+  getNinjaSpritePositionForLane
 } from '../ninjaLanePresentation';
+import { GAME_OVER_BGM_TRACK_ID } from '../assets/audioAssetCatalog';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact' | 'death';
@@ -433,7 +436,7 @@ export class SandboxScene extends BaseScene {
     this.applyActorPlaybackRate(this.player, 'mainNinja', 'idle');
     this.player.play(getMainNinjaAnimationKey('idle', 'right'));
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
-    this.syncPlayerToCurrentLane();
+    this.setPlayerPositionForLane(this.centerX, this.playerLaneMovement.currentY, 'idle');
 
     this.debugOverlayGraphic = this.add.graphics().setDepth(100);
     this.lastActorResetRequestId = this.debug.get().actorResetRequestId;
@@ -588,6 +591,7 @@ export class SandboxScene extends BaseScene {
     this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
+    this.playSfx('round-start');
 
     this.enemies.forEach((enemy, index) => {
       if (index < enemyCount) {
@@ -623,11 +627,19 @@ export class SandboxScene extends BaseScene {
     enemy.corpseTween = null;
     this.clearEnemyAttackHitArea(enemy);
     enemy.laneMovement.reset(spawn.laneId);
-    const spriteY = this.getEnemySpriteYForLane(enemy, spawn.y, 'idle');
+    const spritePosition = getNinjaSpritePositionForLane({
+      boundsConfig: this.app.getNinjaBoundsConfig(),
+      actorId: 'enemyNinja',
+      direction: enemy.facingDirection,
+      actionId: 'idle',
+      scale: NINJA_SPRITE_SCALE,
+      laneX: spawn.x,
+      laneY: spawn.y
+    });
 
     enemy.sprite
-      .enableBody(true, spawn.x, spriteY, true, true)
-      .setPosition(spawn.x, spriteY)
+      .enableBody(true, spritePosition.x, spritePosition.y, true, true)
+      .setPosition(spritePosition.x, spritePosition.y)
       .setVelocity(0, 0)
       .setAlpha(1)
       .setDepth(ENEMY_DEPTH);
@@ -728,6 +740,10 @@ export class SandboxScene extends BaseScene {
     this.damageKnockbackVector.set(0, 0);
     this.damageKnockbackOrigin.set(0, 0);
     this.attackHitArea.setTo(0, 0, 0, 0);
+  }
+
+  protected override shouldSyncDebugBgm(): boolean {
+    return this.gameOverOverlay === null;
   }
 
   update(time: number, delta: number): void {
@@ -944,48 +960,42 @@ export class SandboxScene extends BaseScene {
           : 'idle';
   }
 
-  private getPlayerSpriteYForLane(
+  private setPlayerToLaneY(
     laneY: number,
     actionId: string = this.getPlayerBoundsAction()
-  ): number {
-    return getNinjaSpriteYForLane({
+  ): void {
+    if (this.player === null) {
+      return;
+    }
+
+    this.setPlayerPositionForLane(
+      this.getRenderedActorLanePoint(
+        this.player,
+        'mainNinja',
+        this.facingDirection,
+        this.getPlayerBoundsAction()
+      ).x,
+      laneY,
+      actionId
+    );
+  }
+
+  private setPlayerPositionForLane(
+    laneX: number,
+    laneY: number,
+    actionId: string = this.getPlayerBoundsAction()
+  ): void {
+    const position = getNinjaSpritePositionForLane({
       boundsConfig: this.app.getNinjaBoundsConfig(),
       actorId: 'mainNinja',
       direction: this.facingDirection,
       actionId,
       scale: NINJA_SPRITE_SCALE,
+      laneX,
       laneY
     });
-  }
 
-  private setPlayerToLaneY(
-    laneY: number,
-    actionId: string = this.getPlayerBoundsAction()
-  ): void {
-    this.player?.setY(this.getPlayerSpriteYForLane(laneY, actionId));
-  }
-
-  private setPlayerPositionForLane(
-    x: number,
-    laneY: number,
-    actionId: string = this.getPlayerBoundsAction()
-  ): void {
-    this.player?.setPosition(x, this.getPlayerSpriteYForLane(laneY, actionId));
-  }
-
-  private getEnemySpriteYForLane(
-    enemy: EnemyState,
-    laneY: number,
-    actionId: string = this.getEnemyBoundsAction(enemy)
-  ): number {
-    return getNinjaSpriteYForLane({
-      boundsConfig: this.app.getNinjaBoundsConfig(),
-      actorId: 'enemyNinja',
-      direction: enemy.facingDirection,
-      actionId,
-      scale: NINJA_SPRITE_SCALE,
-      laneY
-    });
+    this.player?.setPosition(position.x, position.y);
   }
 
   private setEnemyToLaneY(
@@ -993,16 +1003,90 @@ export class SandboxScene extends BaseScene {
     laneY: number,
     actionId: string = this.getEnemyBoundsAction(enemy)
   ): void {
-    enemy.sprite.setY(this.getEnemySpriteYForLane(enemy, laneY, actionId));
+    this.setEnemyPositionForLane(
+      enemy,
+      this.getRenderedActorLanePoint(
+        enemy.sprite,
+        'enemyNinja',
+        enemy.facingDirection,
+        this.getEnemyBoundsAction(enemy)
+      ).x,
+      laneY,
+      actionId
+    );
   }
 
   private setEnemyPositionForLane(
     enemy: EnemyState,
-    x: number,
+    laneX: number,
     laneY: number,
     actionId: string = this.getEnemyBoundsAction(enemy)
   ): void {
-    enemy.sprite.setPosition(x, this.getEnemySpriteYForLane(enemy, laneY, actionId));
+    const position = getNinjaSpritePositionForLane({
+      boundsConfig: this.app.getNinjaBoundsConfig(),
+      actorId: 'enemyNinja',
+      direction: enemy.facingDirection,
+      actionId,
+      scale: NINJA_SPRITE_SCALE,
+      laneX,
+      laneY
+    });
+
+    enemy.sprite.setPosition(position.x, position.y);
+  }
+
+  private getRenderedActorLanePoint(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    actorId: 'mainNinja' | 'enemyNinja',
+    fallbackDirection: FacingDirection,
+    fallbackActionId: string
+  ): Phaser.Math.Vector2 {
+    const renderedState = this.getRenderedActorAnimationState(
+      sprite,
+      actorId,
+      fallbackDirection,
+      fallbackActionId
+    );
+
+    return this.getActorLanePointFromSprite(
+      sprite,
+      actorId,
+      renderedState.direction,
+      renderedState.actionId
+    );
+  }
+
+  private getRenderedActorAnimationState(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    actorId: 'mainNinja' | 'enemyNinja',
+    fallbackDirection: FacingDirection,
+    fallbackActionId: string
+  ): { readonly direction: FacingDirection; readonly actionId: string } {
+    const parts = sprite.anims.currentAnim?.key.split('.') ?? [];
+    const direction = parts[2] === 'left' || parts[2] === 'right'
+      ? parts[2]
+      : fallbackDirection;
+    const actionId = parts[0] === 'anim' && parts[1] === actorId && parts[3]
+      ? parts[3]
+      : fallbackActionId;
+
+    return { direction, actionId };
+  }
+
+  private getActorLaneXFromSprite(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    actorId: 'mainNinja' | 'enemyNinja',
+    direction: FacingDirection,
+    actionId: string
+  ): number {
+    return getNinjaLaneXFromSprite({
+      boundsConfig: this.app.getNinjaBoundsConfig(),
+      actorId,
+      direction,
+      actionId,
+      scale: NINJA_SPRITE_SCALE,
+      spriteX: sprite.x
+    });
   }
 
   private getActorLaneYFromSprite(
@@ -1019,6 +1103,25 @@ export class SandboxScene extends BaseScene {
       scale: NINJA_SPRITE_SCALE,
       spriteY: sprite.y
     });
+  }
+
+  private getActorLanePointFromSprite(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
+    actorId: 'mainNinja' | 'enemyNinja',
+    direction: FacingDirection,
+    actionId: string
+  ): Phaser.Math.Vector2 {
+    const point = getNinjaLanePointFromSprite({
+      boundsConfig: this.app.getNinjaBoundsConfig(),
+      actorId,
+      direction,
+      actionId,
+      scale: NINJA_SPRITE_SCALE,
+      spriteX: sprite.x,
+      spriteY: sprite.y
+    });
+
+    return new Phaser.Math.Vector2(point.x, point.y);
   }
 
   private queueAssets(backgroundFileName: DebugBackgroundFileName): boolean {
@@ -1359,10 +1462,10 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    this.currentAction = 'jump';
     this.clearAttackHitArea();
     this.markActiveEnemyAttacksAsDodged();
     this.player.setVelocity(0, 0);
+    this.playSfx('lane-dash');
     this.playNinjaAnimation('jump', true);
   }
 
@@ -1415,7 +1518,16 @@ export class SandboxScene extends BaseScene {
         deltaSeconds
       });
 
-      this.setPlayerPositionForLane(this.player.x, laneFrame.y, 'jump');
+      this.setPlayerPositionForLane(
+        this.getActorLaneXFromSprite(
+          this.player,
+          'mainNinja',
+          this.facingDirection,
+          this.getPlayerBoundsAction()
+        ),
+        laneFrame.y,
+        'jump'
+      );
       this.player.setVelocity(0, 0);
 
       if (laneFrame.completedTransition) {
@@ -1473,10 +1585,10 @@ export class SandboxScene extends BaseScene {
 
     this.updateForwardVectorFromInput();
     this.playerLaneMovement?.resetTapState();
-    this.currentAction = action;
     this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.player.setVelocity(0, 0);
+    this.playSfx('player-slash');
     this.playNinjaAnimation(action, true);
   }
 
@@ -1492,10 +1604,10 @@ export class SandboxScene extends BaseScene {
 
     this.updateForwardVectorFromInput();
     this.playerLaneMovement?.resetTapState();
-    this.currentAction = 'jump';
     this.clearAttackHitArea();
     this.markActiveEnemyAttacksAsDodged();
     this.player.setVelocity(0, 0);
+    this.playSfx('jump');
     this.playNinjaAnimation('jump', true);
   }
 
@@ -1539,19 +1651,20 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const movedX = this.player.x - this.damageKnockbackOrigin.x;
+    const playerLanePoint = this.getActorLanePointFromSprite(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
+    const movedX = playerLanePoint.x - this.damageKnockbackOrigin.x;
     const movedDistance = Math.abs(movedX);
 
     if (movedDistance >= PLAYER_DAMAGE_KNOCKBACK_DISTANCE) {
       this.setPlayerPositionForLane(
         this.damageKnockbackOrigin.x +
           this.damageKnockbackVector.x * PLAYER_DAMAGE_KNOCKBACK_DISTANCE,
-        this.playerLaneMovement?.currentY ?? this.getActorLaneYFromSprite(
-          this.player,
-          'mainNinja',
-          this.facingDirection,
-          this.getPlayerBoundsAction()
-        )
+        this.playerLaneMovement?.currentY ?? playerLanePoint.y
       );
       this.player.setVelocity(0, 0);
       return;
@@ -1617,7 +1730,19 @@ export class SandboxScene extends BaseScene {
 
     this.syncEnemyToCurrentLane(enemy);
 
-    const toPlayerX = this.player.x - enemy.sprite.x;
+    const playerLaneX = this.getActorLaneXFromSprite(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
+    const enemyLaneX = this.getActorLaneXFromSprite(
+      enemy.sprite,
+      'enemyNinja',
+      enemy.facingDirection,
+      this.getEnemyBoundsAction(enemy)
+    );
+    const toPlayerX = playerLaneX - enemyLaneX;
     const distanceToPlayerX = Math.abs(toPlayerX);
 
     if (distanceToPlayerX > 0) {
@@ -1645,13 +1770,26 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    enemy.action = 'jump';
     enemy.sprite.setVelocity(0, 0);
 
     if (this.player !== null) {
       this.updateEnemyFacingFromVector(
         enemy,
-        new Phaser.Math.Vector2(this.player.x - enemy.sprite.x, 0)
+        new Phaser.Math.Vector2(
+          this.getActorLaneXFromSprite(
+            this.player,
+            'mainNinja',
+            this.facingDirection,
+            this.getPlayerBoundsAction()
+          ) -
+            this.getActorLaneXFromSprite(
+              enemy.sprite,
+              'enemyNinja',
+              enemy.facingDirection,
+              this.getEnemyBoundsAction(enemy)
+            ),
+          0
+        )
       );
     }
 
@@ -1668,7 +1806,17 @@ export class SandboxScene extends BaseScene {
       deltaSeconds
     });
 
-    this.setEnemyPositionForLane(enemy, enemy.sprite.x, laneFrame.y, 'jump');
+    this.setEnemyPositionForLane(
+      enemy,
+      this.getActorLaneXFromSprite(
+        enemy.sprite,
+        'enemyNinja',
+        enemy.facingDirection,
+        this.getEnemyBoundsAction(enemy)
+      ),
+      laneFrame.y,
+      'jump'
+    );
     enemy.sprite.setVelocity(0, 0);
 
     if (!laneFrame.completedTransition) {
@@ -1701,14 +1849,28 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    enemy.action = 'slash';
     enemy.attackDamageDealt = false;
     this.clearEnemyAttackHitArea(enemy);
     enemy.sprite.setVelocity(0, 0);
     this.updateEnemyFacingFromVector(
       enemy,
-      new Phaser.Math.Vector2(this.player.x - enemy.sprite.x, 0)
+      new Phaser.Math.Vector2(
+        this.getActorLaneXFromSprite(
+          this.player,
+          'mainNinja',
+          this.facingDirection,
+          this.getPlayerBoundsAction()
+        ) -
+          this.getActorLaneXFromSprite(
+            enemy.sprite,
+            'enemyNinja',
+            enemy.facingDirection,
+            this.getEnemyBoundsAction(enemy)
+          ),
+        0
+      )
     );
+    this.playSfx('enemy-slash');
     this.playEnemyAnimation(enemy, 'slash', true);
   }
 
@@ -1763,7 +1925,24 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const knockbackDirection = new Phaser.Math.Vector2(this.player.x - enemy.sprite.x, 0);
+    this.playSfx('player-hurt');
+
+    const playerLanePoint = this.getActorLanePointFromSprite(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
+    const enemyLanePoint = this.getActorLanePointFromSprite(
+      enemy.sprite,
+      'enemyNinja',
+      enemy.facingDirection,
+      this.getEnemyBoundsAction(enemy)
+    );
+    const knockbackDirection = new Phaser.Math.Vector2(
+      playerLanePoint.x - enemyLanePoint.x,
+      0
+    );
 
     if (knockbackDirection.lengthSq() === 0) {
       knockbackDirection.set(enemy.facingDirection === 'left' ? -1 : 1, 0);
@@ -1771,13 +1950,13 @@ export class SandboxScene extends BaseScene {
 
     knockbackDirection.normalize();
     this.damageKnockbackVector.copy(knockbackDirection);
-    this.damageKnockbackOrigin.set(this.player.x, this.player.y);
+    this.damageKnockbackOrigin.copy(playerLanePoint);
     this.currentAction = 'hurt';
     this.clearAttackHitArea();
 
     const towardEnemy = new Phaser.Math.Vector2(
-      enemy.sprite.x - this.player.x,
-      enemy.sprite.y - this.player.y
+      enemyLanePoint.x - playerLanePoint.x,
+      enemyLanePoint.y - playerLanePoint.y
     );
     this.updateFacingFromVector(towardEnemy);
     const knockbackSpeed = this.debug.get().gameplayTuning.playerKnockbackSpeed;
@@ -1788,6 +1967,11 @@ export class SandboxScene extends BaseScene {
       false
     );
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'impact');
+    this.setPlayerPositionForLane(
+      playerLanePoint.x,
+      this.playerLaneMovement?.currentY ?? playerLanePoint.y,
+      'impact'
+    );
   }
 
   private startPlayerDeath(): void {
@@ -1805,10 +1989,18 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
+    const lanePoint = this.getRenderedActorLanePoint(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
+
     this.currentAction = 'dead';
     this.playerHealth = 0;
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
+    this.playSfx('main-ninja-death');
     this.stopAllEnemiesForGameOver();
     this.player.disableBody(false, false);
     this.player.setVelocity(0, 0).setAlpha(1);
@@ -1816,6 +2008,11 @@ export class SandboxScene extends BaseScene {
     this.applyActorPlaybackRate(this.player, 'mainNinja', 'death');
     this.player.play(getMainNinjaAnimationKey('death', this.facingDirection), false);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'death');
+    this.setPlayerPositionForLane(
+      lanePoint.x,
+      this.playerLaneMovement?.currentY ?? lanePoint.y,
+      'death'
+    );
     this.scheduleGameOverOverlay(this.getPlayerDeathOverlayFallbackDelay());
     this.renderProgressionHud();
     this.renderHealthBars(this.time.now);
@@ -1927,6 +2124,7 @@ export class SandboxScene extends BaseScene {
 
     overlay.add([backdrop, title, detail, restartButton, menuButton]);
     this.gameOverOverlay = overlay;
+    this.app.audio.playBgm(this, GAME_OVER_BGM_TRACK_ID);
   }
 
   private createGameOverButton(
@@ -1961,6 +2159,7 @@ export class SandboxScene extends BaseScene {
     button.on('pointerdown', () => background.setFillStyle(0x2d5f91, 1));
     button.on('pointerup', () => {
       background.setFillStyle(0x223150, 1);
+      this.playSfx('ui-select');
       onClick();
     });
 
@@ -1984,6 +2183,12 @@ export class SandboxScene extends BaseScene {
     }
 
     const animationKey = getMainNinjaAnimationKey(action, this.facingDirection);
+    const lanePoint = this.getRenderedActorLanePoint(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    );
 
     this.applyActorPlaybackRate(this.player, 'mainNinja', action);
 
@@ -1994,10 +2199,13 @@ export class SandboxScene extends BaseScene {
     this.currentAction = action;
     this.player.play(animationKey, !restart);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, action);
-
-    if (!this.playerLaneMovement?.isTransitioning) {
-      this.syncPlayerToCurrentLane();
-    }
+    this.setPlayerPositionForLane(
+      lanePoint.x,
+      this.playerLaneMovement?.isTransitioning === true
+        ? lanePoint.y
+        : (this.playerLaneMovement?.currentY ?? lanePoint.y),
+      action
+    );
   }
 
   private updateEnemyFacingFromVector(enemy: EnemyState, vector: Phaser.Math.Vector2): void {
@@ -2017,6 +2225,12 @@ export class SandboxScene extends BaseScene {
     restart = false
   ): void {
     const animationKey = getEnemyNinjaAnimationKey(action, enemy.facingDirection);
+    const lanePoint = this.getRenderedActorLanePoint(
+      enemy.sprite,
+      'enemyNinja',
+      enemy.facingDirection,
+      this.getEnemyBoundsAction(enemy)
+    );
 
     this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', action);
 
@@ -2032,10 +2246,12 @@ export class SandboxScene extends BaseScene {
 
     enemy.sprite.play(animationKey, !restart);
     this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, action);
-
-    if (!enemy.laneMovement.isTransitioning) {
-      this.syncEnemyToCurrentLane(enemy);
-    }
+    this.setEnemyPositionForLane(
+      enemy,
+      lanePoint.x,
+      enemy.laneMovement.isTransitioning ? lanePoint.y : enemy.laneMovement.currentY,
+      action
+    );
   }
 
   private updateAttackHitArea(action: PlayerAttackAction): void {
@@ -2084,6 +2300,7 @@ export class SandboxScene extends BaseScene {
 
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
+    this.playSfx('hit');
 
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
@@ -2094,6 +2311,13 @@ export class SandboxScene extends BaseScene {
     if (enemy.action === 'dead') {
       return;
     }
+
+    const lanePoint = this.getRenderedActorLanePoint(
+      enemy.sprite,
+      'enemyNinja',
+      enemy.facingDirection,
+      this.getEnemyBoundsAction(enemy)
+    );
 
     enemy.health = 0;
     enemy.action = 'dead';
@@ -2110,6 +2334,13 @@ export class SandboxScene extends BaseScene {
     this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'death');
     enemy.sprite.play(getEnemyNinjaAnimationKey('death', enemy.facingDirection), false);
     this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, 'death');
+    this.setEnemyPositionForLane(
+      enemy,
+      lanePoint.x,
+      enemy.laneMovement.currentY,
+      'death'
+    );
+    this.playSfx('enemy-defeat');
     this.recordEnemyDefeat(enemy);
     this.renderHealthBars(this.time.now);
   }
@@ -2146,6 +2377,7 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
     this.stopAllEnemyMovement();
+    this.playSfx('round-clear');
     this.renderProgressionHud();
     this.publishDebugTelemetry(this.time.now, true);
   }
@@ -2373,6 +2605,8 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
+    const restoreDebugBgm = this.gameOver || this.gameOverOverlay !== null;
+
     this.facingDirection = 'right';
     this.forwardVector.set(1, 0);
     this.playerLaneMovement = this.createLaneMovementController('middle');
@@ -2396,12 +2630,24 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
 
+    if (restoreDebugBgm) {
+      this.app.audio.playBgm(this, this.debug.get().bgmTrackId);
+    }
+
     const playerLaneY = this.playerLaneMovement.currentY;
-    const playerSpriteY = this.getPlayerSpriteYForLane(playerLaneY, 'idle');
+    const playerSpritePosition = getNinjaSpritePositionForLane({
+      boundsConfig: this.app.getNinjaBoundsConfig(),
+      actorId: 'mainNinja',
+      direction: this.facingDirection,
+      actionId: 'idle',
+      scale: NINJA_SPRITE_SCALE,
+      laneX: this.centerX,
+      laneY: playerLaneY
+    });
 
     this.player
-      .enableBody(true, this.centerX, playerSpriteY, true, true)
-      .setPosition(this.centerX, playerSpriteY)
+      .enableBody(true, playerSpritePosition.x, playerSpritePosition.y, true, true)
+      .setPosition(playerSpritePosition.x, playerSpritePosition.y)
       .setVelocity(0, 0)
       .setAlpha(1);
     this.player.anims.resume();
@@ -2510,7 +2756,7 @@ export class SandboxScene extends BaseScene {
       action,
       animation: sprite.anims.currentAnim?.key ?? 'none',
       frame: sprite.anims.currentFrame?.index ?? 0,
-      x: Math.round(sprite.x),
+      x: Math.round(this.getActorLaneXFromSprite(sprite, actorId, direction, boundsAction)),
       y: Math.round(this.getActorLaneYFromSprite(sprite, actorId, direction, boundsAction)),
       velocityX: Math.round(body.velocity.x),
       velocityY: Math.round(body.velocity.y),

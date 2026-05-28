@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getAppContext, type AppContext } from '../../app/context';
+import type { SfxCueId } from '../assets/audioAssetCatalog';
 import type { GameProfile } from '../profiles';
 import type { SceneKey } from '../sceneKeys';
 import type { ReadableStore, StoreListener, Unsubscribe } from '../../stores/store';
@@ -25,6 +26,22 @@ export abstract class BaseScene extends Phaser.Scene {
     this.cleanupCallbacks = [];
     this.events.once('shutdown', this.disposeScene, this);
     this.events.once('destroy', this.disposeScene, this);
+    this.onStore(this.settings, (settings) => {
+      this.app.audio.syncSettings(this, settings);
+    });
+
+    if (this.scene.key !== 'Boot') {
+      let syncedBgmTrackId: string | null = null;
+
+      this.onStore(this.debug, (state) => {
+        if (!this.shouldSyncDebugBgm() || syncedBgmTrackId === state.bgmTrackId) {
+          return;
+        }
+
+        syncedBgmTrackId = state.bgmTrackId;
+        this.app.audio.playBgm(this, state.bgmTrackId);
+      });
+    }
   }
 
   protected get app(): AppContext {
@@ -110,10 +127,23 @@ export abstract class BaseScene extends Phaser.Scene {
     });
     button.on('pointerup', () => {
       background.setFillStyle(0x223150, 1);
+      this.playSfx('ui-select');
       onClick();
     });
 
     return button;
+  }
+
+  protected preloadAudioAssets(): void {
+    this.app.audio.queueAudioAssets(this);
+  }
+
+  protected playSfx(cueId: SfxCueId): void {
+    this.app.audio.playSfx(this, cueId);
+  }
+
+  protected shouldSyncDebugBgm(): boolean {
+    return true;
   }
 
   protected goTo(sceneKey: SceneKey): void {
