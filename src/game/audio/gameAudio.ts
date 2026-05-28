@@ -9,6 +9,11 @@ import {
   type SfxCueId
 } from '../assets/audioAssetCatalog';
 
+type VolumeAdjustableSound = Phaser.Sound.BaseSound & {
+  setVolume?: (value: number) => unknown;
+  volume?: number;
+};
+
 export interface GameAudio {
   queueAudioAssets(scene: Phaser.Scene): void;
   syncSettings(scene: Phaser.Scene, settings: SettingsState): void;
@@ -18,10 +23,11 @@ export interface GameAudio {
 }
 
 class PhaserGameAudio implements GameAudio {
-  private activeBgm: Phaser.Sound.BaseSound | null = null;
-  private activeBgmKey: string | null = null;
+  private activeBgmSound: Phaser.Sound.BaseSound | null = null;
+  private activeBgmTrackId: BgmTrackId | null = null;
   private pendingBgmTrackId: BgmTrackId | null = null;
   private waitingForUnlock = false;
+  private readonly bgmKeys = new Set(ALL_BGM_TRACKS.map((track) => track.key));
 
   queueAudioAssets(scene: Phaser.Scene): void {
     for (const track of ALL_BGM_TRACKS) {
@@ -59,21 +65,68 @@ class PhaserGameAudio implements GameAudio {
 
     this.pendingBgmTrackId = null;
 
-    if (this.activeBgmKey !== track.key) {
-      this.stopBgm();
-      this.activeBgm = scene.sound.add(track.key, {
+    const bgmSound = this.getOrCreateBgmSound(scene, trackId);
+
+    this.removeOtherBgmSounds(scene, bgmSound);
+    this.activeBgmSound = bgmSound;
+    this.activeBgmTrackId = trackId;
+    this.setBgmVolume(bgmSound, track.volume);
+
+    if (!bgmSound.isPlaying) {
+      bgmSound.play({
         loop: track.loop,
         volume: track.volume
       });
-      this.activeBgmKey = track.key;
+    }
+  }
+
+  private getOrCreateBgmSound(
+    scene: Phaser.Scene,
+    trackId: BgmTrackId
+  ): Phaser.Sound.BaseSound {
+    const track = getBgmTrack(trackId);
+    const sounds = scene.sound.getAll<Phaser.Sound.BaseSound>(track.key);
+    const trackedBgm =
+      this.activeBgmTrackId === trackId &&
+      this.activeBgmSound !== null &&
+      sounds.includes(this.activeBgmSound)
+        ? this.activeBgmSound
+        : null;
+    const reusableBgm = trackedBgm ?? sounds.find((sound) => sound.isPlaying) ?? sounds[0] ?? null;
+
+    if (reusableBgm !== null) {
+      return reusableBgm;
     }
 
-    if (this.activeBgm !== null && !this.activeBgm.isPlaying) {
-      this.activeBgm.play({
-        loop: track.loop,
-        volume: track.volume
-      });
+    return scene.sound.add(track.key, {
+      loop: track.loop,
+      volume: track.volume
+    });
+  }
+
+  private removeOtherBgmSounds(
+    scene: Phaser.Scene,
+    bgmToKeep: Phaser.Sound.BaseSound | null
+  ): void {
+    // BGM is a single managed channel. Selectable and game-over tracks must not coexist.
+    for (const key of this.bgmKeys) {
+      for (const sound of scene.sound.getAll<Phaser.Sound.BaseSound>(key)) {
+        if (sound !== bgmToKeep) {
+          scene.sound.remove(sound);
+        }
+      }
     }
+  }
+
+  private setBgmVolume(sound: Phaser.Sound.BaseSound, volume: number): void {
+    const adjustableSound = sound as VolumeAdjustableSound;
+
+    if (typeof adjustableSound.setVolume === 'function') {
+      adjustableSound.setVolume(volume);
+      return;
+    }
+
+    adjustableSound.volume = volume;
   }
 
   playSfx(scene: Phaser.Scene, cueId: SfxCueId): void {
@@ -96,10 +149,10 @@ class PhaserGameAudio implements GameAudio {
   }
 
   stopBgm(): void {
-    this.activeBgm?.stop();
-    this.activeBgm?.destroy();
-    this.activeBgm = null;
-    this.activeBgmKey = null;
+    this.activeBgmSound?.stop();
+    this.activeBgmSound?.destroy();
+    this.activeBgmSound = null;
+    this.activeBgmTrackId = null;
   }
 
   private loadBgmOnDemand(scene: Phaser.Scene, trackId: BgmTrackId): void {

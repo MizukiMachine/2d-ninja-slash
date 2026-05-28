@@ -20,6 +20,9 @@ export interface SfxCue {
   readonly theme: string;
 }
 
+export const COMBAT_BGM_VOLUME = 0.08;
+export const GAME_OVER_BGM_VOLUME = 0.44;
+
 export const BGM_TRACKS = [
   {
     id: 'boss-duel',
@@ -27,7 +30,7 @@ export const BGM_TRACKS = [
     label: 'Boss Duel',
     path: '/assets/bgm/boss-duel.mp3',
     filePath: 'public/assets/bgm/boss-duel.mp3',
-    volume: 0.4,
+    volume: COMBAT_BGM_VOLUME,
     loop: true,
     durationMs: 90_000,
     theme: 'immediate boss duel melody with heavy war drums'
@@ -40,7 +43,7 @@ export const GAME_OVER_BGM_TRACK = {
   label: 'Game Over Lament',
   path: '/assets/bgm/game-over-lament.mp3',
   filePath: 'public/assets/bgm/game-over-lament.mp3',
-  volume: 0.44,
+  volume: GAME_OVER_BGM_VOLUME,
   loop: true,
   durationMs: 60_000,
   theme: 'somber shinobi defeat lament with low taiko and distant flute'
