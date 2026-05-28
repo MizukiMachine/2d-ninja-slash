@@ -62,6 +62,7 @@ export interface PlayerLaneMovementFrame {
   readonly laneId: PlayerLaneId;
   readonly targetLaneId: PlayerLaneId;
   readonly y: number;
+  readonly depthY: number;
   readonly velocityX: number;
   readonly velocityY: number;
   readonly action: PlayerLaneAction;
@@ -400,6 +401,14 @@ export class PlayerLaneMovementController {
     return this.laneManager.currentY;
   }
 
+  get currentDepthY(): number {
+    if (this.activeTransition !== null) {
+      return this.getTransitionDepthY(this.activeTransition);
+    }
+
+    return this.laneManager.currentY;
+  }
+
   get isTransitioning(): boolean {
     return this.activeTransition !== null;
   }
@@ -497,6 +506,9 @@ export class PlayerLaneMovementController {
 
       const completedTransition = transition.elapsedSeconds >= this.transitionSeconds;
       const y = completedTransition ? transition.targetY : this.getTransitionY(transition);
+      const depthY = completedTransition
+        ? transition.targetY
+        : this.getTransitionDepthY(transition);
 
       if (completedTransition) {
         this.laneManager.setCurrentLane(transition.targetLaneId);
@@ -508,6 +520,7 @@ export class PlayerLaneMovementController {
         laneId: transition.sourceLaneId,
         targetLaneId: transition.targetLaneId,
         y,
+        depthY,
         velocityX: 0,
         velocityY: 0,
         action: 'jump',
@@ -531,6 +544,7 @@ export class PlayerLaneMovementController {
       laneId: this.laneManager.currentLaneId,
       targetLaneId: this.laneManager.currentLaneId,
       y: this.laneManager.currentY,
+      depthY: this.laneManager.currentY,
       velocityX,
       velocityY: 0,
       action: horizontalDirection === 0 ? 'idle' : 'run',
@@ -559,11 +573,15 @@ export class PlayerLaneMovementController {
 
   private getTransitionY(transition: ActiveLaneTransition): number {
     const progress = this.getTransitionProgress(transition);
-    const linearY =
-      transition.sourceY + (transition.targetY - transition.sourceY) * progress;
     const arcY = Math.sin(progress * Math.PI) * this.jumpArcHeight;
 
-    return linearY - arcY;
+    return this.getTransitionDepthY(transition) - arcY;
+  }
+
+  private getTransitionDepthY(transition: ActiveLaneTransition): number {
+    const progress = this.getTransitionProgress(transition);
+
+    return transition.sourceY + (transition.targetY - transition.sourceY) * progress;
   }
 
   private getTransitionProgress(transition: ActiveLaneTransition): number {

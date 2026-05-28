@@ -41,6 +41,7 @@ import {
   type ThreeLaneYSettings
 } from '../playerLaneMovement';
 import {
+  getNinjaLanePerspectiveScaleForY,
   getNinjaLanePointFromSprite,
   getNinjaLaneXFromSprite,
   getNinjaLaneYFromSprite,
@@ -126,8 +127,10 @@ const NINJA_FRAME_COUNT = 32;
 const NINJA_IDLE_ANCHOR_FRAME = 0;
 const NINJA_ANIMATION_PLAYBACK_RATE = 3;
 const NINJA_SPRITE_SCALE = 2.1;
-const PLAYER_DEPTH = 10;
-const ENEMY_DEPTH = 9;
+const ACTOR_DEPTH_BASE = 20;
+const ACTOR_DEPTH_RANGE = 30;
+const PLAYER_DEPTH_BIAS = 0.6;
+const ENEMY_DEPTH_BIAS = 0;
 const HUD_DEPTH = 120;
 const GAME_OVER_DEPTH = 240;
 const PLAYER_HEALTH_BAR_X = 24;
@@ -456,9 +459,9 @@ export class SandboxScene extends BaseScene {
     );
     this.player
       .setOrigin(0.5, 1)
-      .setScale(NINJA_SPRITE_SCALE)
+      .setScale(this.getActorScaleForLaneY(this.playerLaneMovement.currentY))
       .setCollideWorldBounds(true)
-      .setDepth(PLAYER_DEPTH);
+      .setDepth(this.getActorDepthForLaneY(this.playerLaneMovement.currentY, PLAYER_DEPTH_BIAS));
     this.applyActorPlaybackRate(this.player, 'mainNinja', 'idle');
     this.player.play(getMainNinjaAnimationKey('idle', 'right'));
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, 'idle');
@@ -545,6 +548,35 @@ export class SandboxScene extends BaseScene {
     return createThreeLaneLayoutFromYSettings(this.getLaneSettings());
   }
 
+  private getActorScaleForLaneY(laneY: number): number {
+    return getNinjaLanePerspectiveScaleForY({
+      layout: this.getLaneLayout(),
+      laneY,
+      baseScale: NINJA_SPRITE_SCALE
+    });
+  }
+
+  private getActorScaleFromSprite(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+  ): number {
+    const scale = Math.abs(sprite.scaleX);
+
+    return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
+  }
+
+  private getActorDepthForLaneY(laneY: number, bias: number): number {
+    const [upperLane, middleLane, lowerLane] = this.getLaneLayout().lanes;
+    const safeLaneY = Number.isFinite(laneY) ? laneY : middleLane.y;
+    const laneSpan = Math.max(1, lowerLane.y - upperLane.y);
+    const depthProgress = Phaser.Math.Clamp(
+      (safeLaneY - upperLane.y) / laneSpan,
+      0,
+      1
+    );
+
+    return ACTOR_DEPTH_BASE + depthProgress * ACTOR_DEPTH_RANGE + bias;
+  }
+
   private applyLaneSettings(settings: ThreeLaneYSettings): void {
     const normalizedSettings = normalizeSandboxLaneSettings(settings, this.profile.height);
     const signature = this.getLaneSettingsSignature(normalizedSettings);
@@ -587,9 +619,9 @@ export class SandboxScene extends BaseScene {
     );
     enemySprite
       .setOrigin(0.5, 1)
-      .setScale(NINJA_SPRITE_SCALE)
+      .setScale(this.getActorScaleForLaneY(this.centerY + 108))
       .setCollideWorldBounds(true)
-      .setDepth(ENEMY_DEPTH);
+      .setDepth(this.getActorDepthForLaneY(this.centerY + 108, ENEMY_DEPTH_BIAS));
     const enemy = this.createEnemyState(enemySprite, 'left');
     this.physics.add.collider(this.player, enemy.sprite);
     this.registerEnemyAnimationEvents(enemy);
@@ -665,7 +697,7 @@ export class SandboxScene extends BaseScene {
       actorId: 'enemyNinja',
       direction: enemy.facingDirection,
       actionId: 'idle',
-      scale: NINJA_SPRITE_SCALE,
+      scale: this.getActorScaleForLaneY(spawn.y),
       laneX: spawn.x,
       laneY: spawn.y
     });
@@ -675,7 +707,7 @@ export class SandboxScene extends BaseScene {
       .setPosition(spritePosition.x, spritePosition.y)
       .setVelocity(0, 0)
       .setAlpha(1)
-      .setDepth(ENEMY_DEPTH);
+      .setDepth(this.getActorDepthForLaneY(spawn.y, ENEMY_DEPTH_BIAS));
     enemy.sprite.anims.resume();
     this.applyActorPlaybackRate(enemy.sprite, 'enemyNinja', 'idle');
     enemy.sprite.play(getEnemyNinjaAnimationKey('idle', enemy.facingDirection), false);
@@ -1022,19 +1054,24 @@ export class SandboxScene extends BaseScene {
   private setPlayerPositionForLane(
     laneX: number,
     laneY: number,
-    actionId: string = this.getPlayerBoundsAction()
+    actionId: string = this.getPlayerBoundsAction(),
+    depthY: number = laneY
   ): void {
+    const scale = this.getActorScaleForLaneY(depthY);
     const position = getNinjaSpritePositionForLane({
       boundsConfig: this.app.getNinjaBoundsConfig(),
       actorId: 'mainNinja',
       direction: this.facingDirection,
       actionId,
-      scale: NINJA_SPRITE_SCALE,
+      scale,
       laneX,
       laneY
     });
 
-    this.player?.setPosition(position.x, position.y);
+    this.player
+      ?.setScale(scale)
+      .setPosition(position.x, position.y)
+      .setDepth(this.getActorDepthForLaneY(depthY, PLAYER_DEPTH_BIAS));
   }
 
   private setEnemyToLaneY(
@@ -1059,19 +1096,24 @@ export class SandboxScene extends BaseScene {
     enemy: EnemyState,
     laneX: number,
     laneY: number,
-    actionId: string = this.getEnemyBoundsAction(enemy)
+    actionId: string = this.getEnemyBoundsAction(enemy),
+    depthY: number = laneY
   ): void {
+    const scale = this.getActorScaleForLaneY(depthY);
     const position = getNinjaSpritePositionForLane({
       boundsConfig: this.app.getNinjaBoundsConfig(),
       actorId: 'enemyNinja',
       direction: enemy.facingDirection,
       actionId,
-      scale: NINJA_SPRITE_SCALE,
+      scale,
       laneX,
       laneY
     });
 
-    enemy.sprite.setPosition(position.x, position.y);
+    enemy.sprite
+      .setScale(scale)
+      .setPosition(position.x, position.y)
+      .setDepth(this.getActorDepthForLaneY(depthY, ENEMY_DEPTH_BIAS));
   }
 
   private getRenderedActorLanePoint(
@@ -1123,7 +1165,7 @@ export class SandboxScene extends BaseScene {
       actorId,
       direction,
       actionId,
-      scale: NINJA_SPRITE_SCALE,
+      scale: this.getActorScaleFromSprite(sprite),
       spriteX: sprite.x
     });
   }
@@ -1139,7 +1181,7 @@ export class SandboxScene extends BaseScene {
       actorId,
       direction,
       actionId,
-      scale: NINJA_SPRITE_SCALE,
+      scale: this.getActorScaleFromSprite(sprite),
       spriteY: sprite.y
     });
   }
@@ -1155,7 +1197,7 @@ export class SandboxScene extends BaseScene {
       actorId,
       direction,
       actionId,
-      scale: NINJA_SPRITE_SCALE,
+      scale: this.getActorScaleFromSprite(sprite),
       spriteX: sprite.x,
       spriteY: sprite.y
     });
@@ -1565,7 +1607,8 @@ export class SandboxScene extends BaseScene {
           this.getPlayerBoundsAction()
         ),
         laneFrame.y,
-        'jump'
+        'jump',
+        laneFrame.depthY
       );
       this.player.setVelocity(0, 0);
 
@@ -2249,13 +2292,14 @@ export class SandboxScene extends BaseScene {
     this.currentAction = action;
     this.player.play(animationKey, !restart);
     this.applyActorCollisionBounds(this.player, 'mainNinja', this.facingDirection, action);
-    this.setPlayerPositionForLane(
-      lanePoint.x,
-      this.playerLaneMovement?.isTransitioning === true
-        ? lanePoint.y
-        : (this.playerLaneMovement?.currentY ?? lanePoint.y),
-      action
-    );
+    const laneY = this.playerLaneMovement?.isTransitioning === true
+      ? lanePoint.y
+      : (this.playerLaneMovement?.currentY ?? lanePoint.y);
+    const depthY = this.playerLaneMovement?.isTransitioning === true
+      ? this.playerLaneMovement.currentDepthY
+      : laneY;
+
+    this.setPlayerPositionForLane(lanePoint.x, laneY, action, depthY);
   }
 
   private updateEnemyFacingFromVector(enemy: EnemyState, vector: Phaser.Math.Vector2): void {
@@ -2296,11 +2340,19 @@ export class SandboxScene extends BaseScene {
 
     enemy.sprite.play(animationKey, !restart);
     this.applyActorCollisionBounds(enemy.sprite, 'enemyNinja', enemy.facingDirection, action);
+    const laneY = enemy.laneMovement.isTransitioning
+      ? lanePoint.y
+      : enemy.laneMovement.currentY;
+    const depthY = enemy.laneMovement.isTransitioning
+      ? enemy.laneMovement.currentDepthY
+      : laneY;
+
     this.setEnemyPositionForLane(
       enemy,
       lanePoint.x,
-      enemy.laneMovement.isTransitioning ? lanePoint.y : enemy.laneMovement.currentY,
-      action
+      laneY,
+      action,
+      depthY
     );
   }
 
@@ -2692,7 +2744,7 @@ export class SandboxScene extends BaseScene {
       actorId: 'mainNinja',
       direction: this.facingDirection,
       actionId: 'idle',
-      scale: NINJA_SPRITE_SCALE,
+      scale: this.getActorScaleForLaneY(playerLaneY),
       laneX: this.centerX,
       laneY: playerLaneY
     });
