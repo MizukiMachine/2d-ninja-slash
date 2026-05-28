@@ -97,7 +97,7 @@ export const SFX_CUES = [
     label: 'UI Select',
     path: '/assets/sfx/ui-select.mp3',
     filePath: 'public/assets/sfx/ui-select.mp3',
-    volume: 0.42,
+    volume: 0.36,
     theme: 'short wooden menu tap'
   },
   {
@@ -106,7 +106,7 @@ export const SFX_CUES = [
     label: 'Player Slash',
     path: '/assets/sfx/player-slash.mp3',
     filePath: 'public/assets/sfx/player-slash.mp3',
-    volume: 0.66,
+    volume: 0.56,
     theme: 'katana slash air whoosh'
   },
   {
@@ -115,7 +115,7 @@ export const SFX_CUES = [
     label: 'Enemy Slash',
     path: '/assets/sfx/enemy-slash.mp3',
     filePath: 'public/assets/sfx/enemy-slash.mp3',
-    volume: 0.58,
+    volume: 0.49,
     theme: 'lower pitched hostile blade swing'
   },
   {
@@ -124,7 +124,7 @@ export const SFX_CUES = [
     label: 'Jump',
     path: '/assets/sfx/jump.mp3',
     filePath: 'public/assets/sfx/jump.mp3',
-    volume: 0.48,
+    volume: 0.41,
     theme: 'cloth burst ninja jump'
   },
   {
@@ -133,7 +133,7 @@ export const SFX_CUES = [
     label: 'Lane Dash',
     path: '/assets/sfx/lane-dash.mp3',
     filePath: 'public/assets/sfx/lane-dash.mp3',
-    volume: 0.5,
+    volume: 0.43,
     theme: 'quick evasive dash with fabric snap'
   },
   {
@@ -142,7 +142,7 @@ export const SFX_CUES = [
     label: 'Hit',
     path: '/assets/sfx/hit.mp3',
     filePath: 'public/assets/sfx/hit.mp3',
-    volume: 0.64,
+    volume: 0.54,
     theme: 'sharp blade impact on armor'
   },
   {
@@ -151,7 +151,7 @@ export const SFX_CUES = [
     label: 'Player Hurt',
     path: '/assets/sfx/player-hurt.mp3',
     filePath: 'public/assets/sfx/player-hurt.mp3',
-    volume: 0.62,
+    volume: 0.53,
     theme: 'impact thud with breath hit'
   },
   {
@@ -160,7 +160,7 @@ export const SFX_CUES = [
     label: 'Enemy Defeat',
     path: '/assets/sfx/enemy-defeat.mp3',
     filePath: 'public/assets/sfx/enemy-defeat.mp3',
-    volume: 0.7,
+    volume: 0.6,
     theme: 'defeated ninja fall with metal ring'
   },
   {
@@ -169,7 +169,7 @@ export const SFX_CUES = [
     label: 'Player Defeat',
     path: '/assets/sfx/player-defeat.mp3',
     filePath: 'public/assets/sfx/player-defeat.mp3',
-    volume: 0.72,
+    volume: 0.61,
     theme: 'somber defeat hit with low drum'
   },
   {
@@ -178,26 +178,26 @@ export const SFX_CUES = [
     label: 'Main Ninja Death',
     path: '/assets/sfx/main-ninja-death.mp3',
     filePath: 'public/assets/sfx/main-ninja-death.mp3',
-    volume: 0.74,
+    volume: 0.63,
     theme: 'main ninja death fall with cloth slump and low drum'
   },
   {
     id: 'round-clear',
     key: 'sfx.roundClear',
     label: 'Round Clear',
-    path: '/assets/sfx/round-clear.mp3',
-    filePath: 'public/assets/sfx/round-clear.mp3',
-    volume: 0.62,
-    theme: 'victory taiko accent and chime'
+    path: '/assets/sfx/round-clear-loud.wav',
+    filePath: 'public/assets/sfx/round-clear-loud.wav',
+    volume: 0.9,
+    theme: 'louder soft higher taiko double hit round transition'
   },
   {
     id: 'round-start',
     key: 'sfx.roundStart',
     label: 'Round Start',
-    path: '/assets/sfx/round-start.mp3',
-    filePath: 'public/assets/sfx/round-start.mp3',
-    volume: 0.56,
-    theme: 'short combat start drum cue'
+    path: '/assets/sfx/round-start-loud.wav',
+    filePath: 'public/assets/sfx/round-start-loud.wav',
+    volume: 0.82,
+    theme: 'louder soft higher taiko round start pulse'
   }
 ] as const satisfies readonly SfxCue[];
 

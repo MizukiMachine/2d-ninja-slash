@@ -1603,7 +1603,7 @@ export class SandboxScene extends BaseScene {
     this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.player.setVelocity(0, 0);
-    this.playSfx('player-slash');
+    this.playSfx('enemy-slash');
     this.playNinjaAnimation(action, true);
   }
 
@@ -1885,7 +1885,7 @@ export class SandboxScene extends BaseScene {
         0
       )
     );
-    this.playSfx('enemy-slash');
+    this.playSfx('player-slash');
     this.playEnemyAnimation(enemy, 'slash', true);
   }
 
@@ -2392,7 +2392,6 @@ export class SandboxScene extends BaseScene {
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
     this.stopAllEnemyMovement();
-    this.playSfx('round-clear');
     this.renderProgressionHud();
     this.publishDebugTelemetry(this.time.now, true);
   }

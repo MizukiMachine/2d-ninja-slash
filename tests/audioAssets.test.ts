@@ -39,13 +39,19 @@ function getPublicFilePath(publicUrl: string): URL {
   return new URL(`../public/${publicUrl.replace(/^\//u, '')}`, import.meta.url);
 }
 
-function expectMp3File(publicUrl: string): number {
+function expectAudioFile(publicUrl: string): number {
   const filePath = getPublicFilePath(publicUrl);
   const file = readFileSync(filePath);
   const fileSize = statSync(filePath).size;
 
   expect(fileSize).toBeGreaterThan(1024);
-  expect(file.subarray(0, 3).toString('ascii')).toBe('ID3');
+
+  if (publicUrl.endsWith('.wav')) {
+    expect(file.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(file.subarray(8, 12).toString('ascii')).toBe('WAVE');
+  } else {
+    expect(file.subarray(0, 3).toString('ascii')).toBe('ID3');
+  }
 
   return fileSize;
 }
@@ -93,15 +99,15 @@ describe('audio asset catalog', () => {
     expect(getSfxCue('main-ninja-death').key).toBe('sfx.mainNinjaDeath');
   });
 
-  it('has generated mp3 files for every audio asset', () => {
+  it('has generated audio files for every audio asset', () => {
     for (const track of ALL_BGM_TRACKS) {
       const minimumSize = track.id === GAME_OVER_BGM_TRACK_ID ? 600_000 : 900_000;
 
-      expect(expectMp3File(track.path)).toBeGreaterThan(minimumSize);
+      expect(expectAudioFile(track.path)).toBeGreaterThan(minimumSize);
     }
 
     for (const cue of SFX_CUES) {
-      expectMp3File(cue.path);
+      expectAudioFile(cue.path);
     }
   });
 
