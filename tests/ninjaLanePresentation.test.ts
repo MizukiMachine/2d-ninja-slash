@@ -6,6 +6,8 @@ import {
 import {
   getNinjaLaneAnchorOffsetX,
   getNinjaLaneAnchorOffset,
+  getNinjaLanePerspectiveScaleForLane,
+  getNinjaLanePerspectiveScaleForY,
   getNinjaLanePointFromSprite,
   getNinjaLaneXFromSprite,
   getNinjaLaneYFromSprite,
@@ -14,8 +16,49 @@ import {
   getNinjaSpriteYForLane,
   getNinjaVisualBaselineOffset
 } from '../src/game/ninjaLanePresentation';
+import { createThreeLaneLayout } from '../src/game/playerLaneMovement';
 
 describe('ninja lane presentation', () => {
+  it('scales actors by lane depth', () => {
+    expect(
+      getNinjaLanePerspectiveScaleForLane({
+        laneId: 'upper',
+        baseScale: 2.1
+      })
+    ).toBeCloseTo(1.932, 5);
+    expect(
+      getNinjaLanePerspectiveScaleForLane({
+        laneId: 'middle',
+        baseScale: 2.1
+      })
+    ).toBe(2.1);
+    expect(
+      getNinjaLanePerspectiveScaleForLane({
+        laneId: 'lower',
+        baseScale: 2.1
+      })
+    ).toBeCloseTo(2.268, 5);
+  });
+
+  it('interpolates actor scale while moving between lanes', () => {
+    const layout = createThreeLaneLayout({ middleY: 200, spacing: 50 });
+
+    expect(
+      getNinjaLanePerspectiveScaleForY({
+        layout,
+        laneY: 175,
+        baseScale: 2
+      })
+    ).toBeCloseTo(1.92, 5);
+    expect(
+      getNinjaLanePerspectiveScaleForY({
+        layout,
+        laneY: 225,
+        baseScale: 2
+      })
+    ).toBeCloseTo(2.08, 5);
+  });
+
   it('converts lane anchor point to sprite position using the lane anchor', () => {
     const config = setNinjaLaneAnchor(
       DEFAULT_NINJA_BOUNDS_CONFIG,

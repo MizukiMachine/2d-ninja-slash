@@ -47,6 +47,7 @@ describe('player lane movement', () => {
     expect(frame.velocityX).toBe(240);
     expect(frame.velocityY).toBe(0);
     expect(frame.y).toBe(200);
+    expect(frame.depthY).toBe(200);
     expect(frame.action).toBe('run');
     expect(controller.currentLaneId).toBe('middle');
   });
@@ -71,6 +72,8 @@ describe('player lane movement', () => {
     const jumpingFrame = updateController(controller, 0.1);
     expect(jumpingFrame.action).toBe('jump');
     expect(jumpingFrame.isTransitioning).toBe(true);
+    expect(jumpingFrame.y).toBe(159);
+    expect(jumpingFrame.depthY).toBe(175);
     expect(controller.targetLaneId).toBe('upper');
 
     const landedFrame = finishTransition(controller);

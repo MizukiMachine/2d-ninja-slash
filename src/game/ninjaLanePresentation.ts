@@ -4,6 +4,15 @@ import {
   type NinjaActorId,
   type NinjaBoundsConfig
 } from './ninjaBounds';
+import type { PlayerLaneId, ThreeLaneLayout } from './playerLaneMovement';
+
+export type NinjaLaneScaleMultipliers = Readonly<Record<PlayerLaneId, number>>;
+
+export const DEFAULT_NINJA_LANE_SCALE_MULTIPLIERS: NinjaLaneScaleMultipliers = {
+  upper: 0.92,
+  middle: 1,
+  lower: 1.08
+};
 
 export interface NinjaLanePresentationInput {
   readonly boundsConfig: NinjaBoundsConfig;
@@ -11,6 +20,19 @@ export interface NinjaLanePresentationInput {
   readonly direction: string;
   readonly actionId: string;
   readonly scale: number;
+}
+
+export interface NinjaLanePerspectiveScaleForLaneInput {
+  readonly laneId: PlayerLaneId;
+  readonly baseScale: number;
+  readonly scaleMultipliers?: NinjaLaneScaleMultipliers;
+}
+
+export interface NinjaLanePerspectiveScaleForYInput {
+  readonly layout: ThreeLaneLayout;
+  readonly laneY: number;
+  readonly baseScale: number;
+  readonly scaleMultipliers?: NinjaLaneScaleMultipliers;
 }
 
 export interface NinjaSpriteYForLaneInput extends NinjaLanePresentationInput {
@@ -84,6 +106,47 @@ export function getNinjaVisualBaselineOffset(
   return getNinjaLaneAnchorOffset(input);
 }
 
+export function getNinjaLanePerspectiveScaleForLane({
+  laneId,
+  baseScale,
+  scaleMultipliers = DEFAULT_NINJA_LANE_SCALE_MULTIPLIERS
+}: NinjaLanePerspectiveScaleForLaneInput): number {
+  return getSafeBaseScale(baseScale) * scaleMultipliers[laneId];
+}
+
+export function getNinjaLanePerspectiveScaleForY({
+  layout,
+  laneY,
+  baseScale,
+  scaleMultipliers = DEFAULT_NINJA_LANE_SCALE_MULTIPLIERS
+}: NinjaLanePerspectiveScaleForYInput): number {
+  const safeBaseScale = getSafeBaseScale(baseScale);
+  const [upperLane, middleLane, lowerLane] = layout.lanes;
+  const y = Number.isFinite(laneY) ? laneY : middleLane.y;
+
+  if (y <= upperLane.y) {
+    return safeBaseScale * scaleMultipliers.upper;
+  }
+
+  if (y >= lowerLane.y) {
+    return safeBaseScale * scaleMultipliers.lower;
+  }
+
+  if (y <= middleLane.y) {
+    return safeBaseScale * interpolateNumber(
+      scaleMultipliers.upper,
+      scaleMultipliers.middle,
+      getSegmentProgress(upperLane.y, middleLane.y, y)
+    );
+  }
+
+  return safeBaseScale * interpolateNumber(
+    scaleMultipliers.middle,
+    scaleMultipliers.lower,
+    getSegmentProgress(middleLane.y, lowerLane.y, y)
+  );
+}
+
 export function getNinjaSpriteYForLane({
   laneY,
   ...input
@@ -132,4 +195,22 @@ export function getNinjaLanePointFromSprite({
     x: getNinjaLaneXFromSprite({ ...input, spriteX }),
     y: getNinjaLaneYFromSprite({ ...input, spriteY })
   };
+}
+
+function getSafeBaseScale(baseScale: number): number {
+  return Number.isFinite(baseScale) ? baseScale : 1;
+}
+
+function getSegmentProgress(start: number, end: number, value: number): number {
+  const span = end - start;
+
+  if (span <= 0) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, (value - start) / span));
+}
+
+function interpolateNumber(start: number, end: number, progress: number): number {
+  return start + (end - start) * progress;
 }
