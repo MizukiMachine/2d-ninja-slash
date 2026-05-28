@@ -1,15 +1,22 @@
 /old/
 public/assets/*
 !public/assets/
+!public/assets/assets.json
 !public/assets/index.json
 !public/assets/actors/
 !public/assets/actors/**
 !public/assets/backgrounds/
 !public/assets/backgrounds/**
+!public/assets/bgm/
+!public/assets/bgm/**
 !public/assets/config/
 !public/assets/config/**
+!public/assets/sfx/
+!public/assets/sfx/**
 
 node_modules/
+.env
+.env.*
 .vite/
 .tsbuildinfo/
 .mcpheadlessbrowser/

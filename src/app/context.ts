@@ -1,12 +1,14 @@
 import type { GameProfile } from '../game/profiles';
 import type { NinjaBoundsConfig } from '../game/ninjaBounds';
 import type { DebugElementsConfig } from '../game/debugFeatures';
+import type { GameAudio } from '../game/audio/gameAudio';
 import type { DebugStore } from '../stores/debugStore';
 import type { SettingsStore } from '../stores/settingsStore';
 
 export interface AppContext {
   readonly debugStore: DebugStore;
   readonly settingsStore: SettingsStore;
+  readonly audio: GameAudio;
   getProfile(): GameProfile;
   getNinjaBoundsConfig(): NinjaBoundsConfig;
   getDebugElementsConfig(): DebugElementsConfig;

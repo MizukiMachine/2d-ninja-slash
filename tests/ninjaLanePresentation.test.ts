@@ -4,14 +4,19 @@ import {
   setNinjaLaneAnchor
 } from '../src/game/ninjaBounds';
 import {
+  getNinjaLaneAnchorOffsetX,
   getNinjaLaneAnchorOffset,
+  getNinjaLanePointFromSprite,
+  getNinjaLaneXFromSprite,
   getNinjaLaneYFromSprite,
+  getNinjaSpritePositionForLane,
+  getNinjaSpriteXForLane,
   getNinjaSpriteYForLane,
   getNinjaVisualBaselineOffset
 } from '../src/game/ninjaLanePresentation';
 
 describe('ninja lane presentation', () => {
-  it('converts lane baseline y to sprite anchor y using the lane anchor', () => {
+  it('converts lane anchor point to sprite position using the lane anchor', () => {
     const config = setNinjaLaneAnchor(
       DEFAULT_NINJA_BOUNDS_CONFIG,
       'mainNinja',
@@ -20,6 +25,15 @@ describe('ninja lane presentation', () => {
       { x: 73, y: 110 }
     );
 
+    expect(
+      getNinjaLaneAnchorOffsetX({
+        boundsConfig: config,
+        actorId: 'mainNinja',
+        direction: 'right',
+        actionId: 'idle',
+        scale: 2
+      })
+    ).toBe(-18);
     expect(
       getNinjaLaneAnchorOffset({
         boundsConfig: config,
@@ -48,9 +62,30 @@ describe('ninja lane presentation', () => {
         laneY: 450
       })
     ).toBe(486);
+    expect(
+      getNinjaSpriteXForLane({
+        boundsConfig: config,
+        actorId: 'mainNinja',
+        direction: 'right',
+        actionId: 'idle',
+        scale: 2,
+        laneX: 320
+      })
+    ).toBe(302);
+    expect(
+      getNinjaSpritePositionForLane({
+        boundsConfig: config,
+        actorId: 'mainNinja',
+        direction: 'right',
+        actionId: 'idle',
+        scale: 2,
+        laneX: 320,
+        laneY: 450
+      })
+    ).toEqual({ x: 302, y: 486 });
   });
 
-  it('recovers lane baseline y from sprite anchor y', () => {
+  it('recovers lane anchor point from sprite position', () => {
     const config = setNinjaLaneAnchor(
       DEFAULT_NINJA_BOUNDS_CONFIG,
       'enemyNinja',
@@ -70,6 +105,16 @@ describe('ninja lane presentation', () => {
 
     expect(spriteY).toBe(545);
     expect(
+      getNinjaLaneXFromSprite({
+        boundsConfig: config,
+        actorId: 'enemyNinja',
+        direction: 'left',
+        actionId: 'idle',
+        scale: 1.5,
+        spriteX: 512
+      })
+    ).toBe(500);
+    expect(
       getNinjaLaneYFromSprite({
         boundsConfig: config,
         actorId: 'enemyNinja',
@@ -79,5 +124,16 @@ describe('ninja lane presentation', () => {
         spriteY
       })
     ).toBe(530);
+    expect(
+      getNinjaLanePointFromSprite({
+        boundsConfig: config,
+        actorId: 'enemyNinja',
+        direction: 'left',
+        actionId: 'idle',
+        scale: 1.5,
+        spriteX: 512,
+        spriteY
+      })
+    ).toEqual({ x: 500, y: 530 });
   });
 });

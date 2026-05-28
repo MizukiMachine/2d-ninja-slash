@@ -65,6 +65,7 @@ describe('debugStore', () => {
 
     expect(store.get().enemyChaseEnabled).toBe(false);
     expect(store.get().showLaneGuides).toBe(true);
+    expect(store.get().bgmTrackId).toBe('shadow-dojo');
     expect(store.get().sandboxLaneSettings).toEqual(
       createDefaultThreeLaneYSettings({ worldHeight: 720 })
     );
@@ -85,6 +86,7 @@ describe('debugStore', () => {
     store.setShowLaneGuides(false);
     store.setEnemyChaseEnabled(false);
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.setBgmTrackId('boss-duel');
     store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
     store.setPointer({ x: 12, y: 24, worldX: 120, worldY: 240, down: true });
@@ -124,6 +126,7 @@ describe('debugStore', () => {
       showLaneGuides: false,
       enemyChaseEnabled: false,
       backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      bgmTrackId: 'boss-duel',
       sandboxLaneSettings: {
         upperY: 320,
         middleY: 455,
@@ -192,6 +195,7 @@ describe('debugStore', () => {
     store.setShowLaneGuides(false);
     store.setEnemyChaseEnabled(false);
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
+    store.setBgmTrackId('moonlit-pursuit');
     store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
     store.setPlayer({ action: 'run', x: 100 });
@@ -219,6 +223,7 @@ describe('debugStore', () => {
       showLaneGuides: false,
       enemyChaseEnabled: false,
       backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
+      bgmTrackId: 'moonlit-pursuit',
       sandboxLaneSettings: {
         upperY: 320,
         middleY: 455,

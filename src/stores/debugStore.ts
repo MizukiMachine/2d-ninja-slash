@@ -4,6 +4,10 @@ import {
   type DebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
 import {
+  DEFAULT_BGM_TRACK_ID,
+  type BgmTrackId
+} from '../game/assets/audioAssetCatalog';
+import {
   DEFAULT_BACKGROUND_LAB_SETTINGS,
   DEFAULT_BASELINE_LAB_SETTINGS,
   DEFAULT_ELEMENT_EDITOR_SETTINGS,
@@ -88,6 +92,7 @@ export interface DebugState {
   readonly showLaneGuides: boolean;
   readonly enemyChaseEnabled: boolean;
   readonly backgroundFileName: DebugBackgroundFileName;
+  readonly bgmTrackId: BgmTrackId;
   readonly gameplayTuning: GameplayTuning;
   readonly sandboxLaneSettings: SandboxLaneSettings;
   readonly levelProgress: LevelProgressState;
@@ -121,6 +126,7 @@ export interface DebugStore extends WritableStore<DebugState> {
   setEnemyChaseEnabled(enemyChaseEnabled: boolean): void;
   toggleEnemyChase(): void;
   setBackgroundFileName(backgroundFileName: DebugBackgroundFileName): void;
+  setBgmTrackId(bgmTrackId: BgmTrackId): void;
   setGameplayTuning(gameplayTuning: GameplayTuning): void;
   setSandboxLaneSettings(sandboxLaneSettings: SandboxLaneSettings): void;
   setLevelProgress(levelProgress: LevelProgressState): void;
@@ -169,6 +175,7 @@ function createInitialDebugState(): DebugState {
     showLaneGuides: true,
     enemyChaseEnabled: false,
     backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
+    bgmTrackId: DEFAULT_BGM_TRACK_ID,
     gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
     sandboxLaneSettings: DEFAULT_SANDBOX_LANE_SETTINGS,
     levelProgress: DEFAULT_LEVEL_PROGRESS,
@@ -268,6 +275,9 @@ export function createDebugStore(): DebugStore {
     setBackgroundFileName: (backgroundFileName) => {
       store.update((state) => ({ ...state, backgroundFileName }));
     },
+    setBgmTrackId: (bgmTrackId) => {
+      store.update((state) => ({ ...state, bgmTrackId }));
+    },
     setGameplayTuning: (gameplayTuning) => {
       store.update((state) => ({ ...state, gameplayTuning }));
     },
@@ -335,6 +345,7 @@ export function createDebugStore(): DebugStore {
         showLaneGuides: current.showLaneGuides,
         enemyChaseEnabled: current.enemyChaseEnabled,
         backgroundFileName: current.backgroundFileName,
+        bgmTrackId: current.bgmTrackId,
         gameplayTuning: current.gameplayTuning,
         sandboxLaneSettings: current.sandboxLaneSettings,
         levelProgress: current.levelProgress,

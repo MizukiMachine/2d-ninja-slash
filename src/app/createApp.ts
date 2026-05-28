@@ -11,6 +11,11 @@ import {
   isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
 import {
+  BGM_TRACKS,
+  isBgmTrackId
+} from '../game/assets/audioAssetCatalog';
+import { createGameAudio } from '../game/audio/gameAudio';
+import {
   BACKGROUND_FIT_MODES,
   DEBUG_ELEMENT_KINDS,
   DEBUG_ELEMENTS_CONFIG_URL,
@@ -315,9 +320,11 @@ export function createApp(root: HTMLDivElement | null): void {
 
   const debugStore = createDebugStore();
   const settingsStore = createSettingsStore();
+  const audio = createGameAudio();
   const context: AppContext = {
     debugStore,
     settingsStore,
+    audio,
     getProfile: () => getProfileById(profileId),
     getNinjaBoundsConfig: () => ninjaBoundsConfig,
     getDebugElementsConfig: () => debugElementsConfig,
@@ -390,6 +397,12 @@ export function createApp(root: HTMLDivElement | null): void {
       <label class="select-row" for="background-file">
         <span>Background</span>
         <select id="background-file"></select>
+      </label>
+      <label class="select-row" for="bgm-track">
+        <span>BGM</span>
+        <select id="bgm-track">
+          ${BGM_TRACKS.map((track) => `<option value="${track.id}">${track.label}</option>`).join('')}
+        </select>
       </label>
     </div>
     <div class="panel-group">
@@ -745,6 +758,7 @@ export function createApp(root: HTMLDivElement | null): void {
   const laneSaveStatus = requireElement(debugControls, '#lane-save-status', HTMLElement);
   const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
   const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
+  const bgmTrackSelect = requireElement(debugControls, '#bgm-track', HTMLSelectElement);
   const tuningPlayerSpeedInput = requireElement(
     debugControls,
     '#tuning-player-speed',
@@ -1953,6 +1967,7 @@ export function createApp(root: HTMLDivElement | null): void {
     showLaneGuidesToggle.checked = state.showLaneGuides;
     enemyChaseToggle.checked = state.enemyChaseEnabled;
     backgroundFileSelect.value = state.backgroundFileName;
+    bgmTrackSelect.value = state.bgmTrackId;
     setControlGroupHidden(laneEditorControls, state.activeScene !== SceneKeys.LaneEditor);
     setControlGroupHidden(backgroundLabControls, state.activeScene !== SceneKeys.BackgroundLab);
     setControlGroupHidden(runnerControls, state.activeScene !== SceneKeys.RunnerLab);
@@ -2131,6 +2146,12 @@ export function createApp(root: HTMLDivElement | null): void {
   backgroundFileSelect.addEventListener('change', () => {
     if (isDebugBackgroundFileName(backgroundFileSelect.value)) {
       debugStore.setBackgroundFileName(backgroundFileSelect.value);
+    }
+  });
+
+  bgmTrackSelect.addEventListener('change', () => {
+    if (isBgmTrackId(bgmTrackSelect.value)) {
+      debugStore.setBgmTrackId(bgmTrackSelect.value);
     }
   });
 
