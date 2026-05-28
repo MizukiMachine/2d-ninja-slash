@@ -3,6 +3,7 @@ import {
   DEBUG_LEVELS,
   createDefaultDebugElementsConfig,
   createDefaultSandboxLaneSettings,
+  getEnemyMovementSpeed,
   getDebugLevelElements,
   getEditableDebugLevel,
   loadSandboxLaneSettings,
@@ -94,6 +95,22 @@ describe('debug feature config', () => {
       seed: 8,
       laneCount: 2
     });
+  });
+
+  it('keeps effective enemy movement slower than the player', () => {
+    expect(
+      getEnemyMovementSpeed({
+        playerSpeed: 260,
+        enemySpeed: 260,
+        enemyRecoveryMs: 900,
+        playerKnockbackSpeed: 360,
+        roundEnemyBaseCount: 1,
+        roundEnemyIncrease: 1,
+        roundEnemyMaxCount: 9,
+        roundEnemyGrowthMode: 'fibonacci',
+        roundIntermissionMs: 1200
+      })
+    ).toBe(208);
   });
 
   it('persists sandbox lane y settings per profile', () => {

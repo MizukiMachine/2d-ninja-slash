@@ -22,6 +22,7 @@ import {
   PLAYER_MAX_HEALTH
 } from '../combatHealth';
 import {
+  getEnemyMovementSpeed,
   getRoundEnemyCount,
   normalizeGameplayTuning,
   normalizeSandboxLaneSettings
@@ -52,7 +53,7 @@ type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact' | 'death';
 type ControlledMainNinjaAction = Exclude<MainNinjaAction, 'impact' | 'death'>;
 type PlayerAttackAction = 'slash';
 type PlayerAction = ControlledMainNinjaAction | 'hurt' | 'dead';
-type EnemyNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'death';
+type EnemyNinjaAction = 'idle' | 'walk' | 'run' | 'jump' | 'slash' | 'death';
 type EnemyAction = Exclude<EnemyNinjaAction, 'death'> | 'recover' | 'dead';
 type RoundPhase = 'fighting' | 'cleared';
 
@@ -316,6 +317,20 @@ const ENEMY_NINJA_ANIMATIONS: readonly NinjaAnimationConfig<EnemyNinjaAction>[] 
     direction: 'right',
     frameCount: NINJA_FRAME_COUNT,
     frameRate: 12 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: -1
+  },
+  {
+    action: 'walk',
+    direction: 'left',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 10 * NINJA_ANIMATION_PLAYBACK_RATE,
+    repeat: -1
+  },
+  {
+    action: 'walk',
+    direction: 'right',
+    frameCount: NINJA_FRAME_COUNT,
+    frameRate: 10 * NINJA_ANIMATION_PLAYBACK_RATE,
     repeat: -1
   },
   {
@@ -955,8 +970,8 @@ export class SandboxScene extends BaseScene {
       ? 'slash'
       : enemy.action === 'jump'
         ? 'jump'
-        : enemy.action === 'run'
-          ? 'run'
+        : enemy.action === 'run' || enemy.action === 'walk'
+          ? enemy.action
           : 'idle';
   }
 
@@ -1760,9 +1775,9 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const enemySpeed = this.debug.get().gameplayTuning.enemySpeed;
+    const enemySpeed = getEnemyMovementSpeed(this.debug.get().gameplayTuning);
     enemy.sprite.setVelocity(Math.sign(toPlayerX) * enemySpeed, 0);
-    this.playEnemyAnimation(enemy, 'run');
+    this.playEnemyAnimation(enemy, 'walk');
   }
 
   private startEnemyLaneJump(enemy: EnemyState, targetLaneId: PlayerLaneId): void {
@@ -1798,7 +1813,7 @@ export class SandboxScene extends BaseScene {
   }
 
   private updateEnemyLaneJumpMovement(enemy: EnemyState, deltaSeconds: number): void {
-    const enemySpeed = this.debug.get().gameplayTuning.enemySpeed;
+    const enemySpeed = getEnemyMovementSpeed(this.debug.get().gameplayTuning);
     const laneFrame = enemy.laneMovement.update({
       left: false,
       right: false,
