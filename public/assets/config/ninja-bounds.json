@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "savedAt": "2026-05-27T16:35:35Z",
+  "version": 3,
+  "savedAt": "2026-05-27T19:11:19.573Z",
   "boundsByActor": {
     "mainNinja": {
       "left": {
@@ -12,9 +12,9 @@
             "height": 48
           },
           "collision": {
-            "x": 50,
+            "x": 43,
             "y": 47,
-            "width": 26,
+            "width": 38,
             "height": 45
           },
           "attack": {
@@ -32,9 +32,9 @@
             "height": 48
           },
           "collision": {
-            "x": 50,
+            "x": 43,
             "y": 47,
-            "width": 26,
+            "width": 38,
             "height": 45
           },
           "attack": {
@@ -52,7 +52,7 @@
             "height": 48
           },
           "collision": {
-            "x": 44,
+            "x": 43,
             "y": 47,
             "width": 38,
             "height": 45
@@ -72,9 +72,9 @@
             "height": 48
           },
           "collision": {
-            "x": 50,
+            "x": 43,
             "y": 47,
-            "width": 26,
+            "width": 38,
             "height": 45
           },
           "attack": {
@@ -92,9 +92,9 @@
             "height": 48
           },
           "collision": {
-            "x": 50,
+            "x": 43,
             "y": 47,
-            "width": 26,
+            "width": 38,
             "height": 45
           },
           "attack": {
@@ -106,13 +106,13 @@
         },
         "run": {
           "visual": {
-            "x": 48,
-            "y": 44,
+            "x": 47,
+            "y": 42,
             "width": 34,
-            "height": 52
+            "height": 48
           },
           "collision": {
-            "x": 44,
+            "x": 43,
             "y": 47,
             "width": 38,
             "height": 45
@@ -132,16 +132,16 @@
             "height": 48
           },
           "collision": {
-            "x": 38,
+            "x": 43,
             "y": 47,
-            "width": 41,
-            "height": 46
+            "width": 38,
+            "height": 45
           },
           "attack": {
-            "x": 8,
+            "x": 13,
             "y": 59,
             "width": 35,
-            "height": 18
+            "height": 12
           }
         },
         "walk": {
@@ -152,9 +152,9 @@
             "height": 48
           },
           "collision": {
-            "x": 50,
+            "x": 43,
             "y": 47,
-            "width": 26,
+            "width": 38,
             "height": 45
           },
           "attack": {
@@ -168,8 +168,8 @@
       "right": {
         "attack": {
           "visual": {
-            "x": 48,
-            "y": 44,
+            "x": 49,
+            "y": 37,
             "width": 34,
             "height": 48
           },
@@ -188,8 +188,8 @@
         },
         "death": {
           "visual": {
-            "x": 48,
-            "y": 44,
+            "x": 49,
+            "y": 37,
             "width": 34,
             "height": 48
           },
@@ -228,8 +228,8 @@
         },
         "impact": {
           "visual": {
-            "x": 48,
-            "y": 44,
+            "x": 49,
+            "y": 37,
             "width": 34,
             "height": 48
           },
@@ -248,10 +248,10 @@
         },
         "jump": {
           "visual": {
-            "x": 51,
-            "y": 29,
-            "width": 32,
-            "height": 63
+            "x": 49,
+            "y": 37,
+            "width": 34,
+            "height": 48
           },
           "collision": {
             "x": 47,
@@ -268,10 +268,10 @@
         },
         "run": {
           "visual": {
-            "x": 46,
-            "y": 41,
+            "x": 49,
+            "y": 37,
             "width": 34,
-            "height": 52
+            "height": 48
           },
           "collision": {
             "x": 47,
@@ -288,28 +288,28 @@
         },
         "slash": {
           "visual": {
-            "x": 48,
-            "y": 44,
+            "x": 49,
+            "y": 37,
             "width": 34,
             "height": 48
           },
           "collision": {
             "x": 47,
             "y": 47,
-            "width": 45,
+            "width": 38,
             "height": 45
           },
           "attack": {
-            "x": 81,
-            "y": 55,
-            "width": 40,
+            "x": 80,
+            "y": 59,
+            "width": 35,
             "height": 12
           }
         },
         "walk": {
           "visual": {
-            "x": 48,
-            "y": 44,
+            "x": 49,
+            "y": 37,
             "width": 34,
             "height": 48
           },
@@ -1728,6 +1728,140 @@
       "run": 1,
       "slash": 1,
       "walk": 1
+    }
+  },
+  "laneAnchorsByActor": {
+    "mainNinja": {
+      "left": {
+        "attack": {
+          "x": 64,
+          "y": 123
+        },
+        "death": {
+          "x": 63,
+          "y": 91
+        },
+        "idle": {
+          "x": 64,
+          "y": 92
+        },
+        "impact": {
+          "x": 66,
+          "y": 93
+        },
+        "jump": {
+          "x": 73,
+          "y": 92
+        },
+        "run": {
+          "x": 65,
+          "y": 92
+        },
+        "slash": {
+          "x": 63,
+          "y": 94
+        },
+        "walk": {
+          "x": 64,
+          "y": 122
+        }
+      },
+      "right": {
+        "attack": {
+          "x": 64,
+          "y": 123
+        },
+        "death": {
+          "x": 65,
+          "y": 92
+        },
+        "idle": {
+          "x": 68,
+          "y": 92
+        },
+        "impact": {
+          "x": 66,
+          "y": 92
+        },
+        "jump": {
+          "x": 73,
+          "y": 92
+        },
+        "run": {
+          "x": 70,
+          "y": 92
+        },
+        "slash": {
+          "x": 67,
+          "y": 91
+        },
+        "walk": {
+          "x": 64,
+          "y": 122
+        }
+      }
+    },
+    "enemyNinja": {
+      "left": {
+        "crouching": {
+          "x": 65,
+          "y": 119
+        },
+        "death": {
+          "x": 64,
+          "y": 118
+        },
+        "idle": {
+          "x": 65,
+          "y": 119
+        },
+        "jump": {
+          "x": 65,
+          "y": 119
+        },
+        "run": {
+          "x": 65,
+          "y": 119
+        },
+        "slash": {
+          "x": 65,
+          "y": 119
+        },
+        "walk": {
+          "x": 65,
+          "y": 119
+        }
+      },
+      "right": {
+        "crouching": {
+          "x": 65,
+          "y": 119
+        },
+        "death": {
+          "x": 64,
+          "y": 118
+        },
+        "idle": {
+          "x": 65,
+          "y": 119
+        },
+        "jump": {
+          "x": 65,
+          "y": 119
+        },
+        "run": {
+          "x": 65,
+          "y": 119
+        },
+        "slash": {
+          "x": 65,
+          "y": 119
+        },
+        "walk": {
+          "x": 65,
+          "y": 119
+        }
+      }
     }
   }
 }

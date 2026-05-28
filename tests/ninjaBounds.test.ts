@@ -3,6 +3,7 @@ import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
   FACING_DIRECTIONS,
   NINJA_ACTORS,
+  applyNinjaLaneAnchorToAllActions,
   buildNinjaBoundsExport,
   getDefaultNinjaActionId,
   getNinjaAction,
@@ -116,6 +117,26 @@ describe('ninja bounds config', () => {
     expect(mirrorNinjaLaneAnchorHorizontally({ x: 24, y: 110 })).toEqual({
       x: 103,
       y: 110
+    });
+  });
+
+  it('applies a lane anchor to every animation for the selected actor direction', () => {
+    const config = applyNinjaLaneAnchorToAllActions(
+      DEFAULT_NINJA_BOUNDS_CONFIG,
+      'mainNinja',
+      'right',
+      { x: 70, y: 116 }
+    );
+
+    for (const action of NINJA_ACTORS.find((actor) => actor.id === 'mainNinja')?.actions ?? []) {
+      expect(getNinjaLaneAnchor(config, 'mainNinja', 'right', action.id)).toEqual({
+        x: 70,
+        y: 116
+      });
+    }
+    expect(getNinjaLaneAnchor(config, 'mainNinja', 'left', 'idle')).not.toEqual({
+      x: 70,
+      y: 116
     });
   });
 
