@@ -656,7 +656,7 @@ export function createApp(root: HTMLDivElement | null): void {
         </div>
         <div class="panel-group__row">
           <button id="gym-mirror-lane-anchor" class="shell-button" type="button">Mirror anchor</button>
-          <button id="gym-apply-lane-anchor-all" class="shell-button" type="button">Apply anchor all</button>
+          <button id="gym-apply-lane-anchor-all" class="shell-button" type="button">Apply all</button>
         </div>
       </div>
       <p id="gym-save-status" class="panel-note">Loaded defaults</p>
