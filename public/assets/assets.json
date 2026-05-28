@@ -2827,7 +2827,7 @@
         ],
         "playback": {
           "loop": true,
-          "volume": 0.4
+          "volume": 0.08
         }
       },
       "metadata": {

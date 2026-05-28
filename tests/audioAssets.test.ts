@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_BGM_TRACKS,
   BGM_TRACKS,
+  COMBAT_BGM_VOLUME,
   DEFAULT_BGM_TRACK_ID,
+  GAME_OVER_BGM_VOLUME,
   GAME_OVER_BGM_TRACK,
   GAME_OVER_BGM_TRACK_ID,
   SFX_CUES,
@@ -24,6 +26,10 @@ interface AudioAssetIndexEntry {
     readonly loader?: string;
     readonly audioKey?: string;
     readonly urls?: readonly string[];
+    readonly playback?: {
+      readonly loop?: boolean;
+      readonly volume?: number;
+    };
   };
 }
 
@@ -78,6 +84,14 @@ describe('audio asset catalog', () => {
     expect(ALL_BGM_TRACKS.map((track) => track.id)).toContain(GAME_OVER_BGM_TRACK_ID);
     expect(getBgmTrack(GAME_OVER_BGM_TRACK_ID)).toEqual(GAME_OVER_BGM_TRACK);
     expect(GAME_OVER_BGM_TRACK.durationMs).toBeGreaterThanOrEqual(60_000);
+    expect(GAME_OVER_BGM_TRACK.volume).toBe(GAME_OVER_BGM_VOLUME);
+  });
+
+  it('keeps selectable combat BGM mixed low under foreground SFX', () => {
+    for (const track of BGM_TRACKS) {
+      expect(track.volume).toBe(COMBAT_BGM_VOLUME);
+      expect(track.volume).toBeLessThanOrEqual(0.1);
+    }
   });
 
   it('defines major combat and UI sound effect cues', () => {
@@ -127,7 +141,11 @@ describe('audio asset catalog', () => {
         phaser: {
           loader: 'audio',
           audioKey: track.key,
-          urls: [track.path]
+          urls: [track.path],
+          playback: {
+            loop: true,
+            volume: track.volume
+          }
         },
         metadata: {
           requestedDurationMs: track.durationMs
