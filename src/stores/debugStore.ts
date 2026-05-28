@@ -90,7 +90,7 @@ export interface DebugState {
   readonly showPointerProbe: boolean;
   readonly showEnemyRanges: boolean;
   readonly showLaneGuides: boolean;
-  readonly enemyChaseEnabled: boolean;
+  readonly enemyAiEnabled: boolean;
   readonly backgroundFileName: DebugBackgroundFileName;
   readonly bgmTrackId: BgmTrackId;
   readonly gameplayTuning: GameplayTuning;
@@ -123,8 +123,8 @@ export interface DebugStore extends WritableStore<DebugState> {
   setShowPointerProbe(showPointerProbe: boolean): void;
   setShowEnemyRanges(showEnemyRanges: boolean): void;
   setShowLaneGuides(showLaneGuides: boolean): void;
-  setEnemyChaseEnabled(enemyChaseEnabled: boolean): void;
-  toggleEnemyChase(): void;
+  setEnemyAiEnabled(enemyAiEnabled: boolean): void;
+  toggleEnemyAi(): void;
   setBackgroundFileName(backgroundFileName: DebugBackgroundFileName): void;
   setBgmTrackId(bgmTrackId: BgmTrackId): void;
   setGameplayTuning(gameplayTuning: GameplayTuning): void;
@@ -173,7 +173,7 @@ function createInitialDebugState(): DebugState {
     showPointerProbe: false,
     showEnemyRanges: false,
     showLaneGuides: true,
-    enemyChaseEnabled: false,
+    enemyAiEnabled: true,
     backgroundFileName: DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
     bgmTrackId: DEFAULT_BGM_TRACK_ID,
     gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
@@ -266,11 +266,11 @@ export function createDebugStore(): DebugStore {
     setShowLaneGuides: (showLaneGuides) => {
       store.update((state) => ({ ...state, showLaneGuides }));
     },
-    setEnemyChaseEnabled: (enemyChaseEnabled) => {
-      store.update((state) => ({ ...state, enemyChaseEnabled }));
+    setEnemyAiEnabled: (enemyAiEnabled) => {
+      store.update((state) => ({ ...state, enemyAiEnabled }));
     },
-    toggleEnemyChase: () => {
-      store.update((state) => ({ ...state, enemyChaseEnabled: !state.enemyChaseEnabled }));
+    toggleEnemyAi: () => {
+      store.update((state) => ({ ...state, enemyAiEnabled: !state.enemyAiEnabled }));
     },
     setBackgroundFileName: (backgroundFileName) => {
       store.update((state) => ({ ...state, backgroundFileName }));
@@ -343,7 +343,7 @@ export function createDebugStore(): DebugStore {
         showPointerProbe: current.showPointerProbe,
         showEnemyRanges: current.showEnemyRanges,
         showLaneGuides: current.showLaneGuides,
-        enemyChaseEnabled: current.enemyChaseEnabled,
+        enemyAiEnabled: current.enemyAiEnabled,
         backgroundFileName: current.backgroundFileName,
         bgmTrackId: current.bgmTrackId,
         gameplayTuning: current.gameplayTuning,

@@ -393,7 +393,7 @@ export function createApp(root: HTMLDivElement | null): void {
       <button id="pause-toggle" class="shell-button" data-variant="primary" type="button">Pause</button>
       <button id="reset-actors" class="shell-button" type="button">Reset actors</button>
       <label class="toggle-row"><input id="show-world" type="checkbox" /> World bounds</label>
-      <label class="toggle-row"><input id="enemy-chase" type="checkbox" /> Enemy chase</label>
+      <label class="toggle-row"><input id="enemy-ai" type="checkbox" /> Enemy AI</label>
       <label class="select-row" for="background-file">
         <span>Background</span>
         <select id="background-file"></select>
@@ -756,7 +756,7 @@ export function createApp(root: HTMLDivElement | null): void {
   );
   const laneResetButton = requireElement(debugControls, '#lane-reset', HTMLButtonElement);
   const laneSaveStatus = requireElement(debugControls, '#lane-save-status', HTMLElement);
-  const enemyChaseToggle = requireElement(debugControls, '#enemy-chase', HTMLInputElement);
+  const enemyAiToggle = requireElement(debugControls, '#enemy-ai', HTMLInputElement);
   const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
   const bgmTrackSelect = requireElement(debugControls, '#bgm-track', HTMLSelectElement);
   const tuningPlayerSpeedInput = requireElement(
@@ -1965,7 +1965,7 @@ export function createApp(root: HTMLDivElement | null): void {
     showPointerProbeToggle.checked = state.showPointerProbe;
     showEnemyRangesToggle.checked = state.showEnemyRanges;
     showLaneGuidesToggle.checked = state.showLaneGuides;
-    enemyChaseToggle.checked = state.enemyChaseEnabled;
+    enemyAiToggle.checked = state.enemyAiEnabled;
     backgroundFileSelect.value = state.backgroundFileName;
     bgmTrackSelect.value = state.bgmTrackId;
     setControlGroupHidden(laneEditorControls, state.activeScene !== SceneKeys.LaneEditor);
@@ -2139,8 +2139,8 @@ export function createApp(root: HTMLDivElement | null): void {
     debugStore.setShowLaneGuides(showLaneGuidesToggle.checked);
   });
 
-  enemyChaseToggle.addEventListener('change', () => {
-    debugStore.setEnemyChaseEnabled(enemyChaseToggle.checked);
+  enemyAiToggle.addEventListener('change', () => {
+    debugStore.setEnemyAiEnabled(enemyAiToggle.checked);
   });
 
   backgroundFileSelect.addEventListener('change', () => {
