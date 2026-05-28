@@ -57,10 +57,10 @@ function expectAudioFile(publicUrl: string): number {
 }
 
 describe('audio asset catalog', () => {
-  it('defines four selectable ninja combat BGM tracks', () => {
-    expect(BGM_TRACKS).toHaveLength(4);
+  it('defines Boss Duel as the selectable ninja combat BGM track', () => {
+    expect(BGM_TRACKS).toHaveLength(1);
     expect(isBgmTrackId(DEFAULT_BGM_TRACK_ID)).toBe(true);
-    expect(getBgmTrack(DEFAULT_BGM_TRACK_ID).label).toBe('Shadow Dojo');
+    expect(getBgmTrack(DEFAULT_BGM_TRACK_ID).label).toBe('Boss Duel');
 
     const ids = new Set(BGM_TRACKS.map((track) => track.id));
     const keys = new Set(BGM_TRACKS.map((track) => track.key));
