@@ -145,7 +145,7 @@ export const GAMEPLAY_TUNING_LIMITS = {
 
 export const DEFAULT_GAMEPLAY_TUNING: GameplayTuning = {
   playerSpeed: 260,
-  enemySpeed: 260,
+  enemySpeed: 200,
   enemyRecoveryMs: 900,
   playerKnockbackSpeed: 360,
   roundEnemyBaseCount: 1,
@@ -154,6 +154,8 @@ export const DEFAULT_GAMEPLAY_TUNING: GameplayTuning = {
   roundEnemyGrowthMode: 'fibonacci',
   roundIntermissionMs: 1200
 };
+
+export const ENEMY_MOVEMENT_SPEED_PLAYER_RATIO = 0.8;
 
 export const DEFAULT_SANDBOX_LANE_SETTINGS: SandboxLaneSettings =
   createDefaultThreeLaneYSettings({ worldHeight: 720 });
@@ -432,6 +434,16 @@ export function normalizeGameplayTuning(value: unknown): GameplayTuning {
       DEFAULT_GAMEPLAY_TUNING.roundIntermissionMs
     )
   };
+}
+
+export function getEnemyMovementSpeed(gameplayTuning: GameplayTuning): number {
+  const tuning = normalizeGameplayTuning(gameplayTuning);
+  const maxEnemySpeed = Math.max(
+    GAMEPLAY_TUNING_LIMITS.enemySpeed.min,
+    Math.floor(tuning.playerSpeed * ENEMY_MOVEMENT_SPEED_PLAYER_RATIO)
+  );
+
+  return Math.min(tuning.enemySpeed, maxEnemySpeed);
 }
 
 export function createDefaultSandboxLaneSettings(
