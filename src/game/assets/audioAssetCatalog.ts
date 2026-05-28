@@ -158,9 +158,9 @@ export const SFX_CUES = [
     id: 'enemy-defeat',
     key: 'sfx.enemyDefeat',
     label: 'Enemy Defeat',
-    path: '/assets/sfx/enemy-defeat.mp3',
-    filePath: 'public/assets/sfx/enemy-defeat.mp3',
-    volume: 0.6,
+    path: '/assets/sfx/enemy-defeat-loud.mp3',
+    filePath: 'public/assets/sfx/enemy-defeat-loud.mp3',
+    volume: 0.85,
     theme: 'defeated ninja fall with metal ring'
   },
   {

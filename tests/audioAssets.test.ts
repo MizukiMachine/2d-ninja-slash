@@ -96,6 +96,8 @@ describe('audio asset catalog', () => {
       'round-start'
     ]);
     expect(getSfxCue('player-slash').key).toBe('sfx.playerSlash');
+    expect(getSfxCue('enemy-defeat').path).toBe('/assets/sfx/enemy-defeat-loud.mp3');
+    expect(getSfxCue('enemy-defeat').volume).toBe(0.85);
     expect(getSfxCue('main-ninja-death').key).toBe('sfx.mainNinjaDeath');
   });
 

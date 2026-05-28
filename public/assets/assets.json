@@ -3156,19 +3156,19 @@
       "key": "sfx.enemyDefeat",
       "type": "sfx-audio",
       "label": "Enemy Defeat",
-      "filePath": "public/assets/sfx/enemy-defeat.mp3",
-      "path": "/assets/sfx/enemy-defeat.mp3",
+      "filePath": "public/assets/sfx/enemy-defeat-loud.mp3",
+      "path": "/assets/sfx/enemy-defeat-loud.mp3",
       "format": "mp3",
       "animationUse": "combat and UI sound effect",
       "phaser": {
         "loader": "audio",
         "audioKey": "sfx.enemyDefeat",
         "urls": [
-          "/assets/sfx/enemy-defeat.mp3"
+          "/assets/sfx/enemy-defeat-loud.mp3"
         ],
         "playback": {
           "loop": false,
-          "volume": 0.6
+          "volume": 0.85
         }
       },
       "metadata": {
@@ -3176,7 +3176,7 @@
         "theme": "defeated ninja fall with metal ring",
         "generatedBy": "ElevenLabs sound-generation",
         "generatedAt": "2026-05-28",
-        "sizeBytes": 23031,
+        "sizeBytes": 23030,
         "sfxCue": true
       }
     },

@@ -136,9 +136,6 @@ const PLAYER_HEALTH_BAR_HEIGHT = 30;
 const PROGRESSION_HUD_X_OFFSET = 24;
 const PROGRESSION_HUD_Y = 24;
 const ROUND_BANNER_Y = 72;
-const ENEMY_HEALTH_BAR_WIDTH = 70;
-const ENEMY_HEALTH_BAR_HEIGHT = 8;
-const ENEMY_HEALTH_BAR_OFFSET_Y = 16;
 const PLAYER_DEATH_OVERLAY_FALLBACK_BUFFER_MS = 250;
 const PLAYER_DEATH_OVERLAY_RECHECK_MS = 120;
 const ENEMY_CORPSE_HOLD_MS = 1300;
@@ -2339,11 +2336,13 @@ export class SandboxScene extends BaseScene {
 
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
-    this.playSfx('hit');
 
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
+      return;
     }
+
+    this.playSfx('hit');
   }
 
   private startEnemyDeath(enemy: EnemyState): void {
@@ -2815,7 +2814,6 @@ export class SandboxScene extends BaseScene {
 
     graphic.clear();
     this.renderPlayerHealthBar(graphic, time);
-    this.renderEnemyHealthBars(graphic);
   }
 
   private renderProgressionHud(): void {
@@ -2884,56 +2882,6 @@ export class SandboxScene extends BaseScene {
       case 'critical':
         return 0xe94b5f;
     }
-  }
-
-  private renderEnemyHealthBars(graphic: Phaser.GameObjects.Graphics): void {
-    for (const enemy of this.enemies) {
-      this.renderEnemyHealthBar(graphic, enemy);
-    }
-  }
-
-  private renderEnemyHealthBar(
-    graphic: Phaser.GameObjects.Graphics,
-    enemy: EnemyState
-  ): void {
-    if (
-      !enemy.sprite.active ||
-      !enemy.roundActive ||
-      enemy.health <= 0 ||
-      enemy.action === 'dead'
-    ) {
-      return;
-    }
-
-    const ratio = getHealthRatio(enemy.health, ENEMY_MAX_HEALTH);
-    const visualBounds = this.getWorldRectFromFrameRect(
-      enemy.sprite,
-      getNinjaAnimationBounds(
-        this.app.getNinjaBoundsConfig(),
-        'enemyNinja',
-        enemy.facingDirection,
-        this.getEnemyBoundsAction(enemy)
-      ).visual,
-      this.visualBoundsRect
-    );
-    const x = Math.round(
-      visualBounds.x + visualBounds.width / 2 - ENEMY_HEALTH_BAR_WIDTH / 2
-    );
-    const y = Math.round(
-      visualBounds.y - ENEMY_HEALTH_BAR_OFFSET_Y - ENEMY_HEALTH_BAR_HEIGHT
-    );
-
-    graphic.fillStyle(0x050910, 0.76);
-    graphic.fillRect(x, y, ENEMY_HEALTH_BAR_WIDTH, ENEMY_HEALTH_BAR_HEIGHT);
-    graphic.lineStyle(2, 0xf8fbff, 0.78);
-    graphic.strokeRect(x, y, ENEMY_HEALTH_BAR_WIDTH, ENEMY_HEALTH_BAR_HEIGHT);
-    graphic.fillStyle(0xe94b5f, 0.96);
-    graphic.fillRect(
-      x + 2,
-      y + 2,
-      Math.round((ENEMY_HEALTH_BAR_WIDTH - 4) * ratio),
-      ENEMY_HEALTH_BAR_HEIGHT - 4
-    );
   }
 
   private renderDebugOverlays(): void {
