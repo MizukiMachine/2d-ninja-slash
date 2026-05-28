@@ -7,6 +7,7 @@ import {
   normalizeDebugElementsConfig,
   normalizeLevelProgress
 } from '../debugFeatures';
+import { GAME_UI_FONT_FAMILY } from '../gameFonts';
 import { DebugLabScene } from './DebugLabScene';
 
 export class LevelProgressScene extends DebugLabScene {
@@ -79,7 +80,7 @@ export class LevelProgressScene extends DebugLabScene {
       const title = this.add
         .text(-cardWidth / 2 + 18, -cardHeight / 2 + 16, level.label, {
           color: '#f8fafc',
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: GAME_UI_FONT_FAMILY,
           fontSize: '20px',
           fontStyle: '700'
         })
@@ -95,7 +96,7 @@ export class LevelProgressScene extends DebugLabScene {
       const footer = this.add
         .text(-cardWidth / 2 + 18, cardHeight / 2 - 34, unlocked ? 'Open baseline' : 'Unlock in debug panel', {
           color: unlocked ? '#64b5ff' : '#8395aa',
-          fontFamily: 'Arial, Helvetica, sans-serif',
+          fontFamily: GAME_UI_FONT_FAMILY,
           fontSize: '13px',
           fontStyle: '700'
         })

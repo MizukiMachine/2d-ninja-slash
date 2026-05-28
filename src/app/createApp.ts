@@ -2006,7 +2006,7 @@ export function createApp(root: HTMLDivElement | null): void {
         )} hits ${state.attack.hitCount}`
       : 'inactive';
     roundReadout.textContent =
-      `R${state.round.round} ${state.round.defeated}/${state.round.enemies} KO ${state.round.totalDefeated} ${roundTime}`;
+      `ラウンド${state.round.round} ${state.round.defeated}/${state.round.enemies} 倒した敵 ${state.round.totalDefeated} ${roundTime}`;
     renderGymControls();
   };
 

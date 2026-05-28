@@ -7,6 +7,7 @@ import {
   type DebugBackgroundFileName
 } from '../assets/ninjaAssetCatalog';
 import type { BackgroundFitMode } from '../debugFeatures';
+import { GAME_UI_FONT_FAMILY } from '../gameFonts';
 
 const BACKGROUND_DEPTH = -20;
 
@@ -95,7 +96,7 @@ export abstract class DebugLabScene extends BaseScene {
       .text(24, 24, title, {
         backgroundColor: 'rgba(2, 6, 23, 0.62)',
         color: '#f8fafc',
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '20px',
         fontStyle: '700',
         padding: { x: 12, y: 8 }

@@ -4,6 +4,7 @@ import type { SfxCueId } from '../assets/audioAssetCatalog';
 import type { GameProfile } from '../profiles';
 import type { SceneKey } from '../sceneKeys';
 import type { ReadableStore, StoreListener, Unsubscribe } from '../../stores/store';
+import { GAME_DISPLAY_FONT_FAMILY, GAME_UI_FONT_FAMILY } from '../gameFonts';
 
 interface TextButtonConfig {
   readonly x: number;
@@ -71,7 +72,7 @@ export abstract class BaseScene extends Phaser.Scene {
   protected addTitle(text: string, y: number): Phaser.GameObjects.Text {
     return this.add
       .text(this.centerX, y, text, {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_DISPLAY_FONT_FAMILY,
         fontSize: '42px',
         fontStyle: '700',
         color: '#f7fbff'
@@ -82,7 +83,7 @@ export abstract class BaseScene extends Phaser.Scene {
   protected addLabel(text: string, y: number): Phaser.GameObjects.Text {
     return this.add
       .text(this.centerX, y, text, {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '20px',
         color: '#9fb3c9'
       })
@@ -103,7 +104,7 @@ export abstract class BaseScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x3c8edb, 0.9);
     const text = this.add
       .text(0, 0, label, {
-        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '22px',
         color: '#f7fbff'
       })
