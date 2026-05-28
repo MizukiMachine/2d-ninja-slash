@@ -46,6 +46,14 @@ import {
   getNinjaLaneYFromSprite,
   getNinjaSpritePositionForLane
 } from '../ninjaLanePresentation';
+import {
+  getEnemyApproachDirection,
+  getEnemyChaseMovementSpeed,
+  getEnemyFacingDirectionFromPatrol,
+  getEnemyPatrolMovementSpeed,
+  resolveEnemyPatrolState,
+  type EnemyPatrolDirection
+} from '../enemyBehavior';
 import { GAME_OVER_BGM_TRACK_ID } from '../assets/audioAssetCatalog';
 
 type FacingDirection = 'left' | 'right';
@@ -95,6 +103,8 @@ interface EnemyState {
   health: number;
   roundActive: boolean;
   defeated: boolean;
+  patrolDirection: EnemyPatrolDirection;
+  nextPatrolDecisionAt: number;
   recoveryUntil: number;
   attackDamageDealt: boolean;
   attackHitCount: number;
@@ -108,7 +118,6 @@ interface EnemySpawnPoint {
   readonly x: number;
   readonly y: number;
   readonly laneId: PlayerLaneId;
-  readonly facingDirection: FacingDirection;
 }
 
 const NINJA_ACTOR_ROOT_URL = '/assets/actors';
@@ -127,9 +136,6 @@ const PLAYER_HEALTH_BAR_HEIGHT = 30;
 const PROGRESSION_HUD_X_OFFSET = 24;
 const PROGRESSION_HUD_Y = 24;
 const ROUND_BANNER_Y = 72;
-const ENEMY_HEALTH_BAR_WIDTH = 70;
-const ENEMY_HEALTH_BAR_HEIGHT = 8;
-const ENEMY_HEALTH_BAR_OFFSET_Y = 16;
 const PLAYER_DEATH_OVERLAY_FALLBACK_BUFFER_MS = 250;
 const PLAYER_DEATH_OVERLAY_RECHECK_MS = 120;
 const ENEMY_CORPSE_HOLD_MS = 1300;
@@ -140,6 +146,10 @@ const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 24;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 9;
 const ENEMY_LANE_EDGE_SPAWN_INSET = 150;
 const ENEMY_LANE_EDGE_SPAWN_COLUMN_SPACING = 44;
+const ENEMY_FRONT_DETECTION_DISTANCE = 320;
+const ENEMY_PATROL_WORLD_PADDING = 90;
+const ENEMY_PATROL_MIN_DECISION_MS = 850;
+const ENEMY_PATROL_MAX_DECISION_MS = 2200;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -496,6 +506,8 @@ export class SandboxScene extends BaseScene {
       health: ENEMY_MAX_HEALTH,
       roundActive: false,
       defeated: false,
+      patrolDirection: facingDirection === 'left' ? -1 : 1,
+      nextPatrolDecisionAt: 0,
       recoveryUntil: 0,
       attackDamageDealt: false,
       attackHitCount: 0,
@@ -629,7 +641,9 @@ export class SandboxScene extends BaseScene {
     const spawn = this.getEnemySpawnPoint(index);
 
     enemy.laneMovement.setLayout(this.getLaneLayout());
-    enemy.facingDirection = spawn.facingDirection;
+    enemy.patrolDirection = this.getRandomEnemyPatrolDirection();
+    enemy.nextPatrolDecisionAt = this.getNextEnemyPatrolDecisionAt(this.time.now);
+    enemy.facingDirection = getEnemyFacingDirectionFromPatrol(enemy.patrolDirection);
     enemy.action = 'idle';
     enemy.health = ENEMY_MAX_HEALTH;
     enemy.roundActive = true;
@@ -670,6 +684,8 @@ export class SandboxScene extends BaseScene {
     enemy.defeated = false;
     enemy.action = 'idle';
     enemy.health = ENEMY_MAX_HEALTH;
+    enemy.patrolDirection = 1;
+    enemy.nextPatrolDecisionAt = 0;
     enemy.recoveryUntil = 0;
     enemy.attackDamageDealt = false;
     enemy.corpseTimer?.remove(false);
@@ -694,8 +710,7 @@ export class SandboxScene extends BaseScene {
     return {
       x: spawn.x,
       y: spawn.y,
-      laneId: spawn.laneId,
-      facingDirection: spawn.side === 'right' ? 'left' : 'right'
+      laneId: spawn.laneId
     };
   }
 
@@ -798,7 +813,7 @@ export class SandboxScene extends BaseScene {
     this.updateRoundTransition(delta);
 
     for (const enemy of this.enemies) {
-      this.updateEnemy(enemy, time, delta / 1000);
+      this.updateEnemy(enemy, time);
     }
 
     if (this.currentAction === 'hurt') {
@@ -1603,7 +1618,7 @@ export class SandboxScene extends BaseScene {
     this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.player.setVelocity(0, 0);
-    this.playSfx('enemy-slash');
+    this.playSfx('player-slash');
     this.playNinjaAnimation(action, true);
   }
 
@@ -1690,7 +1705,7 @@ export class SandboxScene extends BaseScene {
     this.syncPlayerToCurrentLane();
   }
 
-  private updateEnemy(enemy: EnemyState, time: number, deltaSeconds: number): void {
+  private updateEnemy(enemy: EnemyState, time: number): void {
     if (this.player === null) {
       return;
     }
@@ -1724,26 +1739,88 @@ export class SandboxScene extends BaseScene {
       }
     }
 
-    if (enemy.action === 'jump' || enemy.laneMovement.isTransitioning) {
-      this.updateEnemyLaneJumpMovement(enemy, deltaSeconds);
-      return;
-    }
-
-    if (!this.debug.get().enemyChaseEnabled) {
+    if (!this.debug.get().enemyAiEnabled) {
       enemy.sprite.setVelocity(0, 0);
       this.syncEnemyToCurrentLane(enemy);
       this.playEnemyAnimation(enemy, 'idle');
       return;
     }
 
-    const targetLaneId = this.playerLaneMovement?.targetLaneId ?? 'middle';
+    this.syncEnemyToCurrentLane(enemy);
 
-    if (enemy.laneMovement.currentLaneId !== targetLaneId) {
-      this.startEnemyLaneJump(enemy, targetLaneId);
+    if (this.canEnemySlashReachPlayer(enemy)) {
+      this.startEnemyAttack(enemy);
       return;
     }
 
-    this.syncEnemyToCurrentLane(enemy);
+    const approachDirection = this.getEnemyApproachDirection(enemy);
+
+    if (approachDirection !== null) {
+      const enemySpeed = getEnemyChaseMovementSpeed(
+        getEnemyMovementSpeed(this.debug.get().gameplayTuning)
+      );
+
+      enemy.patrolDirection = approachDirection;
+      this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(approachDirection, 0));
+      enemy.sprite.setVelocity(approachDirection * enemySpeed, 0);
+      this.playEnemyAnimation(enemy, 'run');
+      return;
+    }
+
+    this.updateEnemyPatrol(enemy, time);
+  }
+
+  private updateEnemyPatrol(enemy: EnemyState, time: number): void {
+    const direction = this.resolveEnemyPatrolDirection(enemy, time);
+    const enemySpeed = getEnemyPatrolMovementSpeed(
+      getEnemyMovementSpeed(this.debug.get().gameplayTuning)
+    );
+
+    this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(direction, 0));
+    enemy.sprite.setVelocity(direction * enemySpeed, 0);
+    this.playEnemyAnimation(enemy, 'walk');
+  }
+
+  private resolveEnemyPatrolDirection(
+    enemy: EnemyState,
+    time: number
+  ): EnemyPatrolDirection {
+    const enemyLaneX = this.getActorLaneXFromSprite(
+      enemy.sprite,
+      'enemyNinja',
+      enemy.facingDirection,
+      this.getEnemyBoundsAction(enemy)
+    );
+    const leftLimit = ENEMY_PATROL_WORLD_PADDING;
+    const rightLimit = this.profile.width - ENEMY_PATROL_WORLD_PADDING;
+    const patrolState = resolveEnemyPatrolState({
+      enemyLaneX,
+      patrolDirection: enemy.patrolDirection,
+      time,
+      nextDecisionAt: enemy.nextPatrolDecisionAt,
+      leftLimit,
+      rightLimit,
+      choosePatrolDirection: () => this.getRandomEnemyPatrolDirection(),
+      chooseNextDecisionAt: (currentTime) => this.getNextEnemyPatrolDecisionAt(currentTime)
+    });
+
+    enemy.patrolDirection = patrolState.patrolDirection;
+    enemy.nextPatrolDecisionAt = patrolState.nextDecisionAt;
+
+    return enemy.patrolDirection;
+  }
+
+  private getEnemyApproachDirection(enemy: EnemyState): EnemyPatrolDirection | null {
+    const playerLaneMovement = this.playerLaneMovement;
+
+    if (
+      this.player === null ||
+      playerLaneMovement === null ||
+      playerLaneMovement.isTransitioning ||
+      enemy.laneMovement.currentLaneId !== playerLaneMovement.currentLaneId
+    ) {
+      return null;
+    }
 
     const playerLaneX = this.getActorLaneXFromSprite(
       this.player,
@@ -1757,91 +1834,35 @@ export class SandboxScene extends BaseScene {
       enemy.facingDirection,
       this.getEnemyBoundsAction(enemy)
     );
-    const toPlayerX = playerLaneX - enemyLaneX;
-    const distanceToPlayerX = Math.abs(toPlayerX);
 
-    if (distanceToPlayerX > 0) {
-      this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(toPlayerX, 0));
-    }
-
-    if (this.canEnemySlashReachPlayer(enemy)) {
-      this.startEnemyAttack(enemy);
-      return;
-    }
-
-    if (distanceToPlayerX === 0) {
-      enemy.sprite.setVelocity(0, 0);
-      this.playEnemyAnimation(enemy, 'idle');
-      return;
-    }
-
-    const enemySpeed = getEnemyMovementSpeed(this.debug.get().gameplayTuning);
-    enemy.sprite.setVelocity(Math.sign(toPlayerX) * enemySpeed, 0);
-    this.playEnemyAnimation(enemy, 'walk');
-  }
-
-  private startEnemyLaneJump(enemy: EnemyState, targetLaneId: PlayerLaneId): void {
-    if (!enemy.laneMovement.requestLaneStepToward(targetLaneId)) {
-      return;
-    }
-
-    enemy.sprite.setVelocity(0, 0);
-
-    if (this.player !== null) {
-      this.updateEnemyFacingFromVector(
-        enemy,
-        new Phaser.Math.Vector2(
-          this.getActorLaneXFromSprite(
-            this.player,
-            'mainNinja',
-            this.facingDirection,
-            this.getPlayerBoundsAction()
-          ) -
-            this.getActorLaneXFromSprite(
-              enemy.sprite,
-              'enemyNinja',
-              enemy.facingDirection,
-              this.getEnemyBoundsAction(enemy)
-            ),
-          0
-        )
-      );
-    }
-
-    this.clearEnemyAttackHitArea(enemy);
-    this.playEnemyAnimation(enemy, 'jump', true);
-  }
-
-  private updateEnemyLaneJumpMovement(enemy: EnemyState, deltaSeconds: number): void {
-    const enemySpeed = getEnemyMovementSpeed(this.debug.get().gameplayTuning);
-    const laneFrame = enemy.laneMovement.update({
-      left: false,
-      right: false,
-      speed: enemySpeed,
-      deltaSeconds
+    return getEnemyApproachDirection({
+      enemyLaneId: enemy.laneMovement.currentLaneId,
+      playerLaneId: playerLaneMovement.currentLaneId,
+      playerIsTransitioning: playerLaneMovement.isTransitioning,
+      enemyLaneX,
+      playerLaneX,
+      enemyFacingDirection: enemy.facingDirection,
+      detectionDistance: ENEMY_FRONT_DETECTION_DISTANCE
     });
+  }
 
-    this.setEnemyPositionForLane(
-      enemy,
-      this.getActorLaneXFromSprite(
-        enemy.sprite,
-        'enemyNinja',
-        enemy.facingDirection,
-        this.getEnemyBoundsAction(enemy)
-      ),
-      laneFrame.y,
-      'jump'
+  private isPlayerOnEnemyLane(enemy: EnemyState): boolean {
+    return (
+      this.playerLaneMovement !== null &&
+      !this.playerLaneMovement.isTransitioning &&
+      enemy.laneMovement.currentLaneId === this.playerLaneMovement.currentLaneId
     );
-    enemy.sprite.setVelocity(0, 0);
+  }
 
-    if (!laneFrame.completedTransition) {
-      this.playEnemyAnimation(enemy, 'jump');
-      return;
-    }
+  private getRandomEnemyPatrolDirection(): EnemyPatrolDirection {
+    return Phaser.Math.Between(0, 1) === 0 ? -1 : 1;
+  }
 
-    enemy.action = 'idle';
-    this.clearEnemyAttackHitArea(enemy);
-    this.playEnemyAnimation(enemy, 'idle');
+  private getNextEnemyPatrolDecisionAt(time: number): number {
+    return time + Phaser.Math.Between(
+      ENEMY_PATROL_MIN_DECISION_MS,
+      ENEMY_PATROL_MAX_DECISION_MS
+    );
   }
 
   private syncEnemyToCurrentLane(enemy: EnemyState): void {
@@ -1885,7 +1906,7 @@ export class SandboxScene extends BaseScene {
         0
       )
     );
-    this.playSfx('player-slash');
+    this.playSfx('enemy-slash');
     this.playEnemyAnimation(enemy, 'slash', true);
   }
 
@@ -2315,11 +2336,13 @@ export class SandboxScene extends BaseScene {
 
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
-    this.playSfx('hit');
 
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
+      return;
     }
+
+    this.playSfx('hit');
   }
 
   private startEnemyDeath(enemy: EnemyState): void {
@@ -2456,7 +2479,8 @@ export class SandboxScene extends BaseScene {
       this.gameOver ||
       !canPlayerReceiveEnemyAttack(this.currentAction) ||
       !enemy.roundActive ||
-      enemy.action === 'dead'
+      enemy.action === 'dead' ||
+      !this.isPlayerOnEnemyLane(enemy)
     ) {
       return false;
     }
@@ -2790,7 +2814,6 @@ export class SandboxScene extends BaseScene {
 
     graphic.clear();
     this.renderPlayerHealthBar(graphic, time);
-    this.renderEnemyHealthBars(graphic);
   }
 
   private renderProgressionHud(): void {
@@ -2859,56 +2882,6 @@ export class SandboxScene extends BaseScene {
       case 'critical':
         return 0xe94b5f;
     }
-  }
-
-  private renderEnemyHealthBars(graphic: Phaser.GameObjects.Graphics): void {
-    for (const enemy of this.enemies) {
-      this.renderEnemyHealthBar(graphic, enemy);
-    }
-  }
-
-  private renderEnemyHealthBar(
-    graphic: Phaser.GameObjects.Graphics,
-    enemy: EnemyState
-  ): void {
-    if (
-      !enemy.sprite.active ||
-      !enemy.roundActive ||
-      enemy.health <= 0 ||
-      enemy.action === 'dead'
-    ) {
-      return;
-    }
-
-    const ratio = getHealthRatio(enemy.health, ENEMY_MAX_HEALTH);
-    const visualBounds = this.getWorldRectFromFrameRect(
-      enemy.sprite,
-      getNinjaAnimationBounds(
-        this.app.getNinjaBoundsConfig(),
-        'enemyNinja',
-        enemy.facingDirection,
-        this.getEnemyBoundsAction(enemy)
-      ).visual,
-      this.visualBoundsRect
-    );
-    const x = Math.round(
-      visualBounds.x + visualBounds.width / 2 - ENEMY_HEALTH_BAR_WIDTH / 2
-    );
-    const y = Math.round(
-      visualBounds.y - ENEMY_HEALTH_BAR_OFFSET_Y - ENEMY_HEALTH_BAR_HEIGHT
-    );
-
-    graphic.fillStyle(0x050910, 0.76);
-    graphic.fillRect(x, y, ENEMY_HEALTH_BAR_WIDTH, ENEMY_HEALTH_BAR_HEIGHT);
-    graphic.lineStyle(2, 0xf8fbff, 0.78);
-    graphic.strokeRect(x, y, ENEMY_HEALTH_BAR_WIDTH, ENEMY_HEALTH_BAR_HEIGHT);
-    graphic.fillStyle(0xe94b5f, 0.96);
-    graphic.fillRect(
-      x + 2,
-      y + 2,
-      Math.round((ENEMY_HEALTH_BAR_WIDTH - 4) * ratio),
-      ENEMY_HEALTH_BAR_HEIGHT - 4
-    );
   }
 
   private renderDebugOverlays(): void {

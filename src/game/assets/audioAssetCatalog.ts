@@ -22,39 +22,6 @@ export interface SfxCue {
 
 export const BGM_TRACKS = [
   {
-    id: 'shadow-dojo',
-    key: 'bgm.shadowDojo',
-    label: 'Shadow Dojo',
-    path: '/assets/bgm/shadow-dojo.mp3',
-    filePath: 'public/assets/bgm/shadow-dojo.mp3',
-    volume: 0.42,
-    loop: true,
-    durationMs: 90_000,
-    theme: 'taiko and shakuhachi stealth combat loop'
-  },
-  {
-    id: 'moonlit-pursuit',
-    key: 'bgm.moonlitPursuit',
-    label: 'Moonlit Pursuit',
-    path: '/assets/bgm/moonlit-pursuit.mp3',
-    filePath: 'public/assets/bgm/moonlit-pursuit.mp3',
-    volume: 0.4,
-    loop: true,
-    durationMs: 90_000,
-    theme: 'fast ninja chase with koto plucks and percussion'
-  },
-  {
-    id: 'bamboo-ambush',
-    key: 'bgm.bambooAmbush',
-    label: 'Bamboo Ambush',
-    path: '/assets/bgm/bamboo-ambush.mp3',
-    filePath: 'public/assets/bgm/bamboo-ambush.mp3',
-    volume: 0.38,
-    loop: true,
-    durationMs: 90_000,
-    theme: 'tense bamboo forest ambush groove'
-  },
-  {
     id: 'boss-duel',
     key: 'bgm.bossDuel',
     label: 'Boss Duel',
@@ -63,7 +30,7 @@ export const BGM_TRACKS = [
     volume: 0.4,
     loop: true,
     durationMs: 90_000,
-    theme: 'dramatic duel rhythm with heavy war drums'
+    theme: 'immediate boss duel melody with heavy war drums'
   }
 ] as const satisfies readonly BgmTrack[];
 
@@ -88,7 +55,7 @@ export const ALL_BGM_TRACKS = [
 
 export type BgmTrackId = (typeof ALL_BGM_TRACKS)[number]['id'];
 
-export const DEFAULT_BGM_TRACK_ID: BgmTrackId = 'shadow-dojo';
+export const DEFAULT_BGM_TRACK_ID: BgmTrackId = 'boss-duel';
 
 export const SFX_CUES = [
   {
@@ -158,9 +125,9 @@ export const SFX_CUES = [
     id: 'enemy-defeat',
     key: 'sfx.enemyDefeat',
     label: 'Enemy Defeat',
-    path: '/assets/sfx/enemy-defeat.mp3',
-    filePath: 'public/assets/sfx/enemy-defeat.mp3',
-    volume: 0.6,
+    path: '/assets/sfx/enemy-defeat-loud.mp3',
+    filePath: 'public/assets/sfx/enemy-defeat-loud.mp3',
+    volume: 0.85,
     theme: 'defeated ninja fall with metal ring'
   },
   {

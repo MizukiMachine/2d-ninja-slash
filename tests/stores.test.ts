@@ -60,12 +60,12 @@ describe('settingsStore', () => {
 });
 
 describe('debugStore', () => {
-  it('defaults enemy chase to disabled', () => {
+  it('defaults enemy AI to enabled', () => {
     const store = createDebugStore();
 
-    expect(store.get().enemyChaseEnabled).toBe(false);
+    expect(store.get().enemyAiEnabled).toBe(true);
     expect(store.get().showLaneGuides).toBe(true);
-    expect(store.get().bgmTrackId).toBe('shadow-dojo');
+    expect(store.get().bgmTrackId).toBe('boss-duel');
     expect(store.get().sandboxLaneSettings).toEqual(
       createDefaultThreeLaneYSettings({ worldHeight: 720 })
     );
@@ -84,7 +84,7 @@ describe('debugStore', () => {
     store.setShowPointerProbe(true);
     store.setShowEnemyRanges(true);
     store.setShowLaneGuides(false);
-    store.setEnemyChaseEnabled(false);
+    store.setEnemyAiEnabled(false);
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
     store.setBgmTrackId('boss-duel');
     store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
@@ -124,7 +124,7 @@ describe('debugStore', () => {
       showPointerProbe: true,
       showEnemyRanges: true,
       showLaneGuides: false,
-      enemyChaseEnabled: false,
+      enemyAiEnabled: false,
       backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
       bgmTrackId: 'boss-duel',
       sandboxLaneSettings: {
@@ -193,9 +193,9 @@ describe('debugStore', () => {
     store.setShowPointerProbe(true);
     store.setShowEnemyRanges(true);
     store.setShowLaneGuides(false);
-    store.setEnemyChaseEnabled(false);
+    store.setEnemyAiEnabled(false);
     store.setBackgroundFileName('three-lane-rough-bamboo-shrine.png');
-    store.setBgmTrackId('moonlit-pursuit');
+    store.setBgmTrackId('boss-duel');
     store.setSandboxLaneSettings({ upperY: 320, middleY: 455, lowerY: 610 });
     store.requestActorReset();
     store.setPlayer({ action: 'run', x: 100 });
@@ -221,9 +221,9 @@ describe('debugStore', () => {
       showPointerProbe: true,
       showEnemyRanges: true,
       showLaneGuides: false,
-      enemyChaseEnabled: false,
+      enemyAiEnabled: false,
       backgroundFileName: 'three-lane-rough-bamboo-shrine.png',
-      bgmTrackId: 'moonlit-pursuit',
+      bgmTrackId: 'boss-duel',
       sandboxLaneSettings: {
         upperY: 320,
         middleY: 455,

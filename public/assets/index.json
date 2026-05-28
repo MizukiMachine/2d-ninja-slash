@@ -2812,93 +2812,6 @@
       }
     },
     {
-      "key": "bgm.shadowDojo",
-      "type": "bgm-audio",
-      "label": "Shadow Dojo",
-      "filePath": "public/assets/bgm/shadow-dojo.mp3",
-      "path": "/assets/bgm/shadow-dojo.mp3",
-      "format": "mp3",
-      "animationUse": "looping background music candidate",
-      "phaser": {
-        "loader": "audio",
-        "audioKey": "bgm.shadowDojo",
-        "urls": [
-          "/assets/bgm/shadow-dojo.mp3"
-        ],
-        "playback": {
-          "loop": true,
-          "volume": 0.42
-        }
-      },
-      "metadata": {
-        "id": "shadow-dojo",
-        "theme": "taiko and shakuhachi stealth combat loop",
-        "generatedBy": "ElevenLabs music.compose",
-        "generatedAt": "2026-05-28",
-        "sizeBytes": 1440750,
-        "debugBgmCandidate": true,
-        "requestedDurationMs": 90000
-      }
-    },
-    {
-      "key": "bgm.moonlitPursuit",
-      "type": "bgm-audio",
-      "label": "Moonlit Pursuit",
-      "filePath": "public/assets/bgm/moonlit-pursuit.mp3",
-      "path": "/assets/bgm/moonlit-pursuit.mp3",
-      "format": "mp3",
-      "animationUse": "looping background music candidate",
-      "phaser": {
-        "loader": "audio",
-        "audioKey": "bgm.moonlitPursuit",
-        "urls": [
-          "/assets/bgm/moonlit-pursuit.mp3"
-        ],
-        "playback": {
-          "loop": true,
-          "volume": 0.4
-        }
-      },
-      "metadata": {
-        "id": "moonlit-pursuit",
-        "theme": "fast ninja chase with koto plucks and percussion",
-        "generatedBy": "ElevenLabs music.compose",
-        "generatedAt": "2026-05-28",
-        "sizeBytes": 1440750,
-        "debugBgmCandidate": true,
-        "requestedDurationMs": 90000
-      }
-    },
-    {
-      "key": "bgm.bambooAmbush",
-      "type": "bgm-audio",
-      "label": "Bamboo Ambush",
-      "filePath": "public/assets/bgm/bamboo-ambush.mp3",
-      "path": "/assets/bgm/bamboo-ambush.mp3",
-      "format": "mp3",
-      "animationUse": "looping background music candidate",
-      "phaser": {
-        "loader": "audio",
-        "audioKey": "bgm.bambooAmbush",
-        "urls": [
-          "/assets/bgm/bamboo-ambush.mp3"
-        ],
-        "playback": {
-          "loop": true,
-          "volume": 0.38
-        }
-      },
-      "metadata": {
-        "id": "bamboo-ambush",
-        "theme": "tense bamboo forest ambush groove",
-        "generatedBy": "ElevenLabs music.compose",
-        "generatedAt": "2026-05-28",
-        "sizeBytes": 1441586,
-        "debugBgmCandidate": true,
-        "requestedDurationMs": 90000
-      }
-    },
-    {
       "key": "bgm.bossDuel",
       "type": "bgm-audio",
       "label": "Boss Duel",
@@ -2919,10 +2832,10 @@
       },
       "metadata": {
         "id": "boss-duel",
-        "theme": "dramatic duel rhythm with heavy war drums",
+        "theme": "immediate boss duel melody with heavy war drums",
         "generatedBy": "ElevenLabs music.compose",
         "generatedAt": "2026-05-28",
-        "sizeBytes": 1440750,
+        "sizeBytes": 1441586,
         "debugBgmCandidate": true,
         "requestedDurationMs": 90000
       }
@@ -3156,19 +3069,19 @@
       "key": "sfx.enemyDefeat",
       "type": "sfx-audio",
       "label": "Enemy Defeat",
-      "filePath": "public/assets/sfx/enemy-defeat.mp3",
-      "path": "/assets/sfx/enemy-defeat.mp3",
+      "filePath": "public/assets/sfx/enemy-defeat-loud.mp3",
+      "path": "/assets/sfx/enemy-defeat-loud.mp3",
       "format": "mp3",
       "animationUse": "combat and UI sound effect",
       "phaser": {
         "loader": "audio",
         "audioKey": "sfx.enemyDefeat",
         "urls": [
-          "/assets/sfx/enemy-defeat.mp3"
+          "/assets/sfx/enemy-defeat-loud.mp3"
         ],
         "playback": {
           "loop": false,
-          "volume": 0.6
+          "volume": 0.85
         }
       },
       "metadata": {
@@ -3176,7 +3089,7 @@
         "theme": "defeated ninja fall with metal ring",
         "generatedBy": "ElevenLabs sound-generation",
         "generatedAt": "2026-05-28",
-        "sizeBytes": 23031,
+        "sizeBytes": 23030,
         "sfxCue": true
       }
     },
@@ -3337,9 +3250,6 @@
       ]
     },
     "bgm": [
-      "bgm.shadowDojo",
-      "bgm.moonlitPursuit",
-      "bgm.bambooAmbush",
       "bgm.bossDuel",
       "bgm.gameOverLament"
     ],
@@ -3369,8 +3279,8 @@
       },
       "result": "all character spritesheets are 8x4 grids with 32 non-empty 128px frames"
     },
-    "audioAssetCount": 17,
-    "bgmCount": 5,
+    "audioAssetCount": 14,
+    "bgmCount": 2,
     "sfxCount": 12
   }
 }
