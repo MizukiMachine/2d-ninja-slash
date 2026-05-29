@@ -15,11 +15,6 @@ export class MainMenuScene extends BaseScene {
       { label: 'Sandbox', scene: SceneKeys.Sandbox },
       { label: 'Ninja Gym', scene: SceneKeys.Gym },
       { label: 'Lane Editor', scene: SceneKeys.LaneEditor },
-      { label: 'Level Progress', scene: SceneKeys.LevelProgress },
-      { label: 'Element Editor', scene: SceneKeys.ElementEditor },
-      { label: 'Gameplay Baseline', scene: SceneKeys.BaselineLevel },
-      { label: 'Runner Lab', scene: SceneKeys.RunnerLab },
-      { label: 'Background Lab', scene: SceneKeys.BackgroundLab },
       { label: 'Settings', scene: SceneKeys.Settings }
     ] as const;
     const columns = this.profile.width >= 900 ? 2 : 1;

@@ -8,19 +8,9 @@ import {
   type BgmTrackId
 } from '../game/assets/audioAssetCatalog';
 import {
-  DEFAULT_BACKGROUND_LAB_SETTINGS,
-  DEFAULT_BASELINE_LAB_SETTINGS,
-  DEFAULT_ELEMENT_EDITOR_SETTINGS,
   DEFAULT_GAMEPLAY_TUNING,
-  DEFAULT_LEVEL_PROGRESS,
-  DEFAULT_RUNNER_SETTINGS,
   DEFAULT_SANDBOX_LANE_SETTINGS,
-  type BackgroundLabSettings,
-  type BaselineLabSettings,
-  type ElementEditorSettings,
   type GameplayTuning,
-  type LevelProgressState,
-  type RunnerGenerationSettings,
   type SandboxLaneSettings
 } from '../game/debugFeatures';
 
@@ -95,11 +85,6 @@ export interface DebugState {
   readonly bgmTrackId: BgmTrackId;
   readonly gameplayTuning: GameplayTuning;
   readonly sandboxLaneSettings: SandboxLaneSettings;
-  readonly levelProgress: LevelProgressState;
-  readonly runnerGeneration: RunnerGenerationSettings;
-  readonly baselineLab: BaselineLabSettings;
-  readonly backgroundLab: BackgroundLabSettings;
-  readonly elementEditor: ElementEditorSettings;
   readonly actorResetRequestId: number;
   readonly pointer: DebugPointerState;
   readonly input: DebugInputState;
@@ -129,11 +114,6 @@ export interface DebugStore extends WritableStore<DebugState> {
   setBgmTrackId(bgmTrackId: BgmTrackId): void;
   setGameplayTuning(gameplayTuning: GameplayTuning): void;
   setSandboxLaneSettings(sandboxLaneSettings: SandboxLaneSettings): void;
-  setLevelProgress(levelProgress: LevelProgressState): void;
-  setRunnerGeneration(runnerGeneration: RunnerGenerationSettings): void;
-  setBaselineLab(baselineLab: BaselineLabSettings): void;
-  setBackgroundLab(backgroundLab: BackgroundLabSettings): void;
-  setElementEditor(elementEditor: ElementEditorSettings): void;
   requestActorReset(): void;
   setPointer(pointer: Partial<DebugPointerState>): void;
   setInput(input: Partial<DebugInputState>): void;
@@ -178,11 +158,6 @@ function createInitialDebugState(): DebugState {
     bgmTrackId: DEFAULT_BGM_TRACK_ID,
     gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
     sandboxLaneSettings: DEFAULT_SANDBOX_LANE_SETTINGS,
-    levelProgress: DEFAULT_LEVEL_PROGRESS,
-    runnerGeneration: DEFAULT_RUNNER_SETTINGS,
-    baselineLab: DEFAULT_BASELINE_LAB_SETTINGS,
-    backgroundLab: DEFAULT_BACKGROUND_LAB_SETTINGS,
-    elementEditor: DEFAULT_ELEMENT_EDITOR_SETTINGS,
     actorResetRequestId: 0,
     pointer: {
       x: 0,
@@ -284,21 +259,6 @@ export function createDebugStore(): DebugStore {
     setSandboxLaneSettings: (sandboxLaneSettings) => {
       store.update((state) => ({ ...state, sandboxLaneSettings }));
     },
-    setLevelProgress: (levelProgress) => {
-      store.update((state) => ({ ...state, levelProgress }));
-    },
-    setRunnerGeneration: (runnerGeneration) => {
-      store.update((state) => ({ ...state, runnerGeneration }));
-    },
-    setBaselineLab: (baselineLab) => {
-      store.update((state) => ({ ...state, baselineLab }));
-    },
-    setBackgroundLab: (backgroundLab) => {
-      store.update((state) => ({ ...state, backgroundLab }));
-    },
-    setElementEditor: (elementEditor) => {
-      store.update((state) => ({ ...state, elementEditor }));
-    },
     requestActorReset: () => {
       store.update((state) => ({
         ...state,
@@ -348,11 +308,6 @@ export function createDebugStore(): DebugStore {
         bgmTrackId: current.bgmTrackId,
         gameplayTuning: current.gameplayTuning,
         sandboxLaneSettings: current.sandboxLaneSettings,
-        levelProgress: current.levelProgress,
-        runnerGeneration: current.runnerGeneration,
-        baselineLab: current.baselineLab,
-        backgroundLab: current.backgroundLab,
-        elementEditor: current.elementEditor,
         actorResetRequestId: current.actorResetRequestId
       });
     }
