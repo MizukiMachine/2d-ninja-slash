@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "savedAt": null,
+  "savedAt": "2026-05-29T04:39:46.081Z",
   "profiles": {
     "landscape": {
-      "upperY": 372,
-      "middleY": 468,
-      "lowerY": 564
+      "upperY": 368,
+      "middleY": 483,
+      "lowerY": 618
     },
     "portrait": {
       "upperY": 652,

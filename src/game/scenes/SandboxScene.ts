@@ -42,6 +42,7 @@ import {
 } from '../playerLaneMovement';
 import {
   getNinjaLanePerspectiveScaleForY,
+  getNinjaLanePerspectiveSpeedForLane,
   getNinjaLanePointFromSprite,
   getNinjaLaneXFromSprite,
   getNinjaLaneYFromSprite,
@@ -1592,7 +1593,10 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const playerSpeed = this.debug.get().gameplayTuning.playerSpeed;
+    const playerSpeed = getNinjaLanePerspectiveSpeedForLane({
+      laneId: this.playerLaneMovement?.currentLaneId ?? 'middle',
+      baseSpeed: this.debug.get().gameplayTuning.playerSpeed
+    });
     const laneFrame = this.playerLaneMovement?.update({
       left: movement.left,
       right: movement.right,
@@ -1843,9 +1847,12 @@ export class SandboxScene extends BaseScene {
     const approachDirection = this.getEnemyApproachDirection(enemy);
 
     if (approachDirection !== null) {
-      const enemySpeed = getEnemyChaseMovementSpeed(
-        getEnemyMovementSpeed(this.debug.get().gameplayTuning)
-      );
+      const enemySpeed = getNinjaLanePerspectiveSpeedForLane({
+        laneId: enemy.laneMovement.currentLaneId,
+        baseSpeed: getEnemyChaseMovementSpeed(
+          getEnemyMovementSpeed(this.debug.get().gameplayTuning)
+        )
+      });
 
       enemy.patrolDirection = approachDirection;
       this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(approachDirection, 0));
@@ -1859,9 +1866,12 @@ export class SandboxScene extends BaseScene {
 
   private updateEnemyPatrol(enemy: EnemyState, time: number): void {
     const direction = this.resolveEnemyPatrolDirection(enemy, time);
-    const enemySpeed = getEnemyPatrolMovementSpeed(
-      getEnemyMovementSpeed(this.debug.get().gameplayTuning)
-    );
+    const enemySpeed = getNinjaLanePerspectiveSpeedForLane({
+      laneId: enemy.laneMovement.currentLaneId,
+      baseSpeed: getEnemyPatrolMovementSpeed(
+        getEnemyMovementSpeed(this.debug.get().gameplayTuning)
+      )
+    });
 
     this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(direction, 0));
     enemy.sprite.setVelocity(direction * enemySpeed, 0);
