@@ -20,9 +20,7 @@ import {
   GAMEPLAY_TUNING_CONFIG_URL,
   GAMEPLAY_TUNING_SAVE_ENDPOINT,
   SANDBOX_LANE_SETTINGS_CONFIG_URL,
-  SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT,
   buildDebugElementsExport,
-  buildSandboxLaneSettingsExport,
   createDefaultDebugElementsConfig,
   createDefaultSandboxLaneSettingsConfig,
   createDefaultSandboxLaneSettings,
@@ -97,6 +95,7 @@ import {
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
 import { loadJsonConfig, saveJsonConfig } from './debugConfigIO';
+import { writeSandboxLaneSettings } from './sandboxLaneSettingsIO';
 import { getDebugConsoleRefs } from './debugConsoleRefs';
 import { createDebugControlsHtml } from './debugConsoleTemplate';
 import {
@@ -318,28 +317,23 @@ export function createApp(root: HTMLDivElement | null): void {
     laneEditorSaveStatus = 'Saving lane config...';
     renderLaneEditorControls();
 
-    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+    const { ok, payload } = await writeSandboxLaneSettings(
       sandboxLaneSettingsConfig,
       profileId,
       debugStore.get().sandboxLaneSettings,
       getCurrentProfileHeight()
     );
 
-    const payload = buildSandboxLaneSettingsExport(sandboxLaneSettingsConfig);
-
-    try {
-      await saveJsonConfig(SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT, payload);
+    if (ok) {
       sandboxLaneSettingsConfig = payload;
       sandboxLaneSettingsLoadedFromFile = true;
       sandboxLaneSettingsDirty = false;
       laneEditorSaveStatus = 'Saved public/assets/config/sandbox-lanes.json';
-    } catch {
-      if (allowDownloadFallback) {
-        downloadJsonFile('sandbox-lanes.json', payload);
-        laneEditorSaveStatus = 'Downloaded sandbox-lanes.json';
-      } else {
-        laneEditorSaveStatus = 'Lane auto-save failed (run npm run dev)';
-      }
+    } else if (allowDownloadFallback) {
+      downloadJsonFile('sandbox-lanes.json', payload);
+      laneEditorSaveStatus = 'Downloaded sandbox-lanes.json';
+    } else {
+      laneEditorSaveStatus = 'Lane auto-save failed (run npm run dev)';
     }
 
     renderLaneEditorControls();
@@ -1605,6 +1599,9 @@ export function createApp(root: HTMLDivElement | null): void {
     }
   });
 
+  // Range sliders update live on 'input' but auto-save on 'change' (fires on
+  // release), matching the canvas Lane Editor's drag-release auto-save so panel
+  // edits also survive a reload without pressing Save.
   laneUpperYInput.addEventListener('input', () => {
     patchLaneSettings({ upperY: Number(laneUpperYInput.value) });
   });
@@ -1614,14 +1611,26 @@ export function createApp(root: HTMLDivElement | null): void {
   laneLowerYInput.addEventListener('input', () => {
     patchLaneSettings({ lowerY: Number(laneLowerYInput.value) });
   });
+  laneUpperYInput.addEventListener('change', () => {
+    void saveLaneSettingsToFile(false);
+  });
+  laneMiddleYInput.addEventListener('change', () => {
+    void saveLaneSettingsToFile(false);
+  });
+  laneLowerYInput.addEventListener('change', () => {
+    void saveLaneSettingsToFile(false);
+  });
   laneUpperYNumberInput.addEventListener('change', () => {
     patchLaneSettings({ upperY: Number(laneUpperYNumberInput.value) });
+    void saveLaneSettingsToFile(false);
   });
   laneMiddleYNumberInput.addEventListener('change', () => {
     patchLaneSettings({ middleY: Number(laneMiddleYNumberInput.value) });
+    void saveLaneSettingsToFile(false);
   });
   laneLowerYNumberInput.addEventListener('change', () => {
     patchLaneSettings({ lowerY: Number(laneLowerYNumberInput.value) });
+    void saveLaneSettingsToFile(false);
   });
   laneSaveButton.addEventListener('click', () => {
     void saveLaneSettingsToFile(true);
@@ -1633,6 +1642,7 @@ export function createApp(root: HTMLDivElement | null): void {
       createDefaultSandboxLaneSettings(worldHeight),
       'Unsaved lane reset'
     );
+    void saveLaneSettingsToFile(false);
   });
 
   tuningPlayerSpeedInput.addEventListener('input', setGameplayTuningFromInputs);
