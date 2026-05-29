@@ -623,11 +623,36 @@ export class SandboxScene extends BaseScene {
       .setCollideWorldBounds(true)
       .setDepth(this.getActorDepthForLaneY(this.centerY + 108, ENEMY_DEPTH_BIAS));
     const enemy = this.createEnemyState(enemySprite, 'left');
-    this.physics.add.collider(this.player, enemy.sprite);
+    this.physics.add.collider(
+      this.player,
+      enemy.sprite,
+      undefined,
+      () => this.shouldCollideWithEnemy(enemy),
+      this
+    );
     this.registerEnemyAnimationEvents(enemy);
     this.deactivateEnemy(enemy);
 
     return enemy;
+  }
+
+  /**
+   * Lane-aware collision gate. The player and an enemy only push each other
+   * when they share the same lane and neither is mid lane-change (the jump arc
+   * lifts an actor "above" the lanes). Returning false here tells Arcade
+   * physics to skip separation, so actors on different lanes pass through
+   * instead of interfering across lanes.
+   */
+  private shouldCollideWithEnemy(enemy: EnemyState): boolean {
+    if (this.playerLaneMovement === null) {
+      return true;
+    }
+
+    if (this.playerLaneMovement.isTransitioning || enemy.laneMovement.isTransitioning) {
+      return false;
+    }
+
+    return this.playerLaneMovement.currentLaneId === enemy.laneMovement.currentLaneId;
   }
 
   private ensureEnemyPoolSize(enemyCount: number): void {
@@ -2382,6 +2407,7 @@ export class SandboxScene extends BaseScene {
         enemy.health > 0 &&
         enemy.action !== 'dead' &&
         enemy.sprite.active &&
+        this.isPlayerOnEnemyLane(enemy) &&
         this.isHitAreaOverlappingActor(this.attackHitArea, enemy.sprite)
     );
 
