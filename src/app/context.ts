@@ -19,6 +19,12 @@ export interface AppContext {
   setDebugElementsConfig(config: DebugElementsConfig): void;
   setSandboxLaneSettings(settings: SandboxLaneSettings): void;
   /**
+   * Writes the current lane settings to disk (sandbox-lanes.json).
+   * Provided by the debug console so the Lane Editor can auto-save on
+   * drag-release; undefined in builds without a save endpoint.
+   */
+  persistSandboxLaneSettings?(): void;
+  /**
    * Optional scene to open after Boot/Splash instead of the MainMenu.
    * The debug console leaves this undefined (keeps the full menu); the
    * standalone game build returns the gameplay scene to jump straight in.

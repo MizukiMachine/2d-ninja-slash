@@ -229,6 +229,9 @@ export class LaneEditorScene extends DebugLabScene {
     const settings = this.getLaneSettings();
 
     this.app.setSandboxLaneSettings(settings);
+    // Auto-save to sandbox-lanes.json so adjustments survive a reload
+    // without needing the debug panel's Save button.
+    this.app.persistSandboxLaneSettings?.();
   }
 
   private getLaneSettings(): SandboxLaneSettings {
