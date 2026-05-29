@@ -303,6 +303,53 @@ export function createApp(root: HTMLDivElement | null): void {
 
     return normalizedSettings;
   };
+  let laneSaveInFlight = false;
+  let laneSavePendingAfterFlight = false;
+  const saveLaneSettingsToFile = async (
+    allowDownloadFallback: boolean
+  ): Promise<void> => {
+    if (laneSaveInFlight) {
+      // Coalesce rapid drag-release saves into a single trailing write.
+      laneSavePendingAfterFlight = true;
+      return;
+    }
+
+    laneSaveInFlight = true;
+    laneEditorSaveStatus = 'Saving lane config...';
+    renderLaneEditorControls();
+
+    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      debugStore.get().sandboxLaneSettings,
+      getCurrentProfileHeight()
+    );
+
+    const payload = buildSandboxLaneSettingsExport(sandboxLaneSettingsConfig);
+
+    try {
+      await saveJsonConfig(SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT, payload);
+      sandboxLaneSettingsConfig = payload;
+      sandboxLaneSettingsLoadedFromFile = true;
+      sandboxLaneSettingsDirty = false;
+      laneEditorSaveStatus = 'Saved public/assets/config/sandbox-lanes.json';
+    } catch {
+      if (allowDownloadFallback) {
+        downloadJsonFile('sandbox-lanes.json', payload);
+        laneEditorSaveStatus = 'Downloaded sandbox-lanes.json';
+      } else {
+        laneEditorSaveStatus = 'Lane auto-save failed (run npm run dev)';
+      }
+    }
+
+    renderLaneEditorControls();
+    laneSaveInFlight = false;
+
+    if (laneSavePendingAfterFlight) {
+      laneSavePendingAfterFlight = false;
+      void saveLaneSettingsToFile(allowDownloadFallback);
+    }
+  };
   const context: AppContext = {
     debugStore,
     settingsStore,
@@ -317,6 +364,9 @@ export function createApp(root: HTMLDivElement | null): void {
     },
     setSandboxLaneSettings: (settings) => {
       setSandboxLaneSettingsForCurrentProfile(settings);
+    },
+    persistSandboxLaneSettings: () => {
+      void saveLaneSettingsToFile(false);
     }
   };
 
@@ -1573,31 +1623,8 @@ export function createApp(root: HTMLDivElement | null): void {
   laneLowerYNumberInput.addEventListener('change', () => {
     patchLaneSettings({ lowerY: Number(laneLowerYNumberInput.value) });
   });
-  laneSaveButton.addEventListener('click', async () => {
-    laneEditorSaveStatus = 'Saving lane config...';
-    renderLaneEditorControls();
-
-    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
-      sandboxLaneSettingsConfig,
-      profileId,
-      debugStore.get().sandboxLaneSettings,
-      getCurrentProfileHeight()
-    );
-
-    const payload = buildSandboxLaneSettingsExport(sandboxLaneSettingsConfig);
-
-    try {
-      await saveJsonConfig(SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT, payload);
-      sandboxLaneSettingsConfig = payload;
-      sandboxLaneSettingsLoadedFromFile = true;
-      sandboxLaneSettingsDirty = false;
-      laneEditorSaveStatus = 'Saved public/assets/config/sandbox-lanes.json';
-    } catch {
-      downloadJsonFile('sandbox-lanes.json', payload);
-      laneEditorSaveStatus = 'Downloaded sandbox-lanes.json';
-    }
-
-    renderLaneEditorControls();
+  laneSaveButton.addEventListener('click', () => {
+    void saveLaneSettingsToFile(true);
   });
   laneResetButton.addEventListener('click', () => {
     const worldHeight = getCurrentProfileHeight();
