@@ -12,7 +12,7 @@ export class SplashScene extends BaseScene {
     this.addLabel(`${this.profile.label}`, this.centerY + 30);
 
     this.time.delayedCall(650, () => {
-      this.goTo(SceneKeys.MainMenu);
+      this.goTo(this.app.getInitialScene?.() ?? SceneKeys.MainMenu);
     });
   }
 }

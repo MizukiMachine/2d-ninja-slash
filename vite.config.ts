@@ -2,6 +2,8 @@ import { mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 
+const projectRoot = process.cwd();
+
 const debugBackgroundsModuleId = 'virtual:debug-backgrounds';
 const resolvedDebugBackgroundsModuleId = `\0${debugBackgroundsModuleId}`;
 const defaultDebugBackgroundFileName = 'three-lane-rough-castle-courtyard.png';
@@ -228,6 +230,16 @@ function debugConfigWriterPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [debugBackgroundsPlugin(), debugConfigWriterPlugin()],
+  build: {
+    rollupOptions: {
+      input: {
+        // Debug console (open http://localhost:5190/)
+        main: resolve(projectRoot, 'index.html'),
+        // Standalone game (open http://localhost:5190/game.html)
+        game: resolve(projectRoot, 'game.html')
+      }
+    }
+  },
   server: {
     host: '0.0.0.0',
     port: 5190,

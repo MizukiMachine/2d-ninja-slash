@@ -7,6 +7,7 @@ import type {
 import type { GameAudio } from '../game/audio/gameAudio';
 import type { DebugStore } from '../stores/debugStore';
 import type { SettingsStore } from '../stores/settingsStore';
+import type { SceneKey } from '../game/sceneKeys';
 
 export interface AppContext {
   readonly debugStore: DebugStore;
@@ -17,6 +18,12 @@ export interface AppContext {
   getDebugElementsConfig(): DebugElementsConfig;
   setDebugElementsConfig(config: DebugElementsConfig): void;
   setSandboxLaneSettings(settings: SandboxLaneSettings): void;
+  /**
+   * Optional scene to open after Boot/Splash instead of the MainMenu.
+   * The debug console leaves this undefined (keeps the full menu); the
+   * standalone game build returns the gameplay scene to jump straight in.
+   */
+  getInitialScene?(): SceneKey;
 }
 
 let activeContext: AppContext | null = null;
