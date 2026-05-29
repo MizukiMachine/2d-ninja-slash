@@ -201,7 +201,10 @@ describe('gameAudio', () => {
       sound.destroy,
       sound
     );
-    expect(sound.play).toHaveBeenCalledWith();
+    expect(sound.play).toHaveBeenCalledWith({
+      loop: false,
+      volume: 0.85
+    });
     expect(sound.destroy).not.toHaveBeenCalled();
   });
 

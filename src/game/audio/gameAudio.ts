@@ -136,14 +136,15 @@ class PhaserGameAudio implements GameAudio {
       return;
     }
 
-    const sound = scene.sound.add(cue.key, {
+    const config = {
       loop: false,
       volume: cue.volume
-    });
+    };
+    const sound = scene.sound.add(cue.key, config);
 
     sound.once(Phaser.Sound.Events.COMPLETE, sound.destroy, sound);
 
-    if (!sound.play()) {
+    if (!sound.play(config)) {
       sound.destroy();
     }
   }

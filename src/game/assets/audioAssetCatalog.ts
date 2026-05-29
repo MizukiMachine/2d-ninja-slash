@@ -76,7 +76,7 @@ export const SFX_CUES = [
     label: 'Player Slash',
     path: '/assets/sfx/player-slash.mp3',
     filePath: 'public/assets/sfx/player-slash.mp3',
-    volume: 0.56,
+    volume: 0.24,
     theme: 'katana slash air whoosh'
   },
   {
@@ -85,7 +85,7 @@ export const SFX_CUES = [
     label: 'Enemy Slash',
     path: '/assets/sfx/enemy-slash.mp3',
     filePath: 'public/assets/sfx/enemy-slash.mp3',
-    volume: 0.49,
+    volume: 0.22,
     theme: 'lower pitched hostile blade swing'
   },
   {
@@ -121,7 +121,7 @@ export const SFX_CUES = [
     label: 'Player Hurt',
     path: '/assets/sfx/player-hurt.mp3',
     filePath: 'public/assets/sfx/player-hurt.mp3',
-    volume: 0.53,
+    volume: 0.3,
     theme: 'impact thud with breath hit'
   },
   {
@@ -158,7 +158,7 @@ export const SFX_CUES = [
     path: '/assets/sfx/round-clear-loud.wav',
     filePath: 'public/assets/sfx/round-clear-loud.wav',
     volume: 0.9,
-    theme: 'louder soft higher taiko double hit round transition'
+    theme: 'extra dry sharp hyoshigi wooden clapper double hit round transition'
   },
   {
     id: 'round-start',
@@ -167,14 +167,41 @@ export const SFX_CUES = [
     path: '/assets/sfx/round-start-loud.wav',
     filePath: 'public/assets/sfx/round-start-loud.wav',
     volume: 0.82,
-    theme: 'louder soft higher taiko round start pulse'
+    theme: 'extra dry sharp hyoshigi wooden clapper round start cue'
+  },
+  {
+    id: 'hyoshigi-preview',
+    key: 'sfx.hyoshigiPreview',
+    label: 'Hyoshigi',
+    path: '/assets/sfx/hyoshigi-preview.wav',
+    filePath: 'public/assets/sfx/hyoshigi-preview.wav',
+    volume: 0.84,
+    theme: 'extra dry hyoshigi wooden clapper preview double hit'
+  },
+  {
+    id: 'kotsuzumi-preview',
+    key: 'sfx.kotsuzumiPreview',
+    label: 'Kotsuzumi',
+    path: '/assets/sfx/kotsuzumi-preview.wav',
+    filePath: 'public/assets/sfx/kotsuzumi-preview.wav',
+    volume: 0.78,
+    theme: 'dry small kotsuzumi hand drum preview with short skin resonance'
   }
 ] as const satisfies readonly SfxCue[];
 
 export type SfxCueId = (typeof SFX_CUES)[number]['id'];
 
+export const SFX_COMPARE_CUE_IDS = [
+  'hyoshigi-preview',
+  'kotsuzumi-preview'
+] as const satisfies readonly SfxCueId[];
+
 export function isBgmTrackId(value: string): value is BgmTrackId {
   return ALL_BGM_TRACKS.some((track) => track.id === value);
+}
+
+export function isSfxCueId(value: string): value is SfxCueId {
+  return SFX_CUES.some((cue) => cue.id === value);
 }
 
 export function getBgmTrack(id: BgmTrackId): BgmTrack {

@@ -683,7 +683,7 @@ export class SandboxScene extends BaseScene {
     this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
-    this.playSfx('round-start');
+    this.playSfx('enemy-defeat');
 
     this.enemies.forEach((enemy, index) => {
       if (index < enemyCount) {
@@ -2490,7 +2490,7 @@ export class SandboxScene extends BaseScene {
       enemy.laneMovement.currentY,
       'death'
     );
-    this.playSfx('enemy-defeat');
+    this.playSfx('round-start');
     this.recordEnemyDefeat(enemy);
     this.renderHealthBars(this.time.now);
   }
