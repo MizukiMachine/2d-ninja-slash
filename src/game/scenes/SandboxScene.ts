@@ -58,6 +58,7 @@ import {
 } from '../enemyBehavior';
 import { GAME_OVER_BGM_TRACK_ID } from '../assets/audioAssetCatalog';
 import { GAME_DISPLAY_FONT_FAMILY, GAME_UI_FONT_FAMILY } from '../gameFonts';
+import { SceneJuice } from '../effects/sceneJuice';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact' | 'death';
@@ -155,6 +156,24 @@ const ENEMY_FRONT_DETECTION_DISTANCE = 320;
 const ENEMY_PATROL_WORLD_PADDING = 90;
 const ENEMY_PATROL_MIN_DECISION_MS = 850;
 const ENEMY_PATROL_MAX_DECISION_MS = 2200;
+
+// --- Game feel / juice tuning -------------------------------------------------
+// A connecting blade gives a light punch; a defeat hits harder and lingers.
+const HIT_SHAKE_TRAUMA = 0.26;
+const DEFEAT_SHAKE_TRAUMA = 0.62;
+const PLAYER_HIT_SHAKE_TRAUMA = 0.46;
+const HIT_HITSTOP_MS = 45;
+const DEFEAT_HITSTOP_MS = 120;
+const PLAYER_HIT_HITSTOP_MS = 70;
+// When the player is struck the screen flashes white and a brief invulnerability
+// window (with a blink) prevents being stun-locked by overlapping enemies.
+const PLAYER_DAMAGE_FLASH_COLOR = 0xffffff;
+const PLAYER_DAMAGE_FLASH_ALPHA = 0.55;
+const PLAYER_DAMAGE_FLASH_MS = 220;
+const PLAYER_INVULNERABILITY_MS = 1000;
+const PLAYER_INVULNERABILITY_BLINK_MS = 110;
+// Slight over-scan so the camera shake never reveals the background edges.
+const BACKGROUND_SHAKE_OVERSCAN = 1.08;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -434,6 +453,9 @@ export class SandboxScene extends BaseScene {
   private damageKnockbackOrigin = new Phaser.Math.Vector2(0, 0);
   private attackHitArea = new Phaser.Geom.Rectangle(0, 0, 0, 0);
   private visualBoundsRect = new Phaser.Geom.Rectangle();
+  private juice: SceneJuice | null = null;
+  private playerInvulnerableUntil = 0;
+  private playerBlinkTween: Phaser.Tweens.Tween | null = null;
 
   constructor() {
     super(SceneKeys.Sandbox);
@@ -484,8 +506,14 @@ export class SandboxScene extends BaseScene {
         shadow: { offsetX: 0, offsetY: 2, color: '#05080d', blur: 4, fill: true }
       })
       .setOrigin(0.5)
+      .setScrollFactor(0)
       .setVisible(false);
     this.createHealthHud();
+    this.juice = new SceneJuice(this);
+    this.trackCleanup(() => {
+      this.juice?.destroy();
+      this.juice = null;
+    });
     this.startRound(1);
 
     this.registerKeyboard();
@@ -566,6 +594,76 @@ export class SandboxScene extends BaseScene {
     const scale = Math.abs(sprite.scaleX);
 
     return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
+  }
+
+  /** Approximate visual centre of an actor (origin is feet at 0.5, 1). */
+  private getActorCenter(
+    sprite: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
+  ): { x: number; y: number } {
+    return { x: sprite.x, y: sprite.y - sprite.displayHeight * 0.5 };
+  }
+
+  /** Light spark + punch when a blade connects with an enemy. */
+  private playEnemyHitFeedback(enemy: EnemyState): void {
+    const center = this.getActorCenter(enemy.sprite);
+    const scale = this.getActorScaleFromSprite(enemy.sprite);
+    this.juice?.burstHitSpark(center.x, center.y, scale);
+    this.juice?.shake(HIT_SHAKE_TRAUMA);
+    this.juice?.hitstop(HIT_HITSTOP_MS);
+  }
+
+  /** Heavier debris burst + longer freeze when an enemy is defeated. */
+  private playEnemyDefeatFeedback(enemy: EnemyState): void {
+    const center = this.getActorCenter(enemy.sprite);
+    const scale = this.getActorScaleFromSprite(enemy.sprite);
+    this.juice?.burstEnemyDefeat(center.x, center.y, scale);
+    this.juice?.shake(DEFEAT_SHAKE_TRAUMA);
+    this.juice?.hitstop(DEFEAT_HITSTOP_MS);
+  }
+
+  /** White flash + screen punch when the player is struck. */
+  private playPlayerDamageFeedback(): void {
+    this.juice?.flash(
+      PLAYER_DAMAGE_FLASH_COLOR,
+      PLAYER_DAMAGE_FLASH_ALPHA,
+      PLAYER_DAMAGE_FLASH_MS
+    );
+    this.juice?.shake(PLAYER_HIT_SHAKE_TRAUMA);
+    this.juice?.hitstop(PLAYER_HIT_HITSTOP_MS);
+  }
+
+  private isPlayerInvulnerable(): boolean {
+    return this.time.now < this.playerInvulnerableUntil;
+  }
+
+  private beginPlayerInvulnerability(): void {
+    this.playerInvulnerableUntil = this.time.now + PLAYER_INVULNERABILITY_MS;
+    this.startPlayerInvulnerabilityBlink();
+  }
+
+  private startPlayerInvulnerabilityBlink(): void {
+    if (this.player === null) {
+      return;
+    }
+
+    this.playerBlinkTween?.stop();
+    this.player.setAlpha(1);
+    this.playerBlinkTween = this.tweens.add({
+      targets: this.player,
+      alpha: { from: 1, to: 0.25 },
+      duration: PLAYER_INVULNERABILITY_BLINK_MS,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  private endPlayerInvulnerabilityBlink(): void {
+    this.playerBlinkTween?.stop();
+    this.playerBlinkTween = null;
+
+    if (this.player !== null && this.currentAction !== 'dead') {
+      this.player.setAlpha(this.debug.get().paused ? 0.55 : 1);
+    }
   }
 
   private getActorDepthForLaneY(laneY: number, bias: number): number {
@@ -821,6 +919,9 @@ export class SandboxScene extends BaseScene {
     this.facingDirection = 'right';
     this.currentAction = 'idle';
     this.playerHealth = PLAYER_MAX_HEALTH;
+    this.playerInvulnerableUntil = 0;
+    this.playerBlinkTween?.stop();
+    this.playerBlinkTween = null;
     this.damagedEnemiesThisAttack.clear();
     this.gameOver = false;
     this.roundPhase = 'fighting';
@@ -842,8 +943,24 @@ export class SandboxScene extends BaseScene {
   }
 
   update(time: number, delta: number): void {
+    // Drive juice first so shake/hitstop resolve on real (unscaled) time even
+    // when gameplay is otherwise short-circuited below.
+    this.juice?.update(delta);
+
+    if (this.juice?.isFrozen()) {
+      // Hitstop: the world is frozen this frame, so skip all gameplay logic.
+      return;
+    }
+
     if (this.player === null) {
       return;
+    }
+
+    if (
+      this.playerBlinkTween !== null &&
+      time >= this.playerInvulnerableUntil
+    ) {
+      this.endPlayerInvulnerabilityBlink();
     }
 
     if (this.playerHealth <= 0 && this.currentAction !== 'dead') {
@@ -924,13 +1041,21 @@ export class SandboxScene extends BaseScene {
 
     const { width, height } = this.profile;
     const backgroundFrame = this.background.frame;
-    const scale = Math.max(width / backgroundFrame.width, height / backgroundFrame.height);
+    const scale =
+      Math.max(width / backgroundFrame.width, height / backgroundFrame.height) *
+      BACKGROUND_SHAKE_OVERSCAN;
 
     this.background.setScale(scale);
   }
 
   private createHealthHud(): void {
-    this.healthGraphic = this.add.graphics().setDepth(HUD_DEPTH);
+    // HUD elements are pinned to the camera (scrollFactor 0) so the combat
+    // screen shake (which scrolls the main camera) moves the world but never
+    // the health bar, banner or progression readout.
+    this.healthGraphic = this.add
+      .graphics()
+      .setScrollFactor(0)
+      .setDepth(HUD_DEPTH);
     this.playerHealthLabel = this.add
       .text(
         PLAYER_HEALTH_BAR_X + 12,
@@ -944,6 +1069,7 @@ export class SandboxScene extends BaseScene {
         }
       )
       .setOrigin(0, 0.5)
+      .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 1);
     this.progressionLabel = this.add
       .text(this.profile.width - PROGRESSION_HUD_X_OFFSET, PROGRESSION_HUD_Y, '', {
@@ -956,6 +1082,7 @@ export class SandboxScene extends BaseScene {
         strokeThickness: 3
       })
       .setOrigin(1, 0)
+      .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 1);
     this.roundBannerLabel = this.add
       .text(this.centerX, ROUND_BANNER_Y, '', {
@@ -968,6 +1095,7 @@ export class SandboxScene extends BaseScene {
         shadow: { offsetX: 0, offsetY: 3, color: '#05080d', blur: 5, fill: true }
       })
       .setOrigin(0.5)
+      .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 1);
     this.renderHealthBars(this.time.now);
     this.renderProgressionHud();
@@ -2045,7 +2173,8 @@ export class SandboxScene extends BaseScene {
     if (
       this.player === null ||
       !canPlayerReceiveEnemyAttack(this.currentAction) ||
-      this.gameOver
+      this.gameOver ||
+      this.isPlayerInvulnerable()
     ) {
       return;
     }
@@ -2059,6 +2188,8 @@ export class SandboxScene extends BaseScene {
     }
 
     this.playSfx('player-hurt');
+    this.playPlayerDamageFeedback();
+    this.beginPlayerInvulnerability();
 
     const playerLanePoint = this.getActorLanePointFromSprite(
       this.player,
@@ -2131,6 +2262,8 @@ export class SandboxScene extends BaseScene {
 
     this.currentAction = 'dead';
     this.playerHealth = 0;
+    this.playerInvulnerableUntil = 0;
+    this.endPlayerInvulnerabilityBlink();
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
     this.playSfx('main-ninja-death');
@@ -2215,7 +2348,10 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    const overlay = this.add.container(0, 0).setDepth(GAME_OVER_DEPTH);
+    const overlay = this.add
+      .container(0, 0)
+      .setScrollFactor(0)
+      .setDepth(GAME_OVER_DEPTH);
     const backdrop = this.add
       .rectangle(0, 0, this.profile.width, this.profile.height, 0x050910, 0.74)
       .setOrigin(0)
@@ -2449,6 +2585,10 @@ export class SandboxScene extends BaseScene {
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
 
+    // Light feedback on every connecting blade (kept distinct from the heavier
+    // defeat burst so future multi-HP enemies read a survived hit differently).
+    this.playEnemyHitFeedback(enemy);
+
     // Enemies have 1 HP, so a hit always results in defeat (no surviving-hit SFX).
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
@@ -2489,6 +2629,7 @@ export class SandboxScene extends BaseScene {
       'death'
     );
     this.playSfx('enemy-defeat');
+    this.playEnemyDefeatFeedback(enemy);
     this.recordEnemyDefeat(enemy);
     this.renderHealthBars(this.time.now);
   }
@@ -2762,6 +2903,10 @@ export class SandboxScene extends BaseScene {
     this.damageKnockbackOrigin.set(0, 0);
     this.currentAction = 'idle';
     this.playerHealth = PLAYER_MAX_HEALTH;
+    this.playerInvulnerableUntil = 0;
+    this.playerBlinkTween?.stop();
+    this.playerBlinkTween = null;
+    this.juice?.clear();
     this.damagedEnemiesThisAttack.clear();
     this.gameOver = false;
     this.roundPhase = 'fighting';
