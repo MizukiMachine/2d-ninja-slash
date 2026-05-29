@@ -414,6 +414,9 @@ export class SandboxScene extends BaseScene {
   private activeLaneSettingsSignature = '';
   private facingDirection: FacingDirection = 'right';
   private currentAction: PlayerAction = 'idle';
+  // Horizontal lane position locked at the start of a lane change so the
+  // perspective scale shift during the jump arc cannot drift the X.
+  private playerTransitionLaneX: number | null = null;
   private playerHealth = PLAYER_MAX_HEALTH;
   private damagedEnemiesThisAttack = new Set<EnemyState>();
   private gameOver = false;
@@ -1568,6 +1571,15 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
+    // Capture laneX once, before the jump animation/scale changes, and reuse
+    // it for the whole transition so the player stays on the same column.
+    this.playerTransitionLaneX = this.getRenderedActorLanePoint(
+      this.player,
+      'mainNinja',
+      this.facingDirection,
+      this.getPlayerBoundsAction()
+    ).x;
+
     this.clearAttackHitArea();
     this.markActiveEnemyAttacksAsDodged();
     this.player.setVelocity(0, 0);
@@ -1624,20 +1636,18 @@ export class SandboxScene extends BaseScene {
         deltaSeconds
       });
 
-      this.setPlayerPositionForLane(
-        this.getActorLaneXFromSprite(
-          this.player,
-          'mainNinja',
-          this.facingDirection,
-          this.getPlayerBoundsAction()
-        ),
-        laneFrame.y,
-        'jump',
-        laneFrame.depthY
+      const laneX = this.playerTransitionLaneX ?? this.getActorLaneXFromSprite(
+        this.player,
+        'mainNinja',
+        this.facingDirection,
+        this.getPlayerBoundsAction()
       );
+
+      this.setPlayerPositionForLane(laneX, laneFrame.y, 'jump', laneFrame.depthY);
       this.player.setVelocity(0, 0);
 
       if (laneFrame.completedTransition) {
+        this.playerTransitionLaneX = null;
         this.finishPlayerAction();
       }
 
