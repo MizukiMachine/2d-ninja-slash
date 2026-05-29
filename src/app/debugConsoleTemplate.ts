@@ -1,4 +1,8 @@
-import { BGM_TRACKS } from '../game/assets/audioAssetCatalog';
+import {
+  BGM_TRACKS,
+  SFX_COMPARE_CUE_IDS,
+  getSfxCue
+} from '../game/assets/audioAssetCatalog';
 import {
   GAMEPLAY_TUNING_LIMITS,
   ROUND_ENEMY_GROWTH_MODES
@@ -36,6 +40,16 @@ export function createDebugControlsHtml(): string {
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Sandbox}">Sandbox</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Gym}">Gym</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LaneEditor}">Lanes</button>
+      </div>
+    </div>
+    <div class="panel-group">
+      <p class="panel-group__title">SFX Compare</p>
+      <div class="panel-group__row">
+        ${SFX_COMPARE_CUE_IDS.map((cueId) => {
+          const cue = getSfxCue(cueId);
+
+          return `<button class="shell-button" type="button" data-sfx-preview="${cue.id}" title="${cue.theme}">${cue.label}</button>`;
+        }).join('')}
       </div>
     </div>
     <div class="panel-group">

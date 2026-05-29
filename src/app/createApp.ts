@@ -10,7 +10,11 @@ import {
   BACKGROUND_FILE_NAMES,
   isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
-import { isBgmTrackId } from '../game/assets/audioAssetCatalog';
+import {
+  isBgmTrackId,
+  isSfxCueId,
+  type SfxCueId
+} from '../game/assets/audioAssetCatalog';
 import { createGameAudio } from '../game/audio/gameAudio';
 import {
   DEFAULT_GAMEPLAY_TUNING,
@@ -503,6 +507,25 @@ export function createApp(root: HTMLDivElement | null): void {
     }
 
     game?.scene.start(sceneKey);
+    focusGame();
+  };
+
+  const playPreviewSfx = (cueId: SfxCueId): void => {
+    const activeScene = game?.scene.getScene(debugStore.get().activeScene);
+
+    if (activeScene === null || activeScene === undefined) {
+      return;
+    }
+
+    if (activeScene.sound.locked) {
+      activeScene.sound.once('unlocked', () => {
+        audio.playSfx(activeScene, cueId);
+      });
+      focusGame();
+      return;
+    }
+
+    audio.playSfx(activeScene, cueId);
     focusGame();
   };
 
@@ -1388,6 +1411,20 @@ export function createApp(root: HTMLDivElement | null): void {
   });
 
   debugControls.addEventListener('click', (event) => {
+    const sfxButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-sfx-preview]'
+    );
+
+    if (sfxButton !== null) {
+      const cueId = sfxButton.dataset.sfxPreview;
+
+      if (cueId !== undefined && isSfxCueId(cueId)) {
+        playPreviewSfx(cueId);
+      }
+
+      return;
+    }
+
     const sceneButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
       'button[data-debug-scene]'
     );
