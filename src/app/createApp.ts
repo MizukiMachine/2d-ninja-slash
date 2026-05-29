@@ -10,30 +10,26 @@ import {
   BACKGROUND_FILE_NAMES,
   isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
-import {
-  BGM_TRACKS,
-  isBgmTrackId
-} from '../game/assets/audioAssetCatalog';
+import { isBgmTrackId } from '../game/assets/audioAssetCatalog';
 import { createGameAudio } from '../game/audio/gameAudio';
 import {
-  BACKGROUND_FIT_MODES,
-  DEBUG_ELEMENT_KINDS,
   DEBUG_ELEMENTS_CONFIG_URL,
   DEBUG_ELEMENTS_SAVE_ENDPOINT,
   DEBUG_LEVELS,
   DEFAULT_GAMEPLAY_TUNING,
   GAMEPLAY_TUNING_CONFIG_URL,
-  GAMEPLAY_TUNING_LIMITS,
   GAMEPLAY_TUNING_SAVE_ENDPOINT,
-  ROUND_ENEMY_GROWTH_MODES,
+  SANDBOX_LANE_SETTINGS_CONFIG_URL,
+  SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT,
   buildDebugElementsExport,
+  buildSandboxLaneSettingsExport,
   createDefaultDebugElementsConfig,
+  createDefaultSandboxLaneSettingsConfig,
   createDefaultSandboxLaneSettings,
-  formatElementKind,
   getDebugLevel,
   getDebugLevelElements,
+  getSandboxLaneSettingsForProfile,
   loadLevelProgress,
-  loadSandboxLaneSettings,
   markLevelCompleted,
   normalizeBackgroundLabSettings,
   normalizeBaselineLabSettings,
@@ -42,16 +38,17 @@ import {
   normalizeGameplayTuning,
   normalizeLevelProgress,
   normalizeRunnerSettings,
+  normalizeSandboxLaneSettingsConfig,
   normalizeSandboxLaneSettings,
   resetLevelProgress,
-  resetSandboxLaneSettings,
-  saveSandboxLaneSettings,
+  setSandboxLaneSettingsForProfile,
   setLevelUnlocked,
   type BackgroundFitMode,
   type DebugElementKind,
   type DebugElementsConfig,
   type GameplayTuning,
   type RoundEnemyGrowthMode,
+  type SandboxLaneSettingsConfig,
   type SandboxLaneSettings
 } from '../game/debugFeatures';
 import {
@@ -60,12 +57,9 @@ import {
 } from '../game/playerLaneMovement';
 import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
-  FACING_DIRECTIONS,
-  NINJA_ACTORS,
   NINJA_BOUNDS_CONFIG_URL,
   NINJA_BOUNDS_SAVE_ENDPOINT,
   NINJA_FRAME_SIZE,
-  NINJA_PLAYBACK_RATE_LIMITS,
   areNinjaRectsEqual,
   applyAllNinjaBoundsToAllActions,
   applyNinjaBoundsKindToAllActions,
@@ -102,22 +96,16 @@ import {
 } from '../game/ninjaBounds';
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
+import { loadJsonConfig, saveJsonConfig } from './debugConfigIO';
+import { getDebugConsoleRefs } from './debugConsoleRefs';
+import { createDebugControlsHtml } from './debugConsoleTemplate';
+import {
+  downloadJsonFile,
+  requireElement,
+  setControlGroupHidden
+} from './dom';
 import type { AppContext } from './context';
 import type { Unsubscribe } from '../stores/store';
-
-function requireElement<T extends Element>(
-  root: ParentNode,
-  selector: string,
-  elementType: new (...args: never[]) => T
-): T {
-  const element = root.querySelector(selector);
-
-  if (!(element instanceof elementType)) {
-    throw new Error(`Missing required element: ${selector}`);
-  }
-
-  return element;
-}
 
 function requestAnimationFrameOnce(callback: () => void): void {
   window.requestAnimationFrame(() => {
@@ -207,59 +195,21 @@ function clampInteger(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-function downloadJsonFile(filename: string, payload: object): void {
-  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], {
-    type: 'application/json'
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
+const loadNinjaBoundsConfig = (): Promise<NinjaBoundsConfig | null> =>
+  loadJsonConfig(NINJA_BOUNDS_CONFIG_URL, normalizeNinjaBoundsConfig);
 
-async function loadNinjaBoundsConfig(): Promise<NinjaBoundsConfig | null> {
-  try {
-    const response = await fetch(NINJA_BOUNDS_CONFIG_URL, { cache: 'no-store' });
+const loadGameplayTuningConfig = (): Promise<GameplayTuning | null> =>
+  loadJsonConfig(GAMEPLAY_TUNING_CONFIG_URL, normalizeGameplayTuning);
 
-    if (!response.ok) {
-      return null;
-    }
+const loadDebugElementsConfig = (): Promise<DebugElementsConfig | null> =>
+  loadJsonConfig(DEBUG_ELEMENTS_CONFIG_URL, normalizeDebugElementsConfig);
 
-    return normalizeNinjaBoundsConfig(await response.json());
-  } catch {
-    return null;
-  }
-}
-
-async function loadGameplayTuningConfig(): Promise<GameplayTuning | null> {
-  try {
-    const response = await fetch(GAMEPLAY_TUNING_CONFIG_URL, { cache: 'no-store' });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return normalizeGameplayTuning(await response.json());
-  } catch {
-    return null;
-  }
-}
-
-async function loadDebugElementsConfig(): Promise<DebugElementsConfig | null> {
-  try {
-    const response = await fetch(DEBUG_ELEMENTS_CONFIG_URL, { cache: 'no-store' });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return normalizeDebugElementsConfig(await response.json());
-  } catch {
-    return null;
-  }
-}
+const loadSandboxLaneSettingsConfig =
+  (): Promise<SandboxLaneSettingsConfig | null> =>
+    loadJsonConfig(
+      SANDBOX_LANE_SETTINGS_CONFIG_URL,
+      normalizeSandboxLaneSettingsConfig
+    );
 
 const DEBUG_PANEL_WIDTH_STORAGE_KEY = 'ninja-slash.debugPanelWidth';
 const DEBUG_PANEL_DEFAULT_WIDTH = 330;
@@ -301,6 +251,9 @@ export function createApp(root: HTMLDivElement | null): void {
   let playToastTimeout: number | null = null;
   let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
   let debugElementsConfig = createDefaultDebugElementsConfig();
+  let sandboxLaneSettingsConfig = createDefaultSandboxLaneSettingsConfig();
+  let sandboxLaneSettingsLoadedFromFile = false;
+  let sandboxLaneSettingsDirty = false;
   let gymSaveStatus = 'Loaded defaults';
   let gameplayTuningSaveStatus = 'Loaded defaults';
   let laneEditorSaveStatus = 'Loaded defaults';
@@ -321,6 +274,35 @@ export function createApp(root: HTMLDivElement | null): void {
   const debugStore = createDebugStore();
   const settingsStore = createSettingsStore();
   const audio = createGameAudio();
+  const getCurrentProfileHeight = (): number => getProfileById(profileId).height;
+  const getCurrentSandboxLaneSettings = (): SandboxLaneSettings =>
+    getSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      getCurrentProfileHeight()
+    );
+  const applySandboxLaneSettingsForCurrentProfile = (): void => {
+    debugStore.setSandboxLaneSettings(getCurrentSandboxLaneSettings());
+  };
+  const setSandboxLaneSettingsForCurrentProfile = (
+    settings: SandboxLaneSettings,
+    saveStatus = 'Unsaved lane changes'
+  ): SandboxLaneSettings => {
+    const worldHeight = getCurrentProfileHeight();
+    const normalizedSettings = normalizeSandboxLaneSettings(settings, worldHeight);
+
+    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      normalizedSettings,
+      worldHeight
+    );
+    sandboxLaneSettingsDirty = true;
+    laneEditorSaveStatus = saveStatus;
+    debugStore.setSandboxLaneSettings(normalizedSettings);
+
+    return normalizedSettings;
+  };
   const context: AppContext = {
     debugStore,
     settingsStore,
@@ -332,6 +314,9 @@ export function createApp(root: HTMLDivElement | null): void {
       debugElementsConfig = normalizeDebugElementsConfig(config);
       elementEditorSaveStatus = 'Unsaved element changes';
       debugStore.setElementEditor(normalizeElementEditorSettings(debugStore.get().elementEditor));
+    },
+    setSandboxLaneSettings: (settings) => {
+      setSandboxLaneSettingsForCurrentProfile(settings);
     }
   };
 
@@ -387,738 +372,137 @@ export function createApp(root: HTMLDivElement | null): void {
 
   gameMount.tabIndex = 0;
 
-  debugControls.innerHTML = `
-    <div class="panel-group">
-      <p class="panel-group__title">Runtime</p>
-      <button id="pause-toggle" class="shell-button" data-variant="primary" type="button">Pause</button>
-      <button id="reset-actors" class="shell-button" type="button">Reset actors</button>
-      <label class="toggle-row"><input id="show-world" type="checkbox" /> World bounds</label>
-      <label class="toggle-row"><input id="enemy-ai" type="checkbox" /> Enemy AI</label>
-      <label class="select-row" for="background-file">
-        <span>Background</span>
-        <select id="background-file"></select>
-      </label>
-      <label class="select-row" for="bgm-track">
-        <span>BGM</span>
-        <select id="bgm-track">
-          ${BGM_TRACKS.map((track) => `<option value="${track.id}">${track.label}</option>`).join('')}
-        </select>
-      </label>
-    </div>
-    <div class="panel-group">
-      <p class="panel-group__title">Scenes</p>
-      <div class="panel-group__row">
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Sandbox}">Sandbox</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Gym}">Gym</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LaneEditor}">Lanes</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LevelProgress}">Levels</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.ElementEditor}">Elements</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BaselineLevel}">Baseline</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.RunnerLab}">Runner</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BackgroundLab}">Background</button>
-      </div>
-    </div>
-    <div class="panel-group">
-      <p class="panel-group__title">Overlays</p>
-      <label class="toggle-row"><input id="show-visual-bounds" type="checkbox" /> Visual bounds</label>
-      <label class="toggle-row"><input id="show-hit-boxes" type="checkbox" /> Hit boxes</label>
-      <label class="toggle-row"><input id="show-attack-boxes" type="checkbox" /> Attack boxes</label>
-      <label class="toggle-row"><input id="show-origins" type="checkbox" /> Origins</label>
-      <label class="toggle-row"><input id="show-pointer-probe" type="checkbox" /> Pointer probe</label>
-      <label class="toggle-row"><input id="show-enemy-ranges" type="checkbox" /> Enemy attack box</label>
-    </div>
-    <div id="lane-editor-controls" class="panel-group">
-      <p class="panel-group__title">Lane Editor</p>
-      <label class="toggle-row"><input id="show-lane-guides" type="checkbox" /> Show in Sandbox</label>
-      <label class="range-row">
-        <span>Upper Y</span>
-        <input id="lane-upper-y" type="range" min="0" max="720" step="1" />
-        <strong id="lane-upper-y-readout">372</strong>
-      </label>
-      <label class="range-row">
-        <span>Middle Y</span>
-        <input id="lane-middle-y" type="range" min="0" max="720" step="1" />
-        <strong id="lane-middle-y-readout">468</strong>
-      </label>
-      <label class="range-row">
-        <span>Lower Y</span>
-        <input id="lane-lower-y" type="range" min="0" max="720" step="1" />
-        <strong id="lane-lower-y-readout">564</strong>
-      </label>
-      <div class="editor-grid">
-        <label class="number-row"><span>U</span><input id="lane-upper-y-number" type="number" min="0" max="720" step="1" /></label>
-        <label class="number-row"><span>M</span><input id="lane-middle-y-number" type="number" min="0" max="720" step="1" /></label>
-        <label class="number-row"><span>L</span><input id="lane-lower-y-number" type="number" min="0" max="720" step="1" /></label>
-      </div>
-      <div class="panel-group__row">
-        <button id="lane-reset" class="shell-button" type="button">Reset lanes</button>
-      </div>
-      <p id="lane-save-status" class="panel-note">Loaded defaults</p>
-    </div>
-    <div class="panel-group">
-      <p class="panel-group__title">Gameplay Tuning</p>
-      <label class="range-row">
-        <span>Player</span>
-        <input id="tuning-player-speed" type="range" min="${GAMEPLAY_TUNING_LIMITS.playerSpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.playerSpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.playerSpeed.step}" />
-        <strong id="tuning-player-speed-readout">260</strong>
-      </label>
-      <label class="range-row">
-        <span>Enemy</span>
-        <input id="tuning-enemy-speed" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemySpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.enemySpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.enemySpeed.step}" />
-        <strong id="tuning-enemy-speed-readout">260</strong>
-      </label>
-      <label class="range-row">
-        <span>Recover</span>
-        <input id="tuning-recovery" type="range" min="${GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.min}" max="${GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.max}" step="${GAMEPLAY_TUNING_LIMITS.enemyRecoveryMs.step}" />
-        <strong id="tuning-recovery-readout">900</strong>
-      </label>
-      <label class="range-row">
-        <span>Knockback</span>
-        <input id="tuning-knockback" type="range" min="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.min}" max="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.max}" step="${GAMEPLAY_TUNING_LIMITS.playerKnockbackSpeed.step}" />
-        <strong id="tuning-knockback-readout">360</strong>
-      </label>
-      <label class="range-row">
-        <span>Round base</span>
-        <input id="tuning-round-base" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.min}" max="${GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.max}" step="${GAMEPLAY_TUNING_LIMITS.roundEnemyBaseCount.step}" />
-        <strong id="tuning-round-base-readout">1</strong>
-      </label>
-      <label class="range-row">
-        <span>Round step</span>
-        <input id="tuning-round-step" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.min}" max="${GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.max}" step="${GAMEPLAY_TUNING_LIMITS.roundEnemyIncrease.step}" />
-        <strong id="tuning-round-step-readout">1</strong>
-      </label>
-      <label class="range-row">
-        <span>Round max</span>
-        <input id="tuning-round-max" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.min}" max="${GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.max}" step="${GAMEPLAY_TUNING_LIMITS.roundEnemyMaxCount.step}" />
-        <strong id="tuning-round-max-readout">9</strong>
-      </label>
-      <label class="range-row">
-        <span>Wait</span>
-        <input id="tuning-round-wait" type="range" min="${GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.min}" max="${GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.max}" step="${GAMEPLAY_TUNING_LIMITS.roundIntermissionMs.step}" />
-        <strong id="tuning-round-wait-readout">1200</strong>
-      </label>
-      <label class="select-row" for="tuning-round-growth">
-        <span>Round growth</span>
-        <select id="tuning-round-growth">
-          ${ROUND_ENEMY_GROWTH_MODES.map((mode) => `<option value="${mode}">${mode}</option>`).join('')}
-        </select>
-      </label>
-      <div class="panel-group__row">
-        <button id="tuning-save" class="shell-button" data-variant="primary" type="button">Save</button>
-        <button id="tuning-reset" class="shell-button" type="button">Reset</button>
-      </div>
-      <p id="tuning-save-status" class="panel-note">Loaded defaults</p>
-    </div>
-    <div class="panel-group">
-      <p class="panel-group__title">Level Progress</p>
-      <div id="level-progress-list" class="toggle-list"></div>
-      <div class="panel-group__row">
-        <button id="level-progress-complete" class="shell-button" type="button">Complete selected</button>
-        <button id="level-progress-reset" class="shell-button" type="button">Reset progress</button>
-      </div>
-    </div>
-    <div id="background-lab-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Background Lab</p>
-      <label class="select-row" for="background-fit-mode">
-        <span>Fit</span>
-        <select id="background-fit-mode">
-          ${BACKGROUND_FIT_MODES.map((mode) => `<option value="${mode}">${mode}</option>`).join('')}
-        </select>
-      </label>
-      <label class="toggle-row"><input id="background-show-grid" type="checkbox" /> Grid</label>
-      <label class="toggle-row"><input id="background-show-safe" type="checkbox" /> Safe frame</label>
-      <label class="toggle-row"><input id="background-show-baseline" type="checkbox" /> Baseline</label>
-      <label class="range-row">
-        <span>Scroll</span>
-        <input id="background-scroll-speed" type="range" min="-220" max="220" step="10" />
-        <strong id="background-scroll-readout">0</strong>
-      </label>
-    </div>
-    <div id="runner-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Runner Generator</p>
-      <label class="range-row"><span>Seed</span><input id="runner-seed" type="range" min="1" max="999" step="1" /><strong id="runner-seed-readout">7</strong></label>
-      <label class="range-row"><span>Difficulty</span><input id="runner-difficulty" type="range" min="0" max="1" step="0.01" /><strong id="runner-difficulty-readout">0.42</strong></label>
-      <label class="range-row"><span>Gaps</span><input id="runner-gaps" type="range" min="0" max="1" step="0.01" /><strong id="runner-gaps-readout">0.34</strong></label>
-      <label class="range-row"><span>Lanes</span><input id="runner-lanes" type="range" min="1" max="5" step="1" /><strong id="runner-lanes-readout">3</strong></label>
-      <label class="range-row"><span>Speed</span><input id="runner-speed" type="range" min="0" max="520" step="10" /><strong id="runner-speed-readout">230</strong></label>
-      <label class="toggle-row"><input id="runner-show-plan" type="checkbox" /> Plan view</label>
-      <label class="toggle-row"><input id="runner-show-hitboxes" type="checkbox" /> Hitboxes</label>
-    </div>
-    <div id="baseline-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Baseline Level</p>
-      <label class="select-row" for="baseline-level-select">
-        <span>Level</span>
-        <select id="baseline-level-select">
-          ${DEBUG_LEVELS.map((level) => `<option value="${level.id}">${level.label}</option>`).join('')}
-        </select>
-      </label>
-      <label class="toggle-row"><input id="baseline-show-hitboxes" type="checkbox" /> Hitboxes</label>
-      <label class="toggle-row"><input id="baseline-show-spawn-goal" type="checkbox" /> Spawn / goal</label>
-      <label class="toggle-row"><input id="baseline-show-camera-bands" type="checkbox" /> Camera bands</label>
-    </div>
-    <div id="element-editor-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Element Editor</p>
-      <label class="select-row" for="element-level">
-        <span>Level</span>
-        <select id="element-level">
-          ${DEBUG_LEVELS.map((level) => `<option value="${level.id}">${level.label}</option>`).join('')}
-        </select>
-      </label>
-      <label class="select-row" for="element-kind">
-        <span>Kind</span>
-        <select id="element-kind">
-          ${DEBUG_ELEMENT_KINDS.map((kind) => `<option value="${kind}">${formatElementKind(kind)}</option>`).join('')}
-        </select>
-      </label>
-      <label class="toggle-row"><input id="element-show-grid" type="checkbox" /> Grid</label>
-      <label class="toggle-row"><input id="element-show-labels" type="checkbox" /> Labels</label>
-      <label class="toggle-row"><input id="element-show-collision" type="checkbox" /> Collision inset</label>
-      <div class="panel-group__row">
-        <button id="element-add" class="shell-button" type="button">Add</button>
-        <button id="element-duplicate" class="shell-button" type="button">Duplicate</button>
-        <button id="element-delete" class="shell-button" type="button">Delete</button>
-      </div>
-      <div class="panel-group__row">
-        <button class="shell-button" type="button" data-element-nudge="0,-8">Up</button>
-        <button class="shell-button" type="button" data-element-nudge="-8,0">Left</button>
-        <button class="shell-button" type="button" data-element-nudge="8,0">Right</button>
-        <button class="shell-button" type="button" data-element-nudge="0,8">Down</button>
-      </div>
-      <div class="panel-group__row">
-        <button id="element-save" class="shell-button" data-variant="primary" type="button">Save</button>
-        <button id="element-export" class="shell-button" type="button">Export</button>
-      </div>
-      <p id="element-editor-readout" class="panel-note">Loaded defaults</p>
-    </div>
-    <div id="gym-controls" class="panel-group" hidden>
-      <div class="panel-group__header">
-        <p class="panel-group__title">Gym</p>
-        <button id="gym-exit" class="shell-button" type="button">Exit Gym</button>
-      </div>
-      <label class="select-row" for="gym-actor">
-        <span>Actor</span>
-        <select id="gym-actor">
-          ${NINJA_ACTORS.map(
-            (actor) => `<option value="${actor.id}">${actor.label}</option>`
-          ).join('')}
-        </select>
-      </label>
-      <label class="select-row" for="gym-direction">
-        <span>Direction</span>
-        <select id="gym-direction">
-          ${FACING_DIRECTIONS.map(
-            (direction) => `<option value="${direction}">${direction}</option>`
-          ).join('')}
-        </select>
-      </label>
-      <label class="select-row" for="gym-action">
-        <span>Animation</span>
-        <select id="gym-action"></select>
-      </label>
-      <label class="toggle-row"><input id="gym-show-visual" type="checkbox" /> Visual bounds</label>
-      <label class="toggle-row"><input id="gym-show-collision" type="checkbox" /> Collision bounds</label>
-      <label class="toggle-row"><input id="gym-show-attack" type="checkbox" /> Attack bounds</label>
-      <label class="range-row">
-        <span>Action speed</span>
-        <input id="gym-playback-rate" type="range" min="${NINJA_PLAYBACK_RATE_LIMITS.min}" max="${NINJA_PLAYBACK_RATE_LIMITS.max}" step="${NINJA_PLAYBACK_RATE_LIMITS.step}" />
-        <strong id="gym-playback-readout">1.00x</strong>
-      </label>
-      <div class="frame-control">
-        <div class="frame-control__header">
-          <span>Attack Frames</span>
-          <strong id="gym-frame-readout">1/32</strong>
-        </div>
-        <p id="gym-attack-frame-readout" class="panel-note">Active: none</p>
-        <div id="gym-attack-frame-strip" class="frame-strip" aria-label="Attack active frames"></div>
-        <div class="panel-group__row">
-          <button id="gym-toggle-current-hit-frame" class="shell-button" type="button">Enable current</button>
-          <button id="gym-only-current-hit-frame" class="shell-button" type="button">Only current</button>
-          <button id="gym-clear-hit-frames" class="shell-button" type="button">Clear</button>
-          <button id="gym-reset-hit-frames" class="shell-button" type="button">Default</button>
-        </div>
-      </div>
-      <label class="select-row" for="gym-bounds-kind">
-        <span>Bounds</span>
-        <select id="gym-bounds-kind">
-          <option value="visual">Visual</option>
-          <option value="collision">Collision</option>
-          <option value="attack">Attack</option>
-        </select>
-      </label>
-      <div class="editor-grid">
-        <label class="number-row"><span>X</span><input id="gym-bounds-x" type="number" min="0" max="255" step="1" /></label>
-        <label class="number-row"><span>Y</span><input id="gym-bounds-y" type="number" min="0" max="255" step="1" /></label>
-        <label class="number-row"><span>W</span><input id="gym-bounds-width" type="number" min="1" max="256" step="1" /></label>
-        <label class="number-row"><span>H</span><input id="gym-bounds-height" type="number" min="1" max="256" step="1" /></label>
-      </div>
-      <div class="panel-group__row">
-        <button id="gym-save-bounds" class="shell-button" data-variant="primary" type="button">Save config</button>
-        <button id="gym-reset-bounds" class="shell-button" type="button">Reset</button>
-        <button id="gym-mirror-direction" class="shell-button" type="button">Mirror selected</button>
-        <button id="gym-apply-kind-all" class="shell-button" type="button">Apply selected</button>
-        <button id="gym-apply-all" class="shell-button" type="button">Apply all</button>
-      </div>
-      <div class="frame-control">
-        <div class="frame-control__header">
-          <span>Lane Anchor</span>
-          <strong id="gym-lane-anchor-readout">X64 Y127</strong>
-        </div>
-        <div class="editor-grid">
-          <label class="number-row"><span>X</span><input id="gym-lane-anchor-x" type="number" min="0" max="${NINJA_FRAME_SIZE - 1}" step="1" /></label>
-          <label class="number-row"><span>Y</span><input id="gym-lane-anchor-y" type="number" min="0" max="${NINJA_FRAME_SIZE - 1}" step="1" /></label>
-        </div>
-        <div class="panel-group__row">
-          <button id="gym-mirror-lane-anchor" class="shell-button" type="button">Mirror anchor</button>
-          <button id="gym-apply-lane-anchor-all" class="shell-button" type="button">Apply all</button>
-        </div>
-      </div>
-      <p id="gym-save-status" class="panel-note">Loaded defaults</p>
-    </div>
-    <div class="metrics">
-      <div class="metrics__row"><span>Scene</span><strong id="scene-readout">Boot</strong></div>
-      <div class="metrics__row"><span>FPS</span><strong id="fps-readout">0</strong></div>
-      <div class="metrics__row"><span>Pointer</span><strong id="pointer-readout">0, 0</strong></div>
-      <div class="metrics__row"><span>Input</span><strong id="input-readout">idle</strong></div>
-      <div class="metrics__row"><span>Player</span><strong id="player-readout">none</strong></div>
-      <div class="metrics__row"><span>Enemy</span><strong id="enemy-readout">none</strong></div>
-      <div class="metrics__row"><span>Attack</span><strong id="attack-readout">inactive</strong></div>
-      <div class="metrics__row"><span>Round</span><strong id="round-readout">ready</strong></div>
-    </div>
-  `;
+  debugControls.innerHTML = createDebugControlsHtml();
 
-  const pauseToggle = requireElement(debugControls, '#pause-toggle', HTMLButtonElement);
-  const resetActorsButton = requireElement(debugControls, '#reset-actors', HTMLButtonElement);
-  const showWorldToggle = requireElement(debugControls, '#show-world', HTMLInputElement);
-  const showVisualBoundsToggle = requireElement(
-    debugControls,
-    '#show-visual-bounds',
-    HTMLInputElement
-  );
-  const showHitBoxesToggle = requireElement(debugControls, '#show-hit-boxes', HTMLInputElement);
-  const showAttackBoxesToggle = requireElement(
-    debugControls,
-    '#show-attack-boxes',
-    HTMLInputElement
-  );
-  const showOriginsToggle = requireElement(debugControls, '#show-origins', HTMLInputElement);
-  const showPointerProbeToggle = requireElement(
-    debugControls,
-    '#show-pointer-probe',
-    HTMLInputElement
-  );
-  const showEnemyRangesToggle = requireElement(
-    debugControls,
-    '#show-enemy-ranges',
-    HTMLInputElement
-  );
-  const laneEditorControls = requireElement(
-    debugControls,
-    '#lane-editor-controls',
-    HTMLElement
-  );
-  const showLaneGuidesToggle = requireElement(
-    debugControls,
-    '#show-lane-guides',
-    HTMLInputElement
-  );
-  const laneUpperYInput = requireElement(debugControls, '#lane-upper-y', HTMLInputElement);
-  const laneMiddleYInput = requireElement(debugControls, '#lane-middle-y', HTMLInputElement);
-  const laneLowerYInput = requireElement(debugControls, '#lane-lower-y', HTMLInputElement);
-  const laneUpperYReadout = requireElement(
-    debugControls,
-    '#lane-upper-y-readout',
-    HTMLElement
-  );
-  const laneMiddleYReadout = requireElement(
-    debugControls,
-    '#lane-middle-y-readout',
-    HTMLElement
-  );
-  const laneLowerYReadout = requireElement(
-    debugControls,
-    '#lane-lower-y-readout',
-    HTMLElement
-  );
-  const laneUpperYNumberInput = requireElement(
-    debugControls,
-    '#lane-upper-y-number',
-    HTMLInputElement
-  );
-  const laneMiddleYNumberInput = requireElement(
-    debugControls,
-    '#lane-middle-y-number',
-    HTMLInputElement
-  );
-  const laneLowerYNumberInput = requireElement(
-    debugControls,
-    '#lane-lower-y-number',
-    HTMLInputElement
-  );
-  const laneResetButton = requireElement(debugControls, '#lane-reset', HTMLButtonElement);
-  const laneSaveStatus = requireElement(debugControls, '#lane-save-status', HTMLElement);
-  const enemyAiToggle = requireElement(debugControls, '#enemy-ai', HTMLInputElement);
-  const backgroundFileSelect = requireElement(debugControls, '#background-file', HTMLSelectElement);
-  const bgmTrackSelect = requireElement(debugControls, '#bgm-track', HTMLSelectElement);
-  const tuningPlayerSpeedInput = requireElement(
-    debugControls,
-    '#tuning-player-speed',
-    HTMLInputElement
-  );
-  const tuningPlayerSpeedReadout = requireElement(
-    debugControls,
-    '#tuning-player-speed-readout',
-    HTMLElement
-  );
-  const tuningEnemySpeedInput = requireElement(
-    debugControls,
-    '#tuning-enemy-speed',
-    HTMLInputElement
-  );
-  const tuningEnemySpeedReadout = requireElement(
-    debugControls,
-    '#tuning-enemy-speed-readout',
-    HTMLElement
-  );
-  const tuningRecoveryInput = requireElement(
-    debugControls,
-    '#tuning-recovery',
-    HTMLInputElement
-  );
-  const tuningRecoveryReadout = requireElement(
-    debugControls,
-    '#tuning-recovery-readout',
-    HTMLElement
-  );
-  const tuningKnockbackInput = requireElement(
-    debugControls,
-    '#tuning-knockback',
-    HTMLInputElement
-  );
-  const tuningKnockbackReadout = requireElement(
-    debugControls,
-    '#tuning-knockback-readout',
-    HTMLElement
-  );
-  const tuningRoundBaseInput = requireElement(
-    debugControls,
-    '#tuning-round-base',
-    HTMLInputElement
-  );
-  const tuningRoundBaseReadout = requireElement(
-    debugControls,
-    '#tuning-round-base-readout',
-    HTMLElement
-  );
-  const tuningRoundStepInput = requireElement(
-    debugControls,
-    '#tuning-round-step',
-    HTMLInputElement
-  );
-  const tuningRoundStepReadout = requireElement(
-    debugControls,
-    '#tuning-round-step-readout',
-    HTMLElement
-  );
-  const tuningRoundMaxInput = requireElement(
-    debugControls,
-    '#tuning-round-max',
-    HTMLInputElement
-  );
-  const tuningRoundMaxReadout = requireElement(
-    debugControls,
-    '#tuning-round-max-readout',
-    HTMLElement
-  );
-  const tuningRoundWaitInput = requireElement(
-    debugControls,
-    '#tuning-round-wait',
-    HTMLInputElement
-  );
-  const tuningRoundWaitReadout = requireElement(
-    debugControls,
-    '#tuning-round-wait-readout',
-    HTMLElement
-  );
-  const tuningRoundGrowthSelect = requireElement(
-    debugControls,
-    '#tuning-round-growth',
-    HTMLSelectElement
-  );
-  const tuningSaveButton = requireElement(debugControls, '#tuning-save', HTMLButtonElement);
-  const tuningResetButton = requireElement(debugControls, '#tuning-reset', HTMLButtonElement);
-  const tuningSaveStatus = requireElement(debugControls, '#tuning-save-status', HTMLElement);
-  const levelProgressList = requireElement(debugControls, '#level-progress-list', HTMLElement);
-  const levelProgressCompleteButton = requireElement(
-    debugControls,
-    '#level-progress-complete',
-    HTMLButtonElement
-  );
-  const levelProgressResetButton = requireElement(
-    debugControls,
-    '#level-progress-reset',
-    HTMLButtonElement
-  );
-  const backgroundLabControls = requireElement(
-    debugControls,
-    '#background-lab-controls',
-    HTMLElement
-  );
-  const backgroundFitModeSelect = requireElement(
-    debugControls,
-    '#background-fit-mode',
-    HTMLSelectElement
-  );
-  const backgroundShowGridToggle = requireElement(
-    debugControls,
-    '#background-show-grid',
-    HTMLInputElement
-  );
-  const backgroundShowSafeToggle = requireElement(
-    debugControls,
-    '#background-show-safe',
-    HTMLInputElement
-  );
-  const backgroundShowBaselineToggle = requireElement(
-    debugControls,
-    '#background-show-baseline',
-    HTMLInputElement
-  );
-  const backgroundScrollSpeedInput = requireElement(
-    debugControls,
-    '#background-scroll-speed',
-    HTMLInputElement
-  );
-  const backgroundScrollReadout = requireElement(
-    debugControls,
-    '#background-scroll-readout',
-    HTMLElement
-  );
-  const runnerControls = requireElement(debugControls, '#runner-controls', HTMLElement);
-  const runnerSeedInput = requireElement(debugControls, '#runner-seed', HTMLInputElement);
-  const runnerSeedReadout = requireElement(debugControls, '#runner-seed-readout', HTMLElement);
-  const runnerDifficultyInput = requireElement(
-    debugControls,
-    '#runner-difficulty',
-    HTMLInputElement
-  );
-  const runnerDifficultyReadout = requireElement(
-    debugControls,
-    '#runner-difficulty-readout',
-    HTMLElement
-  );
-  const runnerGapsInput = requireElement(debugControls, '#runner-gaps', HTMLInputElement);
-  const runnerGapsReadout = requireElement(debugControls, '#runner-gaps-readout', HTMLElement);
-  const runnerLanesInput = requireElement(debugControls, '#runner-lanes', HTMLInputElement);
-  const runnerLanesReadout = requireElement(debugControls, '#runner-lanes-readout', HTMLElement);
-  const runnerSpeedInput = requireElement(debugControls, '#runner-speed', HTMLInputElement);
-  const runnerSpeedReadout = requireElement(debugControls, '#runner-speed-readout', HTMLElement);
-  const runnerShowPlanToggle = requireElement(
-    debugControls,
-    '#runner-show-plan',
-    HTMLInputElement
-  );
-  const runnerShowHitboxesToggle = requireElement(
-    debugControls,
-    '#runner-show-hitboxes',
-    HTMLInputElement
-  );
-  const baselineControls = requireElement(debugControls, '#baseline-controls', HTMLElement);
-  const baselineLevelSelect = requireElement(
-    debugControls,
-    '#baseline-level-select',
-    HTMLSelectElement
-  );
-  const baselineShowHitboxesToggle = requireElement(
-    debugControls,
-    '#baseline-show-hitboxes',
-    HTMLInputElement
-  );
-  const baselineShowSpawnGoalToggle = requireElement(
-    debugControls,
-    '#baseline-show-spawn-goal',
-    HTMLInputElement
-  );
-  const baselineShowCameraBandsToggle = requireElement(
-    debugControls,
-    '#baseline-show-camera-bands',
-    HTMLInputElement
-  );
-  const elementEditorControls = requireElement(
-    debugControls,
-    '#element-editor-controls',
-    HTMLElement
-  );
-  const elementLevelSelect = requireElement(debugControls, '#element-level', HTMLSelectElement);
-  const elementKindSelect = requireElement(debugControls, '#element-kind', HTMLSelectElement);
-  const elementShowGridToggle = requireElement(
-    debugControls,
-    '#element-show-grid',
-    HTMLInputElement
-  );
-  const elementShowLabelsToggle = requireElement(
-    debugControls,
-    '#element-show-labels',
-    HTMLInputElement
-  );
-  const elementShowCollisionToggle = requireElement(
-    debugControls,
-    '#element-show-collision',
-    HTMLInputElement
-  );
-  const elementAddButton = requireElement(debugControls, '#element-add', HTMLButtonElement);
-  const elementDuplicateButton = requireElement(
-    debugControls,
-    '#element-duplicate',
-    HTMLButtonElement
-  );
-  const elementDeleteButton = requireElement(debugControls, '#element-delete', HTMLButtonElement);
-  const elementSaveButton = requireElement(debugControls, '#element-save', HTMLButtonElement);
-  const elementExportButton = requireElement(debugControls, '#element-export', HTMLButtonElement);
-  const elementEditorReadout = requireElement(
-    debugControls,
-    '#element-editor-readout',
-    HTMLElement
-  );
-  const gymControls = requireElement(debugControls, '#gym-controls', HTMLElement);
-  const gymExitButton = requireElement(debugControls, '#gym-exit', HTMLButtonElement);
-  const gymActorSelect = requireElement(debugControls, '#gym-actor', HTMLSelectElement);
-  const gymDirectionSelect = requireElement(debugControls, '#gym-direction', HTMLSelectElement);
-  const gymActionSelect = requireElement(debugControls, '#gym-action', HTMLSelectElement);
-  const gymShowVisualToggle = requireElement(debugControls, '#gym-show-visual', HTMLInputElement);
-  const gymShowCollisionToggle = requireElement(
-    debugControls,
-    '#gym-show-collision',
-    HTMLInputElement
-  );
-  const gymShowAttackToggle = requireElement(debugControls, '#gym-show-attack', HTMLInputElement);
-  const gymPlaybackRateInput = requireElement(
-    debugControls,
-    '#gym-playback-rate',
-    HTMLInputElement
-  );
-  const gymPlaybackReadout = requireElement(
-    debugControls,
-    '#gym-playback-readout',
-    HTMLElement
-  );
-  const gymFrameReadout = requireElement(debugControls, '#gym-frame-readout', HTMLElement);
-  const gymAttackFrameReadout = requireElement(
-    debugControls,
-    '#gym-attack-frame-readout',
-    HTMLElement
-  );
-  const gymAttackFrameStrip = requireElement(
-    debugControls,
-    '#gym-attack-frame-strip',
-    HTMLElement
-  );
-  const gymToggleCurrentHitFrameButton = requireElement(
-    debugControls,
-    '#gym-toggle-current-hit-frame',
-    HTMLButtonElement
-  );
-  const gymOnlyCurrentHitFrameButton = requireElement(
-    debugControls,
-    '#gym-only-current-hit-frame',
-    HTMLButtonElement
-  );
-  const gymClearHitFramesButton = requireElement(
-    debugControls,
-    '#gym-clear-hit-frames',
-    HTMLButtonElement
-  );
-  const gymResetHitFramesButton = requireElement(
-    debugControls,
-    '#gym-reset-hit-frames',
-    HTMLButtonElement
-  );
-  const gymBoundsKindSelect = requireElement(
-    debugControls,
-    '#gym-bounds-kind',
-    HTMLSelectElement
-  );
-  const gymBoundsXInput = requireElement(debugControls, '#gym-bounds-x', HTMLInputElement);
-  const gymBoundsYInput = requireElement(debugControls, '#gym-bounds-y', HTMLInputElement);
-  const gymBoundsWidthInput = requireElement(
-    debugControls,
-    '#gym-bounds-width',
-    HTMLInputElement
-  );
-  const gymBoundsHeightInput = requireElement(
-    debugControls,
-    '#gym-bounds-height',
-    HTMLInputElement
-  );
-  const gymSaveBoundsButton = requireElement(
-    debugControls,
-    '#gym-save-bounds',
-    HTMLButtonElement
-  );
-  const gymResetBoundsButton = requireElement(
-    debugControls,
-    '#gym-reset-bounds',
-    HTMLButtonElement
-  );
-  const gymMirrorDirectionButton = requireElement(
-    debugControls,
-    '#gym-mirror-direction',
-    HTMLButtonElement
-  );
-  const gymApplyKindAllButton = requireElement(
-    debugControls,
-    '#gym-apply-kind-all',
-    HTMLButtonElement
-  );
-  const gymApplyAllButton = requireElement(
-    debugControls,
-    '#gym-apply-all',
-    HTMLButtonElement
-  );
-  const gymLaneAnchorReadout = requireElement(
-    debugControls,
-    '#gym-lane-anchor-readout',
-    HTMLElement
-  );
-  const gymLaneAnchorXInput = requireElement(
-    debugControls,
-    '#gym-lane-anchor-x',
-    HTMLInputElement
-  );
-  const gymLaneAnchorYInput = requireElement(
-    debugControls,
-    '#gym-lane-anchor-y',
-    HTMLInputElement
-  );
-  const gymMirrorLaneAnchorButton = requireElement(
-    debugControls,
-    '#gym-mirror-lane-anchor',
-    HTMLButtonElement
-  );
-  const gymApplyLaneAnchorAllButton = requireElement(
-    debugControls,
-    '#gym-apply-lane-anchor-all',
-    HTMLButtonElement
-  );
-  const gymSaveStatusElement = requireElement(debugControls, '#gym-save-status', HTMLElement);
-  const sceneReadout = requireElement(debugControls, '#scene-readout', HTMLElement);
-  const fpsReadout = requireElement(debugControls, '#fps-readout', HTMLElement);
-  const pointerReadout = requireElement(debugControls, '#pointer-readout', HTMLElement);
-  const inputReadout = requireElement(debugControls, '#input-readout', HTMLElement);
-  const playerReadout = requireElement(debugControls, '#player-readout', HTMLElement);
-  const enemyReadout = requireElement(debugControls, '#enemy-readout', HTMLElement);
-  const attackReadout = requireElement(debugControls, '#attack-readout', HTMLElement);
-  const roundReadout = requireElement(debugControls, '#round-readout', HTMLElement);
-
-  const setControlGroupHidden = (group: HTMLElement, hidden: boolean): void => {
-    group.hidden = hidden;
-    group
-      .querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>(
-        'input, select, button'
-      )
-      .forEach((control) => {
-        control.disabled = hidden;
-      });
-  };
+  const {
+    pauseToggle,
+    resetActorsButton,
+    showWorldToggle,
+    showVisualBoundsToggle,
+    showHitBoxesToggle,
+    showAttackBoxesToggle,
+    showOriginsToggle,
+    showPointerProbeToggle,
+    showEnemyRangesToggle,
+    laneEditorControls,
+    showLaneGuidesToggle,
+    laneUpperYInput,
+    laneMiddleYInput,
+    laneLowerYInput,
+    laneUpperYReadout,
+    laneMiddleYReadout,
+    laneLowerYReadout,
+    laneUpperYNumberInput,
+    laneMiddleYNumberInput,
+    laneLowerYNumberInput,
+    laneSaveButton,
+    laneResetButton,
+    laneSaveStatus,
+    enemyAiToggle,
+    backgroundFileSelect,
+    bgmTrackSelect,
+    tuningPlayerSpeedInput,
+    tuningPlayerSpeedReadout,
+    tuningEnemySpeedInput,
+    tuningEnemySpeedReadout,
+    tuningRecoveryInput,
+    tuningRecoveryReadout,
+    tuningKnockbackInput,
+    tuningKnockbackReadout,
+    tuningRoundBaseInput,
+    tuningRoundBaseReadout,
+    tuningRoundStepInput,
+    tuningRoundStepReadout,
+    tuningRoundMaxInput,
+    tuningRoundMaxReadout,
+    tuningRoundWaitInput,
+    tuningRoundWaitReadout,
+    tuningRoundGrowthSelect,
+    tuningSaveButton,
+    tuningResetButton,
+    tuningSaveStatus,
+    levelProgressList,
+    levelProgressCompleteButton,
+    levelProgressResetButton,
+    backgroundLabControls,
+    backgroundFitModeSelect,
+    backgroundShowGridToggle,
+    backgroundShowSafeToggle,
+    backgroundShowBaselineToggle,
+    backgroundScrollSpeedInput,
+    backgroundScrollReadout,
+    runnerControls,
+    runnerSeedInput,
+    runnerSeedReadout,
+    runnerDifficultyInput,
+    runnerDifficultyReadout,
+    runnerGapsInput,
+    runnerGapsReadout,
+    runnerLanesInput,
+    runnerLanesReadout,
+    runnerSpeedInput,
+    runnerSpeedReadout,
+    runnerShowPlanToggle,
+    runnerShowHitboxesToggle,
+    baselineControls,
+    baselineLevelSelect,
+    baselineShowHitboxesToggle,
+    baselineShowSpawnGoalToggle,
+    baselineShowCameraBandsToggle,
+    elementEditorControls,
+    elementLevelSelect,
+    elementKindSelect,
+    elementShowGridToggle,
+    elementShowLabelsToggle,
+    elementShowCollisionToggle,
+    elementAddButton,
+    elementDuplicateButton,
+    elementDeleteButton,
+    elementSaveButton,
+    elementExportButton,
+    elementEditorReadout,
+    gymControls,
+    gymExitButton,
+    gymActorSelect,
+    gymDirectionSelect,
+    gymActionSelect,
+    gymShowVisualToggle,
+    gymShowCollisionToggle,
+    gymShowAttackToggle,
+    gymPlaybackRateInput,
+    gymPlaybackReadout,
+    gymFrameReadout,
+    gymAttackFrameReadout,
+    gymAttackFrameStrip,
+    gymToggleCurrentHitFrameButton,
+    gymOnlyCurrentHitFrameButton,
+    gymClearHitFramesButton,
+    gymResetHitFramesButton,
+    gymBoundsKindSelect,
+    gymBoundsXInput,
+    gymBoundsYInput,
+    gymBoundsWidthInput,
+    gymBoundsHeightInput,
+    gymSaveBoundsButton,
+    gymResetBoundsButton,
+    gymMirrorDirectionButton,
+    gymApplyKindAllButton,
+    gymApplyAllButton,
+    gymLaneAnchorReadout,
+    gymLaneAnchorXInput,
+    gymLaneAnchorYInput,
+    gymMirrorLaneAnchorButton,
+    gymApplyLaneAnchorAllButton,
+    gymSaveStatusElement,
+    sceneReadout,
+    fpsReadout,
+    pointerReadout,
+    inputReadout,
+    playerReadout,
+    enemyReadout,
+    attackReadout,
+    roundReadout
+  } = getDebugConsoleRefs(debugControls);
 
   const refreshScale = (): void => {
     requestAnimationFrameOnce(() => {
@@ -1230,8 +614,6 @@ export function createApp(root: HTMLDivElement | null): void {
     );
   };
 
-  const getCurrentProfileHeight = (): number => getProfileById(profileId).height;
-
   const getLaneControlMaxY = (): number =>
     Math.max(THREE_LANE_MIN_Y, getCurrentProfileHeight() - THREE_LANE_BOTTOM_INSET);
 
@@ -1252,37 +634,16 @@ export function createApp(root: HTMLDivElement | null): void {
     });
   };
 
-  const saveLaneSettingsForCurrentProfile = (
-    settings: SandboxLaneSettings
-  ): SandboxLaneSettings => {
-    const worldHeight = getCurrentProfileHeight();
-    const normalizedSettings = normalizeSandboxLaneSettings(settings, worldHeight);
-
-    try {
-      const savedSettings = saveSandboxLaneSettings(
-        profileId,
-        normalizedSettings,
-        worldHeight
-      );
-      laneEditorSaveStatus = 'Saved local lane settings';
-      return savedSettings;
-    } catch {
-      laneEditorSaveStatus = 'Using unsaved lane settings';
-      return normalizedSettings;
-    }
-  };
-
   const patchLaneSettings = (patch: Partial<SandboxLaneSettings>): void => {
     const current = normalizeSandboxLaneSettings(
       debugStore.get().sandboxLaneSettings,
       getCurrentProfileHeight()
     );
-    const nextSettings = saveLaneSettingsForCurrentProfile({
+
+    setSandboxLaneSettingsForCurrentProfile({
       ...current,
       ...patch
     });
-
-    debugStore.setSandboxLaneSettings(nextSettings);
   };
 
   const readGameplayTuningInputs = (): GameplayTuning =>
@@ -1873,10 +1234,12 @@ export function createApp(root: HTMLDivElement | null): void {
     root.dataset.profile = profileId;
     profileToggle.textContent = formatProfileLabel(profileId);
     profileToggle.title = `${GAME_PROFILES[profileId].label}`;
-    debugStore.setSandboxLaneSettings(
-      loadSandboxLaneSettings(profileId, getCurrentProfileHeight())
-    );
-    laneEditorSaveStatus = 'Loaded local lane settings';
+    applySandboxLaneSettingsForCurrentProfile();
+    if (!sandboxLaneSettingsDirty) {
+      laneEditorSaveStatus = sandboxLaneSettingsLoadedFromFile
+        ? 'Loaded public/assets/config/sandbox-lanes.json'
+        : 'Loaded defaults';
+    }
     debugStore.resetRuntime();
     game = createGame({ parent: gameMount, context });
     refreshScale();
@@ -2029,6 +1392,27 @@ export function createApp(root: HTMLDivElement | null): void {
 
     gameplayTuningSaveStatus = 'Loaded public/assets/config/gameplay-tuning.json';
     debugStore.setGameplayTuning(loadedConfig);
+  });
+  void loadSandboxLaneSettingsConfig().then((loadedConfig) => {
+    if (loadedConfig === null) {
+      return;
+    }
+
+    sandboxLaneSettingsLoadedFromFile = true;
+    if (sandboxLaneSettingsDirty) {
+      sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+        loadedConfig,
+        profileId,
+        debugStore.get().sandboxLaneSettings,
+        getCurrentProfileHeight()
+      );
+      return;
+    }
+
+    sandboxLaneSettingsConfig = loadedConfig;
+    laneEditorSaveStatus = 'Loaded public/assets/config/sandbox-lanes.json';
+    applySandboxLaneSettingsForCurrentProfile();
+    renderLaneEditorControls();
   });
   void loadDebugElementsConfig().then((loadedConfig) => {
     if (loadedConfig === null) {
@@ -2189,17 +1573,39 @@ export function createApp(root: HTMLDivElement | null): void {
   laneLowerYNumberInput.addEventListener('change', () => {
     patchLaneSettings({ lowerY: Number(laneLowerYNumberInput.value) });
   });
+  laneSaveButton.addEventListener('click', async () => {
+    laneEditorSaveStatus = 'Saving lane config...';
+    renderLaneEditorControls();
+
+    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      debugStore.get().sandboxLaneSettings,
+      getCurrentProfileHeight()
+    );
+
+    const payload = buildSandboxLaneSettingsExport(sandboxLaneSettingsConfig);
+
+    try {
+      await saveJsonConfig(SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT, payload);
+      sandboxLaneSettingsConfig = payload;
+      sandboxLaneSettingsLoadedFromFile = true;
+      sandboxLaneSettingsDirty = false;
+      laneEditorSaveStatus = 'Saved public/assets/config/sandbox-lanes.json';
+    } catch {
+      downloadJsonFile('sandbox-lanes.json', payload);
+      laneEditorSaveStatus = 'Downloaded sandbox-lanes.json';
+    }
+
+    renderLaneEditorControls();
+  });
   laneResetButton.addEventListener('click', () => {
     const worldHeight = getCurrentProfileHeight();
 
-    try {
-      const resetSettings = resetSandboxLaneSettings(profileId, worldHeight);
-      laneEditorSaveStatus = 'Reset local lane settings';
-      debugStore.setSandboxLaneSettings(resetSettings);
-    } catch {
-      laneEditorSaveStatus = 'Using default lane settings';
-      debugStore.setSandboxLaneSettings(createDefaultSandboxLaneSettings(worldHeight));
-    }
+    setSandboxLaneSettingsForCurrentProfile(
+      createDefaultSandboxLaneSettings(worldHeight),
+      'Unsaved lane reset'
+    );
   });
 
   tuningPlayerSpeedInput.addEventListener('input', setGameplayTuningFromInputs);
@@ -2218,16 +1624,7 @@ export function createApp(root: HTMLDivElement | null): void {
     const payload = normalizeGameplayTuning(debugStore.get().gameplayTuning);
 
     try {
-      const response = await fetch(GAMEPLAY_TUNING_SAVE_ENDPOINT, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Save failed with ${response.status}`);
-      }
-
+      await saveJsonConfig(GAMEPLAY_TUNING_SAVE_ENDPOINT, payload);
       gameplayTuningSaveStatus = 'Saved public/assets/config/gameplay-tuning.json';
     } catch {
       downloadJsonFile('gameplay-tuning.json', payload);
@@ -2362,16 +1759,7 @@ export function createApp(root: HTMLDivElement | null): void {
     const payload = buildDebugElementsExport(debugElementsConfig);
 
     try {
-      const response = await fetch(DEBUG_ELEMENTS_SAVE_ENDPOINT, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Save failed with ${response.status}`);
-      }
-
+      await saveJsonConfig(DEBUG_ELEMENTS_SAVE_ENDPOINT, payload);
       debugElementsConfig = payload;
       elementEditorSaveStatus = 'Saved public/assets/config/debug-elements.json';
     } catch {
@@ -2519,16 +1907,7 @@ export function createApp(root: HTMLDivElement | null): void {
     const payload = buildNinjaBoundsExport(ninjaBoundsConfig);
 
     try {
-      const response = await fetch(NINJA_BOUNDS_SAVE_ENDPOINT, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Save failed with ${response.status}`);
-      }
-
+      await saveJsonConfig(NINJA_BOUNDS_SAVE_ENDPOINT, payload);
       gymSaveStatus = 'Saved public/assets/config/ninja-bounds.json';
     } catch {
       downloadJsonFile('ninja-bounds.json', payload);
