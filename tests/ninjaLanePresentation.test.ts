@@ -8,6 +8,7 @@ import {
   getNinjaLaneAnchorOffset,
   getNinjaLanePerspectiveScaleForLane,
   getNinjaLanePerspectiveScaleForY,
+  getNinjaLanePerspectiveSpeedForLane,
   getNinjaLanePointFromSprite,
   getNinjaLaneXFromSprite,
   getNinjaLaneYFromSprite,
@@ -38,6 +39,27 @@ describe('ninja lane presentation', () => {
         baseScale: 2.1
       })
     ).toBeCloseTo(2.94, 5);
+  });
+
+  it('scales movement speed by lane depth (near faster, far slower)', () => {
+    expect(
+      getNinjaLanePerspectiveSpeedForLane({
+        laneId: 'upper',
+        baseSpeed: 260
+      })
+    ).toBeCloseTo(182, 5);
+    expect(
+      getNinjaLanePerspectiveSpeedForLane({
+        laneId: 'middle',
+        baseSpeed: 260
+      })
+    ).toBeCloseTo(260, 5);
+    expect(
+      getNinjaLanePerspectiveSpeedForLane({
+        laneId: 'lower',
+        baseSpeed: 260
+      })
+    ).toBeCloseTo(338, 5);
   });
 
   it('interpolates actor scale while moving between lanes', () => {

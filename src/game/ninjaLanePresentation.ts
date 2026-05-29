@@ -14,6 +14,18 @@ export const DEFAULT_NINJA_LANE_SCALE_MULTIPLIERS: NinjaLaneScaleMultipliers = {
   lower: 1.4
 };
 
+export type NinjaLaneSpeedMultipliers = Readonly<Record<PlayerLaneId, number>>;
+
+// Perspective-based movement speed: the near (lower) lane reads as moving
+// faster and the far (upper) lane slower, mirroring the depth illusion the
+// lane scale multipliers create. Centered on the middle lane (x1.0) so the
+// configured player/enemy speeds are preserved on the middle lane.
+export const DEFAULT_NINJA_LANE_SPEED_MULTIPLIERS: NinjaLaneSpeedMultipliers = {
+  upper: 0.7,
+  middle: 1.0,
+  lower: 1.3
+};
+
 export interface NinjaLanePresentationInput {
   readonly boundsConfig: NinjaBoundsConfig;
   readonly actorId: NinjaActorId;
@@ -26,6 +38,12 @@ export interface NinjaLanePerspectiveScaleForLaneInput {
   readonly laneId: PlayerLaneId;
   readonly baseScale: number;
   readonly scaleMultipliers?: NinjaLaneScaleMultipliers;
+}
+
+export interface NinjaLanePerspectiveSpeedForLaneInput {
+  readonly laneId: PlayerLaneId;
+  readonly baseSpeed: number;
+  readonly speedMultipliers?: NinjaLaneSpeedMultipliers;
 }
 
 export interface NinjaLanePerspectiveScaleForYInput {
@@ -112,6 +130,14 @@ export function getNinjaLanePerspectiveScaleForLane({
   scaleMultipliers = DEFAULT_NINJA_LANE_SCALE_MULTIPLIERS
 }: NinjaLanePerspectiveScaleForLaneInput): number {
   return getSafeBaseScale(baseScale) * scaleMultipliers[laneId];
+}
+
+export function getNinjaLanePerspectiveSpeedForLane({
+  laneId,
+  baseSpeed,
+  speedMultipliers = DEFAULT_NINJA_LANE_SPEED_MULTIPLIERS
+}: NinjaLanePerspectiveSpeedForLaneInput): number {
+  return getSafeBaseScale(baseSpeed) * speedMultipliers[laneId];
 }
 
 export function getNinjaLanePerspectiveScaleForY({
