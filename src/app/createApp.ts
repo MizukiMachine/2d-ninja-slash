@@ -6,12 +6,28 @@ import {
   type ProfileId
 } from '../game/profiles';
 import { SceneKeys } from '../game/sceneKeys';
+import { GAME_SUBTITLE, GAME_TITLE } from '../game/gameTitle';
 import {
   BACKGROUND_FILE_NAMES,
   isDebugBackgroundFileName
 } from '../game/assets/ninjaAssetCatalog';
-import { isBgmTrackId } from '../game/assets/audioAssetCatalog';
+import {
+  isBgmTrackId,
+  isSfxCueId,
+  type SfxCueId
+} from '../game/assets/audioAssetCatalog';
 import { createGameAudio } from '../game/audio/gameAudio';
+import {
+  SFX_BINDINGS_CONFIG_URL,
+  SFX_BINDINGS_SAVE_ENDPOINT,
+  SFX_TRIGGERS,
+  clampSfxVolume,
+  createDefaultSfxBindingsConfig,
+  isSfxTriggerId,
+  normalizeSfxBindingsConfig,
+  type SfxBindingsConfig,
+  type SfxTriggerId
+} from '../game/audio/sfxBindings';
 import {
   DEFAULT_GAMEPLAY_TUNING,
   GAMEPLAY_TUNING_CONFIG_URL,
@@ -187,6 +203,9 @@ const loadSandboxLaneSettingsConfig =
       normalizeSandboxLaneSettingsConfig
     );
 
+const loadSfxBindingsConfig = (): Promise<SfxBindingsConfig | null> =>
+  loadJsonConfig(SFX_BINDINGS_CONFIG_URL, normalizeSfxBindingsConfig);
+
 const DEBUG_PANEL_WIDTH_STORAGE_KEY = 'ninja-slash.debugPanelWidth';
 const DEBUG_PANEL_DEFAULT_WIDTH = 330;
 const DEBUG_PANEL_MIN_WIDTH = 300;
@@ -232,6 +251,7 @@ export function createApp(root: HTMLDivElement | null): void {
   let gymSaveStatus = 'Loaded defaults';
   let gameplayTuningSaveStatus = 'Loaded defaults';
   let laneEditorSaveStatus = 'Loaded defaults';
+  let sfxAssignSaveStatus = 'Loaded defaults';
   let gymSelectedActorId: NinjaActorId = 'mainNinja';
   let gymSelectedDirection: FacingDirection = 'right';
   let gymSelectedActionId = getDefaultNinjaActionId(gymSelectedActorId);
@@ -338,8 +358,8 @@ export function createApp(root: HTMLDivElement | null): void {
     <header class="app-shell__header">
       <div class="app-shell__brand">
         <p class="eyebrow">PHASER 4 DEBUG LAB</p>
-        <h1>2D Ninja Slash</h1>
-        <p class="subtitle">Sandbox, lane, gym, and tuning workspace</p>
+        <h1>${GAME_TITLE}</h1>
+        <p class="subtitle">${GAME_SUBTITLE} debug workspace</p>
       </div>
       <div class="app-shell__header-action">
         <button id="play-toggle" class="shell-button" data-variant="primary" type="button" aria-pressed="false">Play</button>
@@ -466,6 +486,10 @@ export function createApp(root: HTMLDivElement | null): void {
     gymMirrorLaneAnchorButton,
     gymApplyLaneAnchorAllButton,
     gymSaveStatusElement,
+    sfxAssignControls,
+    sfxAssignSaveButton,
+    sfxAssignResetButton,
+    sfxAssignStatus,
     sceneReadout,
     fpsReadout,
     pointerReadout,
@@ -504,6 +528,37 @@ export function createApp(root: HTMLDivElement | null): void {
 
     game?.scene.start(sceneKey);
     focusGame();
+  };
+
+  const resolveSfxPreviewVolume = (cueId: SfxCueId): number =>
+    debugStore.get().sfxBindings.volumes[cueId];
+
+  const playPreviewSfx = (cueId: SfxCueId): void => {
+    const activeScene = game?.scene.getScene(debugStore.get().activeScene);
+
+    if (activeScene === null || activeScene === undefined) {
+      return;
+    }
+
+    // Read the live volume at play time so preview/test buttons reflect the
+    // current slider value (and re-bindings) without stale closures.
+    const volume = resolveSfxPreviewVolume(cueId);
+
+    if (activeScene.sound.locked) {
+      activeScene.sound.once('unlocked', () => {
+        audio.playSfx(activeScene, cueId, volume);
+      });
+      focusGame();
+      return;
+    }
+
+    audio.playSfx(activeScene, cueId, volume);
+    focusGame();
+  };
+
+  // Plays the cue currently bound to a game event (debug "test" button).
+  const playTriggerSfx = (triggerId: SfxTriggerId): void => {
+    playPreviewSfx(debugStore.get().sfxBindings.bindings[triggerId]);
   };
 
   const getDebugPanelMaxWidth = (): number => {
@@ -657,6 +712,69 @@ export function createApp(root: HTMLDivElement | null): void {
     tuningRoundMaxReadout.textContent = String(tuning.roundEnemyMaxCount);
     tuningRoundWaitReadout.textContent = String(tuning.roundIntermissionMs);
     tuningSaveStatus.textContent = gameplayTuningSaveStatus;
+  };
+
+  const renderSfxAssignControls = (): void => {
+    const { bindings, volumes } = debugStore.get().sfxBindings;
+    const activeElement = document.activeElement;
+
+    // Per-event cards: the cue select plus the volume of its currently-bound cue.
+    for (const trigger of SFX_TRIGGERS) {
+      const boundCueId = bindings[trigger.id];
+      const select = sfxAssignControls.querySelector<HTMLSelectElement>(
+        `[data-sfx-bind="${trigger.id}"]`
+      );
+
+      if (select !== null && select !== activeElement) {
+        select.value = boundCueId;
+      }
+
+      const volume = volumes[boundCueId];
+      const slider = sfxAssignControls.querySelector<HTMLInputElement>(
+        `[data-sfx-row-vol="${trigger.id}"]`
+      );
+
+      if (slider !== null && slider !== activeElement) {
+        slider.value = String(volume);
+      }
+
+      const readout = sfxAssignControls.querySelector<HTMLElement>(
+        `[data-sfx-row-readout="${trigger.id}"]`
+      );
+
+      if (readout !== null) {
+        readout.textContent = volume.toFixed(2);
+      }
+    }
+
+    // "Other" cues (not bound to any event by default) keep a per-cue volume row.
+    sfxAssignControls
+      .querySelectorAll<HTMLInputElement>('[data-sfx-vol]')
+      .forEach((input) => {
+        const cueId = input.dataset.sfxVol;
+
+        if (cueId === undefined || !isSfxCueId(cueId)) {
+          return;
+        }
+
+        const volume = volumes[cueId];
+
+        // Skip writing the slider while the user drags it (re-entry guard) so
+        // the live subscription can't fight the pointer or steal focus.
+        if (input !== activeElement) {
+          input.value = String(volume);
+        }
+
+        const readout = sfxAssignControls.querySelector<HTMLElement>(
+          `[data-sfx-vol-readout="${cueId}"]`
+        );
+
+        if (readout !== null) {
+          readout.textContent = volume.toFixed(2);
+        }
+      });
+
+    sfxAssignStatus.textContent = sfxAssignSaveStatus;
   };
 
   const renderLaneEditorControls = (): void => {
@@ -1204,6 +1322,7 @@ export function createApp(root: HTMLDivElement | null): void {
     setControlGroupHidden(laneEditorControls, state.activeScene !== SceneKeys.LaneEditor);
     renderLaneEditorControls();
     renderGameplayTuningControls();
+    renderSfxAssignControls();
     fpsReadout.textContent = `${state.performance.fps.toFixed(1)} / ${state.performance.physicsBodies} bodies`;
     pointerReadout.textContent = `${state.pointer.x}, ${state.pointer.y} / ${state.pointer.worldX}, ${state.pointer.worldY} ${
       state.pointer.down ? 'down' : 'up'
@@ -1270,6 +1389,14 @@ export function createApp(root: HTMLDivElement | null): void {
     laneEditorSaveStatus = 'Loaded public/assets/config/sandbox-lanes.json';
     applySandboxLaneSettingsForCurrentProfile();
     renderLaneEditorControls();
+  });
+  void loadSfxBindingsConfig().then((loadedConfig) => {
+    if (loadedConfig === null) {
+      return;
+    }
+
+    sfxAssignSaveStatus = 'Loaded public/assets/config/sfx-bindings.json';
+    debugStore.setSfxBindings(loadedConfig);
   });
 
   const subscriptions: Unsubscribe[] = [
@@ -1388,6 +1515,34 @@ export function createApp(root: HTMLDivElement | null): void {
   });
 
   debugControls.addEventListener('click', (event) => {
+    const sfxTestButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-sfx-test]'
+    );
+
+    if (sfxTestButton !== null) {
+      const triggerId = sfxTestButton.dataset.sfxTest;
+
+      if (triggerId !== undefined && isSfxTriggerId(triggerId)) {
+        playTriggerSfx(triggerId);
+      }
+
+      return;
+    }
+
+    const sfxButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      'button[data-sfx-preview]'
+    );
+
+    if (sfxButton !== null) {
+      const cueId = sfxButton.dataset.sfxPreview;
+
+      if (cueId !== undefined && isSfxCueId(cueId)) {
+        playPreviewSfx(cueId);
+      }
+
+      return;
+    }
+
     const sceneButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
       'button[data-debug-scene]'
     );
@@ -1477,6 +1632,102 @@ export function createApp(root: HTMLDivElement | null): void {
   tuningResetButton.addEventListener('click', () => {
     gameplayTuningSaveStatus = 'Reset to defaults';
     debugStore.setGameplayTuning(DEFAULT_GAMEPLAY_TUNING);
+  });
+
+  const writeSfxBindingsToFile = async (): Promise<void> => {
+    const payload = normalizeSfxBindingsConfig(debugStore.get().sfxBindings);
+
+    try {
+      await saveJsonConfig(SFX_BINDINGS_SAVE_ENDPOINT, payload);
+      sfxAssignSaveStatus = 'Saved public/assets/config/sfx-bindings.json';
+    } catch {
+      downloadJsonFile('sfx-bindings.json', payload);
+      sfxAssignSaveStatus = 'Downloaded sfx-bindings.json';
+    }
+
+    renderSfxAssignControls();
+  };
+
+  let sfxBindingsSaveTimer: ReturnType<typeof setTimeout> | undefined;
+  const queueSfxBindingsSave = (): void => {
+    sfxAssignSaveStatus = 'Unsaved SFX changes';
+    if (sfxBindingsSaveTimer !== undefined) {
+      clearTimeout(sfxBindingsSaveTimer);
+    }
+    sfxBindingsSaveTimer = setTimeout(() => {
+      void writeSfxBindingsToFile();
+    }, 400);
+  };
+
+  // Event-binding selects and per-cue volume sliders. Selects fire 'change';
+  // sliders update the store live on 'input' and auto-save on 'change' (release),
+  // mirroring the Lane Editor's drag-release auto-save.
+  sfxAssignControls.addEventListener('change', (event) => {
+    const select = (event.target as HTMLElement).closest<HTMLSelectElement>(
+      'select[data-sfx-bind]'
+    );
+
+    if (select !== null) {
+      const triggerId = select.dataset.sfxBind;
+
+      if (triggerId !== undefined && isSfxTriggerId(triggerId) && isSfxCueId(select.value)) {
+        debugStore.setSfxBinding(triggerId, select.value);
+        queueSfxBindingsSave();
+      }
+
+      return;
+    }
+
+    // Volume sliders (per-event row or per-cue "other") auto-save on release.
+    const slider = (event.target as HTMLElement).closest<HTMLInputElement>(
+      'input[data-sfx-vol], input[data-sfx-row-vol]'
+    );
+
+    if (slider !== null) {
+      queueSfxBindingsSave();
+    }
+  });
+  // Resolve the cue a volume slider edits: per-event rows target the bound cue;
+  // "other" rows target the cue directly.
+  const resolveSfxVolumeCueId = (slider: HTMLInputElement): SfxCueId | null => {
+    const triggerId = slider.dataset.sfxRowVol;
+
+    if (triggerId !== undefined) {
+      return isSfxTriggerId(triggerId)
+        ? debugStore.get().sfxBindings.bindings[triggerId]
+        : null;
+    }
+
+    const cueId = slider.dataset.sfxVol;
+
+    return cueId !== undefined && isSfxCueId(cueId) ? cueId : null;
+  };
+  sfxAssignControls.addEventListener('input', (event) => {
+    const slider = (event.target as HTMLElement).closest<HTMLInputElement>(
+      'input[data-sfx-vol], input[data-sfx-row-vol]'
+    );
+
+    if (slider === null) {
+      return;
+    }
+
+    const cueId = resolveSfxVolumeCueId(slider);
+
+    if (cueId !== null) {
+      debugStore.setSfxVolume(cueId, clampSfxVolume(Number(slider.value)));
+    }
+  });
+  sfxAssignSaveButton.addEventListener('click', () => {
+    if (sfxBindingsSaveTimer !== undefined) {
+      clearTimeout(sfxBindingsSaveTimer);
+    }
+    sfxAssignSaveStatus = 'Saving SFX...';
+    renderSfxAssignControls();
+    void writeSfxBindingsToFile();
+  });
+  sfxAssignResetButton.addEventListener('click', () => {
+    debugStore.setSfxBindings(createDefaultSfxBindingsConfig());
+    queueSfxBindingsSave();
   });
 
   gymExitButton.addEventListener('click', () => {

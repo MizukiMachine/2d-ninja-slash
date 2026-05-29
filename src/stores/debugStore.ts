@@ -5,7 +5,8 @@ import {
 } from '../game/assets/ninjaAssetCatalog';
 import {
   DEFAULT_BGM_TRACK_ID,
-  type BgmTrackId
+  type BgmTrackId,
+  type SfxCueId
 } from '../game/assets/audioAssetCatalog';
 import {
   DEFAULT_GAMEPLAY_TUNING,
@@ -13,6 +14,12 @@ import {
   type GameplayTuning,
   type SandboxLaneSettings
 } from '../game/debugFeatures';
+import {
+  clampSfxVolume,
+  createDefaultSfxBindingsConfig,
+  type SfxBindingsConfig,
+  type SfxTriggerId
+} from '../game/audio/sfxBindings';
 
 export interface DebugPointerState {
   readonly x: number;
@@ -85,6 +92,7 @@ export interface DebugState {
   readonly bgmTrackId: BgmTrackId;
   readonly gameplayTuning: GameplayTuning;
   readonly sandboxLaneSettings: SandboxLaneSettings;
+  readonly sfxBindings: SfxBindingsConfig;
   readonly actorResetRequestId: number;
   readonly pointer: DebugPointerState;
   readonly input: DebugInputState;
@@ -114,6 +122,9 @@ export interface DebugStore extends WritableStore<DebugState> {
   setBgmTrackId(bgmTrackId: BgmTrackId): void;
   setGameplayTuning(gameplayTuning: GameplayTuning): void;
   setSandboxLaneSettings(sandboxLaneSettings: SandboxLaneSettings): void;
+  setSfxBindings(sfxBindings: SfxBindingsConfig): void;
+  setSfxBinding(triggerId: SfxTriggerId, cueId: SfxCueId): void;
+  setSfxVolume(cueId: SfxCueId, volume: number): void;
   requestActorReset(): void;
   setPointer(pointer: Partial<DebugPointerState>): void;
   setInput(input: Partial<DebugInputState>): void;
@@ -158,6 +169,7 @@ function createInitialDebugState(): DebugState {
     bgmTrackId: DEFAULT_BGM_TRACK_ID,
     gameplayTuning: DEFAULT_GAMEPLAY_TUNING,
     sandboxLaneSettings: DEFAULT_SANDBOX_LANE_SETTINGS,
+    sfxBindings: createDefaultSfxBindingsConfig(),
     actorResetRequestId: 0,
     pointer: {
       x: 0,
@@ -259,6 +271,27 @@ export function createDebugStore(): DebugStore {
     setSandboxLaneSettings: (sandboxLaneSettings) => {
       store.update((state) => ({ ...state, sandboxLaneSettings }));
     },
+    setSfxBindings: (sfxBindings) => {
+      store.update((state) => ({ ...state, sfxBindings }));
+    },
+    setSfxBinding: (triggerId, cueId) => {
+      store.update((state) => ({
+        ...state,
+        sfxBindings: {
+          ...state.sfxBindings,
+          bindings: { ...state.sfxBindings.bindings, [triggerId]: cueId }
+        }
+      }));
+    },
+    setSfxVolume: (cueId, volume) => {
+      store.update((state) => ({
+        ...state,
+        sfxBindings: {
+          ...state.sfxBindings,
+          volumes: { ...state.sfxBindings.volumes, [cueId]: clampSfxVolume(volume) }
+        }
+      }));
+    },
     requestActorReset: () => {
       store.update((state) => ({
         ...state,
@@ -308,6 +341,7 @@ export function createDebugStore(): DebugStore {
         bgmTrackId: current.bgmTrackId,
         gameplayTuning: current.gameplayTuning,
         sandboxLaneSettings: current.sandboxLaneSettings,
+        sfxBindings: current.sfxBindings,
         actorResetRequestId: current.actorResetRequestId
       });
     }

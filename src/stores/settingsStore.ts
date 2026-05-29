@@ -3,6 +3,8 @@ import { createStore, type WritableStore } from './store';
 export interface SettingsState {
   readonly volume: number;
   readonly muted: boolean;
+  /** When false, background music is silenced while SFX keep playing. */
+  readonly bgmEnabled: boolean;
 }
 
 export interface SettingsStore extends WritableStore<SettingsState> {
@@ -11,12 +13,15 @@ export interface SettingsStore extends WritableStore<SettingsState> {
   decreaseVolume(step?: number): void;
   setMuted(muted: boolean): void;
   toggleMuted(): void;
+  setBgmEnabled(bgmEnabled: boolean): void;
+  toggleBgm(): void;
   reset(): void;
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
   volume: 0.8,
-  muted: false
+  muted: false,
+  bgmEnabled: true
 };
 
 const SETTINGS_STORAGE_KEY = 'phaser-4-starter-settings';
@@ -34,7 +39,11 @@ function normalizeSettings(value: unknown): SettingsState {
 
   return {
     volume: typeof maybeSettings.volume === 'number' ? clampVolume(maybeSettings.volume) : DEFAULT_SETTINGS.volume,
-    muted: typeof maybeSettings.muted === 'boolean' ? maybeSettings.muted : DEFAULT_SETTINGS.muted
+    muted: typeof maybeSettings.muted === 'boolean' ? maybeSettings.muted : DEFAULT_SETTINGS.muted,
+    bgmEnabled:
+      typeof maybeSettings.bgmEnabled === 'boolean'
+        ? maybeSettings.bgmEnabled
+        : DEFAULT_SETTINGS.bgmEnabled
   };
 }
 
@@ -106,6 +115,12 @@ export function createSettingsStore(storage: Storage | null = getBrowserStorage(
     },
     toggleMuted: () => {
       store.update((state) => ({ ...state, muted: !state.muted }));
+    },
+    setBgmEnabled: (bgmEnabled) => {
+      store.update((state) => ({ ...state, bgmEnabled }));
+    },
+    toggleBgm: () => {
+      store.update((state) => ({ ...state, bgmEnabled: !state.bgmEnabled }));
     },
     reset: () => {
       store.set(DEFAULT_SETTINGS);

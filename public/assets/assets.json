@@ -2915,7 +2915,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.56
+          "volume": 0.24
         }
       },
       "metadata": {
@@ -2943,7 +2943,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.49
+          "volume": 0.22
         }
       },
       "metadata": {
@@ -3055,7 +3055,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.53
+          "volume": 0.3
         }
       },
       "metadata": {
@@ -3172,10 +3172,10 @@
       },
       "metadata": {
         "id": "round-clear",
-        "theme": "louder soft higher taiko double hit round transition",
+        "theme": "extra dry sharp hyoshigi wooden clapper double hit round transition",
         "generatedBy": "local deterministic PCM synthesis",
-        "generatedAt": "2026-05-28",
-        "sizeBytes": 65312,
+        "generatedAt": "2026-05-29",
+        "sizeBytes": 33560,
         "sfxCue": true
       }
     },
@@ -3200,11 +3200,69 @@
       },
       "metadata": {
         "id": "round-start",
-        "theme": "louder soft higher taiko round start pulse",
+        "theme": "extra dry sharp hyoshigi wooden clapper round start cue",
         "generatedBy": "local deterministic PCM synthesis",
-        "generatedAt": "2026-05-28",
-        "sizeBytes": 54728,
+        "generatedAt": "2026-05-29",
+        "sizeBytes": 26504,
         "sfxCue": true
+      }
+    },
+    {
+      "key": "sfx.hyoshigiPreview",
+      "type": "sfx-audio",
+      "label": "Hyoshigi",
+      "filePath": "public/assets/sfx/hyoshigi-preview.wav",
+      "path": "/assets/sfx/hyoshigi-preview.wav",
+      "format": "wav",
+      "animationUse": "debug sound effect comparison",
+      "phaser": {
+        "loader": "audio",
+        "audioKey": "sfx.hyoshigiPreview",
+        "urls": [
+          "/assets/sfx/hyoshigi-preview.wav"
+        ],
+        "playback": {
+          "loop": false,
+          "volume": 0.84
+        }
+      },
+      "metadata": {
+        "id": "hyoshigi-preview",
+        "theme": "extra dry hyoshigi wooden clapper preview double hit",
+        "generatedBy": "local deterministic PCM synthesis",
+        "generatedAt": "2026-05-29",
+        "sizeBytes": 30032,
+        "sfxCue": true,
+        "debugSfxCompare": true
+      }
+    },
+    {
+      "key": "sfx.kotsuzumiPreview",
+      "type": "sfx-audio",
+      "label": "Kotsuzumi",
+      "filePath": "public/assets/sfx/kotsuzumi-preview.wav",
+      "path": "/assets/sfx/kotsuzumi-preview.wav",
+      "format": "wav",
+      "animationUse": "debug sound effect comparison",
+      "phaser": {
+        "loader": "audio",
+        "audioKey": "sfx.kotsuzumiPreview",
+        "urls": [
+          "/assets/sfx/kotsuzumi-preview.wav"
+        ],
+        "playback": {
+          "loop": false,
+          "volume": 0.78
+        }
+      },
+      "metadata": {
+        "id": "kotsuzumi-preview",
+        "theme": "dry small kotsuzumi hand drum preview with short skin resonance",
+        "generatedBy": "local deterministic PCM synthesis",
+        "generatedAt": "2026-05-29",
+        "sizeBytes": 51200,
+        "sfxCue": true,
+        "debugSfxCompare": true
       }
     }
   ],
@@ -3267,7 +3325,9 @@
       "sfx.playerDefeat",
       "sfx.mainNinjaDeath",
       "sfx.roundClear",
-      "sfx.roundStart"
+      "sfx.roundStart",
+      "sfx.hyoshigiPreview",
+      "sfx.kotsuzumiPreview"
     ]
   },
   "validation": {
@@ -3281,8 +3341,8 @@
       },
       "result": "all character spritesheets are 8x4 grids with 32 non-empty 128px frames"
     },
-    "audioAssetCount": 14,
+    "audioAssetCount": 16,
     "bgmCount": 2,
-    "sfxCount": 12
+    "sfxCount": 14
   }
 }

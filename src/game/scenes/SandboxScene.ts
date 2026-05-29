@@ -2449,12 +2449,10 @@ export class SandboxScene extends BaseScene {
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
 
+    // Enemies have 1 HP, so a hit always results in defeat (no surviving-hit SFX).
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
-      return;
     }
-
-    this.playSfx('hit');
   }
 
   private startEnemyDeath(enemy: EnemyState): void {

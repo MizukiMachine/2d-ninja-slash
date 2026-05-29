@@ -18,7 +18,7 @@ export interface GameAudio {
   queueAudioAssets(scene: Phaser.Scene): void;
   syncSettings(scene: Phaser.Scene, settings: SettingsState): void;
   playBgm(scene: Phaser.Scene, trackId: BgmTrackId): void;
-  playSfx(scene: Phaser.Scene, cueId: SfxCueId): void;
+  playSfx(scene: Phaser.Scene, cueId: SfxCueId, volumeOverride?: number): void;
   stopBgm(): void;
 }
 
@@ -26,6 +26,10 @@ class PhaserGameAudio implements GameAudio {
   private activeBgmSound: Phaser.Sound.BaseSound | null = null;
   private activeBgmTrackId: BgmTrackId | null = null;
   private pendingBgmTrackId: BgmTrackId | null = null;
+  // The track that should be playing when BGM is enabled. Retained across an
+  // off→on toggle so the same track resumes without the scene re-requesting it.
+  private desiredBgmTrackId: BgmTrackId | null = null;
+  private bgmEnabled = true;
   private waitingForUnlock = false;
   private readonly bgmKeys = new Set(ALL_BGM_TRACKS.map((track) => track.key));
 
@@ -46,10 +50,35 @@ class PhaserGameAudio implements GameAudio {
   syncSettings(scene: Phaser.Scene, settings: SettingsState): void {
     scene.sound.volume = settings.volume;
     scene.sound.mute = settings.muted;
+    this.setBgmEnabled(scene, settings.bgmEnabled);
+  }
+
+  private setBgmEnabled(scene: Phaser.Scene, enabled: boolean): void {
+    if (this.bgmEnabled === enabled) {
+      return;
+    }
+
+    this.bgmEnabled = enabled;
+
+    if (!enabled) {
+      // Silence BGM but remember the desired track so it can resume on re-enable.
+      this.stopBgm();
+      return;
+    }
+
+    if (this.desiredBgmTrackId !== null) {
+      this.playBgm(scene, this.desiredBgmTrackId);
+    }
   }
 
   playBgm(scene: Phaser.Scene, trackId: BgmTrackId): void {
     const track = getBgmTrack(trackId);
+
+    this.desiredBgmTrackId = trackId;
+
+    if (!this.bgmEnabled) {
+      return;
+    }
 
     this.pendingBgmTrackId = trackId;
 
@@ -129,21 +158,27 @@ class PhaserGameAudio implements GameAudio {
     adjustableSound.volume = volume;
   }
 
-  playSfx(scene: Phaser.Scene, cueId: SfxCueId): void {
+  playSfx(scene: Phaser.Scene, cueId: SfxCueId, volumeOverride?: number): void {
     const cue = getSfxCue(cueId);
 
     if (scene.sound.locked || !scene.cache.audio.exists(cue.key)) {
       return;
     }
 
-    const sound = scene.sound.add(cue.key, {
+    // Defensive: only honour a finite override, otherwise fall back to the
+    // catalog volume so a corrupt stored value can never mute or blow out a cue.
+    const volume = Number.isFinite(volumeOverride)
+      ? (volumeOverride as number)
+      : cue.volume;
+    const config = {
       loop: false,
-      volume: cue.volume
-    });
+      volume
+    };
+    const sound = scene.sound.add(cue.key, config);
 
     sound.once(Phaser.Sound.Events.COMPLETE, sound.destroy, sound);
 
-    if (!sound.play()) {
+    if (!sound.play(config)) {
       sound.destroy();
     }
   }

@@ -14,7 +14,7 @@ async function bootGame(): Promise<void> {
   mount.tabIndex = 0;
 
   const context = await createGameContext({
-    initialScene: SceneKeys.Sandbox
+    initialScene: SceneKeys.MainMenu
   });
 
   createGame({ parent: mount, context });
