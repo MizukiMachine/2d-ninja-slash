@@ -25,19 +25,19 @@ describe('ninja lane presentation', () => {
         laneId: 'upper',
         baseScale: 2.1
       })
-    ).toBeCloseTo(1.785, 5);
+    ).toBeCloseTo(2.1, 5);
     expect(
       getNinjaLanePerspectiveScaleForLane({
         laneId: 'middle',
         baseScale: 2.1
       })
-    ).toBe(2.1);
+    ).toBeCloseTo(2.52, 5);
     expect(
       getNinjaLanePerspectiveScaleForLane({
         laneId: 'lower',
         baseScale: 2.1
       })
-    ).toBeCloseTo(2.415, 5);
+    ).toBeCloseTo(2.94, 5);
   });
 
   it('interpolates actor scale while moving between lanes', () => {
@@ -49,14 +49,14 @@ describe('ninja lane presentation', () => {
         laneY: 175,
         baseScale: 2
       })
-    ).toBeCloseTo(1.85, 5);
+    ).toBeCloseTo(2.2, 5);
     expect(
       getNinjaLanePerspectiveScaleForY({
         layout,
         laneY: 225,
         baseScale: 2
       })
-    ).toBeCloseTo(2.15, 5);
+    ).toBeCloseTo(2.6, 5);
   });
 
   it('converts lane anchor point to sprite position using the lane anchor', () => {

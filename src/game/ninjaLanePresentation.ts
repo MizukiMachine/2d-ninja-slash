@@ -9,9 +9,9 @@ import type { PlayerLaneId, ThreeLaneLayout } from './playerLaneMovement';
 export type NinjaLaneScaleMultipliers = Readonly<Record<PlayerLaneId, number>>;
 
 export const DEFAULT_NINJA_LANE_SCALE_MULTIPLIERS: NinjaLaneScaleMultipliers = {
-  upper: 0.85,
-  middle: 1,
-  lower: 1.15
+  upper: 1.0,
+  middle: 1.2,
+  lower: 1.4
 };
 
 export interface NinjaLanePresentationInput {
