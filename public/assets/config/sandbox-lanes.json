@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "savedAt": null,
+  "profiles": {
+    "landscape": {
+      "upperY": 372,
+      "middleY": 468,
+      "lowerY": 564
+    },
+    "portrait": {
+      "upperY": 652,
+      "middleY": 748,
+      "lowerY": 844
+    }
+  }
+}

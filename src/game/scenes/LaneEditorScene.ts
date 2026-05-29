@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { SceneKeys } from '../sceneKeys';
 import {
   normalizeSandboxLaneSettings,
-  saveSandboxLaneSettings,
   type SandboxLaneSettings
 } from '../debugFeatures';
 import {
@@ -195,7 +194,7 @@ export class LaneEditorScene extends DebugLabScene {
       return;
     }
 
-    this.debug.setSandboxLaneSettings(
+    this.app.setSandboxLaneSettings(
       this.createPatchedLaneSettings(this.draggingLaneId, pointerY)
     );
   }
@@ -229,13 +228,7 @@ export class LaneEditorScene extends DebugLabScene {
   private persistLaneSettings(): void {
     const settings = this.getLaneSettings();
 
-    try {
-      this.debug.setSandboxLaneSettings(
-        saveSandboxLaneSettings(this.profile.id, settings, this.profile.height)
-      );
-    } catch {
-      this.debug.setSandboxLaneSettings(settings);
-    }
+    this.app.setSandboxLaneSettings(settings);
   }
 
   private getLaneSettings(): SandboxLaneSettings {

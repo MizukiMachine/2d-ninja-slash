@@ -26,14 +26,18 @@ import {
   GAMEPLAY_TUNING_LIMITS,
   GAMEPLAY_TUNING_SAVE_ENDPOINT,
   ROUND_ENEMY_GROWTH_MODES,
+  SANDBOX_LANE_SETTINGS_CONFIG_URL,
+  SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT,
   buildDebugElementsExport,
+  buildSandboxLaneSettingsExport,
   createDefaultDebugElementsConfig,
+  createDefaultSandboxLaneSettingsConfig,
   createDefaultSandboxLaneSettings,
   formatElementKind,
   getDebugLevel,
   getDebugLevelElements,
+  getSandboxLaneSettingsForProfile,
   loadLevelProgress,
-  loadSandboxLaneSettings,
   markLevelCompleted,
   normalizeBackgroundLabSettings,
   normalizeBaselineLabSettings,
@@ -42,16 +46,17 @@ import {
   normalizeGameplayTuning,
   normalizeLevelProgress,
   normalizeRunnerSettings,
+  normalizeSandboxLaneSettingsConfig,
   normalizeSandboxLaneSettings,
   resetLevelProgress,
-  resetSandboxLaneSettings,
-  saveSandboxLaneSettings,
+  setSandboxLaneSettingsForProfile,
   setLevelUnlocked,
   type BackgroundFitMode,
   type DebugElementKind,
   type DebugElementsConfig,
   type GameplayTuning,
   type RoundEnemyGrowthMode,
+  type SandboxLaneSettingsConfig,
   type SandboxLaneSettings
 } from '../game/debugFeatures';
 import {
@@ -261,6 +266,22 @@ async function loadDebugElementsConfig(): Promise<DebugElementsConfig | null> {
   }
 }
 
+async function loadSandboxLaneSettingsConfig(): Promise<SandboxLaneSettingsConfig | null> {
+  try {
+    const response = await fetch(SANDBOX_LANE_SETTINGS_CONFIG_URL, {
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return normalizeSandboxLaneSettingsConfig(await response.json());
+  } catch {
+    return null;
+  }
+}
+
 const DEBUG_PANEL_WIDTH_STORAGE_KEY = 'ninja-slash.debugPanelWidth';
 const DEBUG_PANEL_DEFAULT_WIDTH = 330;
 const DEBUG_PANEL_MIN_WIDTH = 300;
@@ -301,6 +322,9 @@ export function createApp(root: HTMLDivElement | null): void {
   let playToastTimeout: number | null = null;
   let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
   let debugElementsConfig = createDefaultDebugElementsConfig();
+  let sandboxLaneSettingsConfig = createDefaultSandboxLaneSettingsConfig();
+  let sandboxLaneSettingsLoadedFromFile = false;
+  let sandboxLaneSettingsDirty = false;
   let gymSaveStatus = 'Loaded defaults';
   let gameplayTuningSaveStatus = 'Loaded defaults';
   let laneEditorSaveStatus = 'Loaded defaults';
@@ -321,6 +345,35 @@ export function createApp(root: HTMLDivElement | null): void {
   const debugStore = createDebugStore();
   const settingsStore = createSettingsStore();
   const audio = createGameAudio();
+  const getCurrentProfileHeight = (): number => getProfileById(profileId).height;
+  const getCurrentSandboxLaneSettings = (): SandboxLaneSettings =>
+    getSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      getCurrentProfileHeight()
+    );
+  const applySandboxLaneSettingsForCurrentProfile = (): void => {
+    debugStore.setSandboxLaneSettings(getCurrentSandboxLaneSettings());
+  };
+  const setSandboxLaneSettingsForCurrentProfile = (
+    settings: SandboxLaneSettings,
+    saveStatus = 'Unsaved lane changes'
+  ): SandboxLaneSettings => {
+    const worldHeight = getCurrentProfileHeight();
+    const normalizedSettings = normalizeSandboxLaneSettings(settings, worldHeight);
+
+    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      normalizedSettings,
+      worldHeight
+    );
+    sandboxLaneSettingsDirty = true;
+    laneEditorSaveStatus = saveStatus;
+    debugStore.setSandboxLaneSettings(normalizedSettings);
+
+    return normalizedSettings;
+  };
   const context: AppContext = {
     debugStore,
     settingsStore,
@@ -332,6 +385,9 @@ export function createApp(root: HTMLDivElement | null): void {
       debugElementsConfig = normalizeDebugElementsConfig(config);
       elementEditorSaveStatus = 'Unsaved element changes';
       debugStore.setElementEditor(normalizeElementEditorSettings(debugStore.get().elementEditor));
+    },
+    setSandboxLaneSettings: (settings) => {
+      setSandboxLaneSettingsForCurrentProfile(settings);
     }
   };
 
@@ -451,7 +507,8 @@ export function createApp(root: HTMLDivElement | null): void {
         <label class="number-row"><span>L</span><input id="lane-lower-y-number" type="number" min="0" max="720" step="1" /></label>
       </div>
       <div class="panel-group__row">
-        <button id="lane-reset" class="shell-button" type="button">Reset lanes</button>
+        <button id="lane-save" class="shell-button" data-variant="primary" type="button">Save</button>
+        <button id="lane-reset" class="shell-button" type="button">Reset</button>
       </div>
       <p id="lane-save-status" class="panel-note">Loaded defaults</p>
     </div>
@@ -754,6 +811,7 @@ export function createApp(root: HTMLDivElement | null): void {
     '#lane-lower-y-number',
     HTMLInputElement
   );
+  const laneSaveButton = requireElement(debugControls, '#lane-save', HTMLButtonElement);
   const laneResetButton = requireElement(debugControls, '#lane-reset', HTMLButtonElement);
   const laneSaveStatus = requireElement(debugControls, '#lane-save-status', HTMLElement);
   const enemyAiToggle = requireElement(debugControls, '#enemy-ai', HTMLInputElement);
@@ -1230,8 +1288,6 @@ export function createApp(root: HTMLDivElement | null): void {
     );
   };
 
-  const getCurrentProfileHeight = (): number => getProfileById(profileId).height;
-
   const getLaneControlMaxY = (): number =>
     Math.max(THREE_LANE_MIN_Y, getCurrentProfileHeight() - THREE_LANE_BOTTOM_INSET);
 
@@ -1252,37 +1308,16 @@ export function createApp(root: HTMLDivElement | null): void {
     });
   };
 
-  const saveLaneSettingsForCurrentProfile = (
-    settings: SandboxLaneSettings
-  ): SandboxLaneSettings => {
-    const worldHeight = getCurrentProfileHeight();
-    const normalizedSettings = normalizeSandboxLaneSettings(settings, worldHeight);
-
-    try {
-      const savedSettings = saveSandboxLaneSettings(
-        profileId,
-        normalizedSettings,
-        worldHeight
-      );
-      laneEditorSaveStatus = 'Saved local lane settings';
-      return savedSettings;
-    } catch {
-      laneEditorSaveStatus = 'Using unsaved lane settings';
-      return normalizedSettings;
-    }
-  };
-
   const patchLaneSettings = (patch: Partial<SandboxLaneSettings>): void => {
     const current = normalizeSandboxLaneSettings(
       debugStore.get().sandboxLaneSettings,
       getCurrentProfileHeight()
     );
-    const nextSettings = saveLaneSettingsForCurrentProfile({
+
+    setSandboxLaneSettingsForCurrentProfile({
       ...current,
       ...patch
     });
-
-    debugStore.setSandboxLaneSettings(nextSettings);
   };
 
   const readGameplayTuningInputs = (): GameplayTuning =>
@@ -1873,10 +1908,12 @@ export function createApp(root: HTMLDivElement | null): void {
     root.dataset.profile = profileId;
     profileToggle.textContent = formatProfileLabel(profileId);
     profileToggle.title = `${GAME_PROFILES[profileId].label}`;
-    debugStore.setSandboxLaneSettings(
-      loadSandboxLaneSettings(profileId, getCurrentProfileHeight())
-    );
-    laneEditorSaveStatus = 'Loaded local lane settings';
+    applySandboxLaneSettingsForCurrentProfile();
+    if (!sandboxLaneSettingsDirty) {
+      laneEditorSaveStatus = sandboxLaneSettingsLoadedFromFile
+        ? 'Loaded public/assets/config/sandbox-lanes.json'
+        : 'Loaded defaults';
+    }
     debugStore.resetRuntime();
     game = createGame({ parent: gameMount, context });
     refreshScale();
@@ -2029,6 +2066,27 @@ export function createApp(root: HTMLDivElement | null): void {
 
     gameplayTuningSaveStatus = 'Loaded public/assets/config/gameplay-tuning.json';
     debugStore.setGameplayTuning(loadedConfig);
+  });
+  void loadSandboxLaneSettingsConfig().then((loadedConfig) => {
+    if (loadedConfig === null) {
+      return;
+    }
+
+    sandboxLaneSettingsLoadedFromFile = true;
+    if (sandboxLaneSettingsDirty) {
+      sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+        loadedConfig,
+        profileId,
+        debugStore.get().sandboxLaneSettings,
+        getCurrentProfileHeight()
+      );
+      return;
+    }
+
+    sandboxLaneSettingsConfig = loadedConfig;
+    laneEditorSaveStatus = 'Loaded public/assets/config/sandbox-lanes.json';
+    applySandboxLaneSettingsForCurrentProfile();
+    renderLaneEditorControls();
   });
   void loadDebugElementsConfig().then((loadedConfig) => {
     if (loadedConfig === null) {
@@ -2189,17 +2247,48 @@ export function createApp(root: HTMLDivElement | null): void {
   laneLowerYNumberInput.addEventListener('change', () => {
     patchLaneSettings({ lowerY: Number(laneLowerYNumberInput.value) });
   });
+  laneSaveButton.addEventListener('click', async () => {
+    laneEditorSaveStatus = 'Saving lane config...';
+    renderLaneEditorControls();
+
+    sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(
+      sandboxLaneSettingsConfig,
+      profileId,
+      debugStore.get().sandboxLaneSettings,
+      getCurrentProfileHeight()
+    );
+
+    const payload = buildSandboxLaneSettingsExport(sandboxLaneSettingsConfig);
+
+    try {
+      const response = await fetch(SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Save failed with ${response.status}`);
+      }
+
+      sandboxLaneSettingsConfig = payload;
+      sandboxLaneSettingsLoadedFromFile = true;
+      sandboxLaneSettingsDirty = false;
+      laneEditorSaveStatus = 'Saved public/assets/config/sandbox-lanes.json';
+    } catch {
+      downloadJsonFile('sandbox-lanes.json', payload);
+      laneEditorSaveStatus = 'Downloaded sandbox-lanes.json';
+    }
+
+    renderLaneEditorControls();
+  });
   laneResetButton.addEventListener('click', () => {
     const worldHeight = getCurrentProfileHeight();
 
-    try {
-      const resetSettings = resetSandboxLaneSettings(profileId, worldHeight);
-      laneEditorSaveStatus = 'Reset local lane settings';
-      debugStore.setSandboxLaneSettings(resetSettings);
-    } catch {
-      laneEditorSaveStatus = 'Using default lane settings';
-      debugStore.setSandboxLaneSettings(createDefaultSandboxLaneSettings(worldHeight));
-    }
+    setSandboxLaneSettingsForCurrentProfile(
+      createDefaultSandboxLaneSettings(worldHeight),
+      'Unsaved lane reset'
+    );
   });
 
   tuningPlayerSpeedInput.addEventListener('input', setGameplayTuningFromInputs);

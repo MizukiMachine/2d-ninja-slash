@@ -7,6 +7,12 @@ import {
   normalizeThreeLaneYSettings,
   type ThreeLaneYSettings
 } from './playerLaneMovement';
+import {
+  DEFAULT_PROFILE_ID,
+  GAME_PROFILES,
+  isProfileId,
+  type ProfileId
+} from './profiles';
 
 export type DebugElementKind = 'platform' | 'hazard' | 'pickup' | 'spawn' | 'goal' | 'enemy';
 export type BackgroundFitMode = 'cover' | 'contain' | 'native';
@@ -103,10 +109,23 @@ export interface DebugElementsConfig {
   readonly levels: readonly DebugElementsLevelConfig[];
 }
 
+export type SandboxLaneSettingsByProfile = Readonly<
+  Record<ProfileId, SandboxLaneSettings>
+>;
+
+export interface SandboxLaneSettingsConfig {
+  readonly version: 1;
+  readonly savedAt: string | null;
+  readonly profiles: SandboxLaneSettingsByProfile;
+}
+
 export const DEBUG_ELEMENTS_CONFIG_URL = '/assets/config/debug-elements.json';
 export const DEBUG_ELEMENTS_SAVE_ENDPOINT = '/__debug/debug-elements';
 export const GAMEPLAY_TUNING_CONFIG_URL = '/assets/config/gameplay-tuning.json';
 export const GAMEPLAY_TUNING_SAVE_ENDPOINT = '/__debug/gameplay-tuning';
+export const SANDBOX_LANE_SETTINGS_CONFIG_URL =
+  '/assets/config/sandbox-lanes.json';
+export const SANDBOX_LANE_SETTINGS_SAVE_ENDPOINT = '/__debug/sandbox-lanes';
 export const LEVEL_PROGRESS_STORAGE_KEY = 'ninja-slash.levelProgress.v1';
 export const LEVEL_PROGRESS_CHANGED_EVENT = 'ninja-slash-level-progress-changed';
 export const SANDBOX_LANE_SETTINGS_STORAGE_KEY_PREFIX =
@@ -452,6 +471,17 @@ export function createDefaultSandboxLaneSettings(
   return createDefaultThreeLaneYSettings({ worldHeight });
 }
 
+export function createDefaultSandboxLaneSettingsConfig(): SandboxLaneSettingsConfig {
+  return {
+    version: 1,
+    savedAt: null,
+    profiles: {
+      landscape: createDefaultSandboxLaneSettings(GAME_PROFILES.landscape.height),
+      portrait: createDefaultSandboxLaneSettings(GAME_PROFILES.portrait.height)
+    }
+  };
+}
+
 export function normalizeSandboxLaneSettings(
   value: unknown,
   worldHeight: number
@@ -460,6 +490,89 @@ export function normalizeSandboxLaneSettings(
     worldHeight,
     fallback: createDefaultSandboxLaneSettings(worldHeight)
   });
+}
+
+export function normalizeSandboxLaneSettingsConfig(
+  value: unknown
+): SandboxLaneSettingsConfig {
+  const candidate = value as
+    | (Partial<SandboxLaneSettingsConfig> & {
+        readonly profiles?: unknown;
+      })
+    | null;
+  const rawProfiles = candidate?.profiles;
+  const profilesCandidate =
+    rawProfiles !== null &&
+    typeof rawProfiles === 'object' &&
+    !Array.isArray(rawProfiles)
+      ? (rawProfiles as Partial<Record<ProfileId, unknown>>)
+      : {};
+  const defaultConfig = createDefaultSandboxLaneSettingsConfig();
+  const profiles = Object.fromEntries(
+    Object.values(GAME_PROFILES).map((profile) => {
+      const profileValue = profilesCandidate[profile.id];
+      const legacyRootValue =
+        profile.id === DEFAULT_PROFILE_ID ? candidate : undefined;
+
+      return [
+        profile.id,
+        normalizeSandboxLaneSettings(
+          profileValue ?? legacyRootValue,
+          profile.height
+        )
+      ];
+    })
+  ) as SandboxLaneSettingsByProfile;
+
+  return {
+    version: 1,
+    savedAt: typeof candidate?.savedAt === 'string' ? candidate.savedAt : null,
+    profiles: {
+      ...defaultConfig.profiles,
+      ...profiles
+    }
+  };
+}
+
+export function getSandboxLaneSettingsForProfile(
+  config: SandboxLaneSettingsConfig,
+  profileId: string,
+  worldHeight: number
+): SandboxLaneSettings {
+  const normalizedConfig = normalizeSandboxLaneSettingsConfig(config);
+  const selectedProfileId = isProfileId(profileId) ? profileId : DEFAULT_PROFILE_ID;
+
+  return normalizeSandboxLaneSettings(
+    normalizedConfig.profiles[selectedProfileId],
+    worldHeight
+  );
+}
+
+export function setSandboxLaneSettingsForProfile(
+  config: SandboxLaneSettingsConfig,
+  profileId: string,
+  settings: SandboxLaneSettings,
+  worldHeight: number
+): SandboxLaneSettingsConfig {
+  const normalizedConfig = normalizeSandboxLaneSettingsConfig(config);
+  const selectedProfileId = isProfileId(profileId) ? profileId : DEFAULT_PROFILE_ID;
+
+  return {
+    ...normalizedConfig,
+    profiles: {
+      ...normalizedConfig.profiles,
+      [selectedProfileId]: normalizeSandboxLaneSettings(settings, worldHeight)
+    }
+  };
+}
+
+export function buildSandboxLaneSettingsExport(
+  config: SandboxLaneSettingsConfig
+): SandboxLaneSettingsConfig {
+  return {
+    ...normalizeSandboxLaneSettingsConfig(config),
+    savedAt: new Date().toISOString()
+  };
 }
 
 export function loadSandboxLaneSettings(

@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEBUG_LEVELS,
+  buildSandboxLaneSettingsExport,
   createDefaultDebugElementsConfig,
+  createDefaultSandboxLaneSettingsConfig,
   createDefaultSandboxLaneSettings,
   getEnemyMovementSpeed,
   getDebugLevelElements,
   getEditableDebugLevel,
+  getSandboxLaneSettingsForProfile,
   loadSandboxLaneSettings,
   normalizeDebugElementsConfig,
+  normalizeSandboxLaneSettingsConfig,
   normalizeRunnerSettings,
   resetSandboxLaneSettings,
   saveSandboxLaneSettings,
+  setSandboxLaneSettingsForProfile,
   setDebugLevelElements
 } from '../src/game/debugFeatures';
 
@@ -139,5 +144,65 @@ describe('debug feature config', () => {
     expect(resetSandboxLaneSettings('landscape', 720, storage)).toEqual(
       createDefaultSandboxLaneSettings(720)
     );
+  });
+
+  it('normalizes sandbox lane settings config per profile', () => {
+    const config = normalizeSandboxLaneSettingsConfig({
+      savedAt: '2026-05-29T00:00:00.000Z',
+      profiles: {
+        landscape: {
+          upperY: 320,
+          middleY: 455,
+          lowerY: 610
+        },
+        portrait: {
+          upperY: 620,
+          middleY: 760,
+          lowerY: 920
+        }
+      }
+    });
+
+    expect(config).toEqual({
+      version: 1,
+      savedAt: '2026-05-29T00:00:00.000Z',
+      profiles: {
+        landscape: {
+          upperY: 320,
+          middleY: 455,
+          lowerY: 610
+        },
+        portrait: {
+          upperY: 620,
+          middleY: 760,
+          lowerY: 920
+        }
+      }
+    });
+  });
+
+  it('patches and exports sandbox lane settings config', () => {
+    const config = setSandboxLaneSettingsForProfile(
+      createDefaultSandboxLaneSettingsConfig(),
+      'landscape',
+      {
+        upperY: 330,
+        middleY: 470,
+        lowerY: 620
+      },
+      720
+    );
+    const exported = buildSandboxLaneSettingsExport(config);
+
+    expect(getSandboxLaneSettingsForProfile(config, 'landscape', 720)).toEqual({
+      upperY: 330,
+      middleY: 470,
+      lowerY: 620
+    });
+    expect(getSandboxLaneSettingsForProfile(config, 'portrait', 1280)).toEqual(
+      createDefaultSandboxLaneSettings(1280)
+    );
+    expect(exported.version).toBe(1);
+    expect(Date.parse(exported.savedAt ?? '')).not.toBeNaN();
   });
 });
