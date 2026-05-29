@@ -13,37 +13,17 @@ import {
 import { isBgmTrackId } from '../game/assets/audioAssetCatalog';
 import { createGameAudio } from '../game/audio/gameAudio';
 import {
-  DEBUG_ELEMENTS_CONFIG_URL,
-  DEBUG_ELEMENTS_SAVE_ENDPOINT,
-  DEBUG_LEVELS,
   DEFAULT_GAMEPLAY_TUNING,
   GAMEPLAY_TUNING_CONFIG_URL,
   GAMEPLAY_TUNING_SAVE_ENDPOINT,
   SANDBOX_LANE_SETTINGS_CONFIG_URL,
-  buildDebugElementsExport,
-  createDefaultDebugElementsConfig,
   createDefaultSandboxLaneSettingsConfig,
   createDefaultSandboxLaneSettings,
-  getDebugLevel,
-  getDebugLevelElements,
   getSandboxLaneSettingsForProfile,
-  loadLevelProgress,
-  markLevelCompleted,
-  normalizeBackgroundLabSettings,
-  normalizeBaselineLabSettings,
-  normalizeDebugElementsConfig,
-  normalizeElementEditorSettings,
   normalizeGameplayTuning,
-  normalizeLevelProgress,
-  normalizeRunnerSettings,
   normalizeSandboxLaneSettingsConfig,
   normalizeSandboxLaneSettings,
-  resetLevelProgress,
   setSandboxLaneSettingsForProfile,
-  setLevelUnlocked,
-  type BackgroundFitMode,
-  type DebugElementKind,
-  type DebugElementsConfig,
   type GameplayTuning,
   type RoundEnemyGrowthMode,
   type SandboxLaneSettingsConfig,
@@ -200,9 +180,6 @@ const loadNinjaBoundsConfig = (): Promise<NinjaBoundsConfig | null> =>
 const loadGameplayTuningConfig = (): Promise<GameplayTuning | null> =>
   loadJsonConfig(GAMEPLAY_TUNING_CONFIG_URL, normalizeGameplayTuning);
 
-const loadDebugElementsConfig = (): Promise<DebugElementsConfig | null> =>
-  loadJsonConfig(DEBUG_ELEMENTS_CONFIG_URL, normalizeDebugElementsConfig);
-
 const loadSandboxLaneSettingsConfig =
   (): Promise<SandboxLaneSettingsConfig | null> =>
     loadJsonConfig(
@@ -249,14 +226,12 @@ export function createApp(root: HTMLDivElement | null): void {
   let playMode = false;
   let playToastTimeout: number | null = null;
   let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
-  let debugElementsConfig = createDefaultDebugElementsConfig();
   let sandboxLaneSettingsConfig = createDefaultSandboxLaneSettingsConfig();
   let sandboxLaneSettingsLoadedFromFile = false;
   let sandboxLaneSettingsDirty = false;
   let gymSaveStatus = 'Loaded defaults';
   let gameplayTuningSaveStatus = 'Loaded defaults';
   let laneEditorSaveStatus = 'Loaded defaults';
-  let elementEditorSaveStatus = 'Loaded defaults';
   let gymSelectedActorId: NinjaActorId = 'mainNinja';
   let gymSelectedDirection: FacingDirection = 'right';
   let gymSelectedActionId = getDefaultNinjaActionId(gymSelectedActorId);
@@ -267,7 +242,6 @@ export function createApp(root: HTMLDivElement | null): void {
   let gymPlaybackRate = 1;
   let gymControlsRenderFrame: number | null = null;
   let gymFrameStripSignature = '';
-  let levelProgressControlsSignature = '';
   let debugPanelWidth = loadDebugPanelWidth();
 
   const debugStore = createDebugStore();
@@ -350,12 +324,6 @@ export function createApp(root: HTMLDivElement | null): void {
     audio,
     getProfile: () => getProfileById(profileId),
     getNinjaBoundsConfig: () => ninjaBoundsConfig,
-    getDebugElementsConfig: () => debugElementsConfig,
-    setDebugElementsConfig: (config) => {
-      debugElementsConfig = normalizeDebugElementsConfig(config);
-      elementEditorSaveStatus = 'Unsaved element changes';
-      debugStore.setElementEditor(normalizeElementEditorSettings(debugStore.get().elementEditor));
-    },
     setSandboxLaneSettings: (settings) => {
       setSandboxLaneSettingsForCurrentProfile(settings);
     },
@@ -371,7 +339,7 @@ export function createApp(root: HTMLDivElement | null): void {
       <div class="app-shell__brand">
         <p class="eyebrow">PHASER 4 DEBUG LAB</p>
         <h1>2D Ninja Slash</h1>
-        <p class="subtitle">Level, element, runner, and tuning workspace</p>
+        <p class="subtitle">Sandbox, lane, gym, and tuning workspace</p>
       </div>
       <div class="app-shell__header-action">
         <button id="play-toggle" class="shell-button" data-variant="primary" type="button" aria-pressed="false">Play</button>
@@ -465,46 +433,6 @@ export function createApp(root: HTMLDivElement | null): void {
     tuningSaveButton,
     tuningResetButton,
     tuningSaveStatus,
-    levelProgressList,
-    levelProgressCompleteButton,
-    levelProgressResetButton,
-    backgroundLabControls,
-    backgroundFitModeSelect,
-    backgroundShowGridToggle,
-    backgroundShowSafeToggle,
-    backgroundShowBaselineToggle,
-    backgroundScrollSpeedInput,
-    backgroundScrollReadout,
-    runnerControls,
-    runnerSeedInput,
-    runnerSeedReadout,
-    runnerDifficultyInput,
-    runnerDifficultyReadout,
-    runnerGapsInput,
-    runnerGapsReadout,
-    runnerLanesInput,
-    runnerLanesReadout,
-    runnerSpeedInput,
-    runnerSpeedReadout,
-    runnerShowPlanToggle,
-    runnerShowHitboxesToggle,
-    baselineControls,
-    baselineLevelSelect,
-    baselineShowHitboxesToggle,
-    baselineShowSpawnGoalToggle,
-    baselineShowCameraBandsToggle,
-    elementEditorControls,
-    elementLevelSelect,
-    elementKindSelect,
-    elementShowGridToggle,
-    elementShowLabelsToggle,
-    elementShowCollisionToggle,
-    elementAddButton,
-    elementDuplicateButton,
-    elementDeleteButton,
-    elementSaveButton,
-    elementExportButton,
-    elementEditorReadout,
     gymControls,
     gymExitButton,
     gymActorSelect,
@@ -708,52 +636,6 @@ export function createApp(root: HTMLDivElement | null): void {
     gameplayTuningSaveStatus = 'Unsaved tuning changes';
   };
 
-  const triggerElementCommand = (
-    command: 'add' | 'delete' | 'duplicate' | 'nudge',
-    nudgeX = 0,
-    nudgeY = 0
-  ): void => {
-    const current = normalizeElementEditorSettings(debugStore.get().elementEditor);
-    debugStore.setElementEditor({
-      ...current,
-      command,
-      commandSerial: current.commandSerial + 1,
-      nudgeX,
-      nudgeY
-    });
-  };
-
-  const renderLevelProgressControls = (): void => {
-    const progress = normalizeLevelProgress(debugStore.get().levelProgress);
-    const signature = JSON.stringify(progress);
-
-    if (signature === levelProgressControlsSignature) {
-      return;
-    }
-
-    levelProgressControlsSignature = signature;
-
-    levelProgressList.replaceChildren(
-      ...DEBUG_LEVELS.map((level) => {
-        const row = document.createElement('label');
-        const input = document.createElement('input');
-        const completed = progress.completedLevelIds.includes(level.id);
-
-        row.className = 'toggle-row';
-        input.type = 'checkbox';
-        input.checked = progress.unlockedLevelIds.includes(level.id);
-        input.disabled = level.id === DEBUG_LEVELS[0].id;
-        input.addEventListener('change', () => {
-          const next = setLevelUnlocked(level.id, input.checked);
-          debugStore.setLevelProgress(next);
-        });
-        row.append(input, `${level.label}${completed ? ' complete' : ''}`);
-
-        return row;
-      })
-    );
-  };
-
   const renderGameplayTuningControls = (): void => {
     const tuning = normalizeGameplayTuning(debugStore.get().gameplayTuning);
 
@@ -802,62 +684,6 @@ export function createApp(root: HTMLDivElement | null): void {
     laneMiddleYReadout.textContent = String(settings.middleY);
     laneLowerYReadout.textContent = String(settings.lowerY);
     laneSaveStatus.textContent = laneEditorSaveStatus;
-  };
-
-  const renderBackgroundLabControls = (): void => {
-    const state = normalizeBackgroundLabSettings(debugStore.get().backgroundLab);
-
-    backgroundFitModeSelect.value = state.fitMode;
-    backgroundShowGridToggle.checked = state.showGrid;
-    backgroundShowSafeToggle.checked = state.showSafeFrame;
-    backgroundShowBaselineToggle.checked = state.showBaseline;
-    backgroundScrollSpeedInput.value = String(state.scrollSpeed);
-    backgroundScrollReadout.textContent = String(state.scrollSpeed);
-  };
-
-  const renderRunnerControls = (): void => {
-    const state = normalizeRunnerSettings(debugStore.get().runnerGeneration);
-
-    runnerSeedInput.value = String(state.seed);
-    runnerDifficultyInput.value = String(state.difficulty);
-    runnerGapsInput.value = String(state.gapDensity);
-    runnerLanesInput.value = String(state.laneCount);
-    runnerSpeedInput.value = String(state.scrollSpeed);
-    runnerShowPlanToggle.checked = state.showPlanView;
-    runnerShowHitboxesToggle.checked = state.showHitboxes;
-    runnerSeedReadout.textContent = String(state.seed);
-    runnerDifficultyReadout.textContent = state.difficulty.toFixed(2);
-    runnerGapsReadout.textContent = state.gapDensity.toFixed(2);
-    runnerLanesReadout.textContent = String(state.laneCount);
-    runnerSpeedReadout.textContent = String(state.scrollSpeed);
-  };
-
-  const renderBaselineControls = (): void => {
-    const state = normalizeBaselineLabSettings(debugStore.get().baselineLab);
-
-    baselineLevelSelect.value = state.selectedLevelId;
-    baselineShowHitboxesToggle.checked = state.showHitboxes;
-    baselineShowSpawnGoalToggle.checked = state.showSpawnGoal;
-    baselineShowCameraBandsToggle.checked = state.showCameraBands;
-  };
-
-  const renderElementEditorControls = (): void => {
-    const state = normalizeElementEditorSettings(debugStore.get().elementEditor);
-    const level = getDebugLevel(state.selectedLevelId);
-    const elements = getDebugLevelElements(debugElementsConfig, state.selectedLevelId);
-    const selected = elements.find((element) => element.id === state.selectedElementId);
-
-    elementLevelSelect.value = state.selectedLevelId;
-    elementKindSelect.value = state.selectedKind;
-    elementShowGridToggle.checked = state.showGrid;
-    elementShowLabelsToggle.checked = state.showLabels;
-    elementShowCollisionToggle.checked = state.showCollision;
-    elementDeleteButton.disabled = Boolean(elementEditorControls.hidden) || selected === undefined;
-    elementDuplicateButton.disabled = Boolean(elementEditorControls.hidden) || selected === undefined;
-    elementEditorReadout.textContent =
-      selected === undefined
-        ? `${level.label} | ${elements.length} elements | ${elementEditorSaveStatus}`
-        : `${level.label} | ${selected.id} ${selected.width}x${selected.height} | ${elementEditorSaveStatus}`;
   };
 
   const scheduleGymControlsRender = (): void => {
@@ -1376,20 +1202,8 @@ export function createApp(root: HTMLDivElement | null): void {
     backgroundFileSelect.value = state.backgroundFileName;
     bgmTrackSelect.value = state.bgmTrackId;
     setControlGroupHidden(laneEditorControls, state.activeScene !== SceneKeys.LaneEditor);
-    setControlGroupHidden(backgroundLabControls, state.activeScene !== SceneKeys.BackgroundLab);
-    setControlGroupHidden(runnerControls, state.activeScene !== SceneKeys.RunnerLab);
-    setControlGroupHidden(
-      baselineControls,
-      state.activeScene !== SceneKeys.BaselineLevel && state.activeScene !== SceneKeys.LevelProgress
-    );
-    setControlGroupHidden(elementEditorControls, state.activeScene !== SceneKeys.ElementEditor);
     renderLaneEditorControls();
     renderGameplayTuningControls();
-    renderLevelProgressControls();
-    renderBackgroundLabControls();
-    renderRunnerControls();
-    renderBaselineControls();
-    renderElementEditorControls();
     fpsReadout.textContent = `${state.performance.fps.toFixed(1)} / ${state.performance.physicsBodies} bodies`;
     pointerReadout.textContent = `${state.pointer.x}, ${state.pointer.y} / ${state.pointer.worldX}, ${state.pointer.worldY} ${
       state.pointer.down ? 'down' : 'up'
@@ -1418,7 +1232,6 @@ export function createApp(root: HTMLDivElement | null): void {
   };
 
   renderBackgroundFileOptions();
-  debugStore.setLevelProgress(loadLevelProgress());
   void loadNinjaBoundsConfig().then((loadedConfig) => {
     if (loadedConfig === null) {
       return;
@@ -1457,15 +1270,6 @@ export function createApp(root: HTMLDivElement | null): void {
     laneEditorSaveStatus = 'Loaded public/assets/config/sandbox-lanes.json';
     applySandboxLaneSettingsForCurrentProfile();
     renderLaneEditorControls();
-  });
-  void loadDebugElementsConfig().then((loadedConfig) => {
-    if (loadedConfig === null) {
-      return;
-    }
-
-    debugElementsConfig = loadedConfig;
-    elementEditorSaveStatus = 'Loaded public/assets/config/debug-elements.json';
-    renderElementEditorControls();
   });
 
   const subscriptions: Unsubscribe[] = [
@@ -1673,141 +1477,6 @@ export function createApp(root: HTMLDivElement | null): void {
   tuningResetButton.addEventListener('click', () => {
     gameplayTuningSaveStatus = 'Reset to defaults';
     debugStore.setGameplayTuning(DEFAULT_GAMEPLAY_TUNING);
-  });
-
-  levelProgressCompleteButton.addEventListener('click', () => {
-    const selectedLevelId = normalizeBaselineLabSettings(debugStore.get().baselineLab).selectedLevelId;
-    debugStore.setLevelProgress(markLevelCompleted(selectedLevelId));
-  });
-  levelProgressResetButton.addEventListener('click', () => {
-    debugStore.setLevelProgress(resetLevelProgress());
-  });
-
-  backgroundFitModeSelect.addEventListener('change', () => {
-    const fitMode = backgroundFitModeSelect.value as BackgroundFitMode;
-    debugStore.setBackgroundLab({
-      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
-      fitMode
-    });
-  });
-  backgroundShowGridToggle.addEventListener('change', () => {
-    debugStore.setBackgroundLab({
-      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
-      showGrid: backgroundShowGridToggle.checked
-    });
-  });
-  backgroundShowSafeToggle.addEventListener('change', () => {
-    debugStore.setBackgroundLab({
-      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
-      showSafeFrame: backgroundShowSafeToggle.checked
-    });
-  });
-  backgroundShowBaselineToggle.addEventListener('change', () => {
-    debugStore.setBackgroundLab({
-      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
-      showBaseline: backgroundShowBaselineToggle.checked
-    });
-  });
-  backgroundScrollSpeedInput.addEventListener('input', () => {
-    debugStore.setBackgroundLab({
-      ...normalizeBackgroundLabSettings(debugStore.get().backgroundLab),
-      scrollSpeed: Number(backgroundScrollSpeedInput.value)
-    });
-  });
-
-  const patchRunnerSettings = (): void => {
-    debugStore.setRunnerGeneration(
-      normalizeRunnerSettings({
-        seed: Number(runnerSeedInput.value),
-        difficulty: Number(runnerDifficultyInput.value),
-        gapDensity: Number(runnerGapsInput.value),
-        laneCount: Number(runnerLanesInput.value),
-        scrollSpeed: Number(runnerSpeedInput.value),
-        showPlanView: runnerShowPlanToggle.checked,
-        showHitboxes: runnerShowHitboxesToggle.checked
-      })
-    );
-  };
-  runnerSeedInput.addEventListener('input', patchRunnerSettings);
-  runnerDifficultyInput.addEventListener('input', patchRunnerSettings);
-  runnerGapsInput.addEventListener('input', patchRunnerSettings);
-  runnerLanesInput.addEventListener('input', patchRunnerSettings);
-  runnerSpeedInput.addEventListener('input', patchRunnerSettings);
-  runnerShowPlanToggle.addEventListener('change', patchRunnerSettings);
-  runnerShowHitboxesToggle.addEventListener('change', patchRunnerSettings);
-
-  const patchBaselineSettings = (): void => {
-    debugStore.setBaselineLab(
-      normalizeBaselineLabSettings({
-        selectedLevelId: baselineLevelSelect.value,
-        showHitboxes: baselineShowHitboxesToggle.checked,
-        showSpawnGoal: baselineShowSpawnGoalToggle.checked,
-        showCameraBands: baselineShowCameraBandsToggle.checked
-      })
-    );
-  };
-  baselineLevelSelect.addEventListener('change', patchBaselineSettings);
-  baselineShowHitboxesToggle.addEventListener('change', patchBaselineSettings);
-  baselineShowSpawnGoalToggle.addEventListener('change', patchBaselineSettings);
-  baselineShowCameraBandsToggle.addEventListener('change', patchBaselineSettings);
-
-  const patchElementEditorSettings = (): void => {
-    const current = normalizeElementEditorSettings(debugStore.get().elementEditor);
-    const selectedLevelId = elementLevelSelect.value;
-    const selectedElementId =
-      current.selectedLevelId === selectedLevelId ? current.selectedElementId : null;
-    const selectedKind = elementKindSelect.value as DebugElementKind;
-    debugStore.setElementEditor({
-      ...current,
-      selectedLevelId,
-      selectedElementId,
-      selectedKind,
-      showGrid: elementShowGridToggle.checked,
-      showLabels: elementShowLabelsToggle.checked,
-      showCollision: elementShowCollisionToggle.checked
-    });
-  };
-  elementLevelSelect.addEventListener('change', patchElementEditorSettings);
-  elementKindSelect.addEventListener('change', patchElementEditorSettings);
-  elementShowGridToggle.addEventListener('change', patchElementEditorSettings);
-  elementShowLabelsToggle.addEventListener('change', patchElementEditorSettings);
-  elementShowCollisionToggle.addEventListener('change', patchElementEditorSettings);
-  elementAddButton.addEventListener('click', () => triggerElementCommand('add'));
-  elementDuplicateButton.addEventListener('click', () => triggerElementCommand('duplicate'));
-  elementDeleteButton.addEventListener('click', () => triggerElementCommand('delete'));
-  debugControls.addEventListener('click', (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
-      'button[data-element-nudge]'
-    );
-
-    if (button === null || button.dataset.elementNudge === undefined) {
-      return;
-    }
-
-    const [nudgeX = 0, nudgeY = 0] = button.dataset.elementNudge
-      .split(',')
-      .map((value) => Number(value));
-    triggerElementCommand('nudge', nudgeX, nudgeY);
-  });
-  elementSaveButton.addEventListener('click', async () => {
-    elementEditorSaveStatus = 'Saving elements...';
-    renderElementEditorControls();
-
-    const payload = buildDebugElementsExport(debugElementsConfig);
-
-    try {
-      await saveJsonConfig(DEBUG_ELEMENTS_SAVE_ENDPOINT, payload);
-      debugElementsConfig = payload;
-      elementEditorSaveStatus = 'Saved public/assets/config/debug-elements.json';
-    } catch {
-      downloadJsonFile('debug-elements.json', payload);
-      elementEditorSaveStatus = 'Downloaded debug-elements.json';
-    }
-
-    renderElementEditorControls();
-  });
-  elementExportButton.addEventListener('click', () => {
-    downloadJsonFile('debug-elements.json', buildDebugElementsExport(debugElementsConfig));
   });
 
   gymExitButton.addEventListener('click', () => {

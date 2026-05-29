@@ -480,11 +480,6 @@ input {
   gap: 8px;
 }
 
-.toggle-list {
-  display: grid;
-  gap: 6px;
-}
-
 .panel-note {
   margin: 0;
   color: var(--muted);

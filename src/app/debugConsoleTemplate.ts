@@ -1,11 +1,7 @@
 import { BGM_TRACKS } from '../game/assets/audioAssetCatalog';
 import {
-  BACKGROUND_FIT_MODES,
-  DEBUG_ELEMENT_KINDS,
-  DEBUG_LEVELS,
   GAMEPLAY_TUNING_LIMITS,
-  ROUND_ENEMY_GROWTH_MODES,
-  formatElementKind
+  ROUND_ENEMY_GROWTH_MODES
 } from '../game/debugFeatures';
 import {
   FACING_DIRECTIONS,
@@ -40,11 +36,6 @@ export function createDebugControlsHtml(): string {
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Sandbox}">Sandbox</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.Gym}">Gym</button>
         <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LaneEditor}">Lanes</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.LevelProgress}">Levels</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.ElementEditor}">Elements</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BaselineLevel}">Baseline</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.RunnerLab}">Runner</button>
-        <button class="shell-button" type="button" data-debug-scene="${SceneKeys.BackgroundLab}">Background</button>
       </div>
     </div>
     <div class="panel-group">
@@ -138,87 +129,6 @@ export function createDebugControlsHtml(): string {
         <button id="tuning-reset" class="shell-button" type="button">Reset</button>
       </div>
       <p id="tuning-save-status" class="panel-note">Loaded defaults</p>
-    </div>
-    <div class="panel-group">
-      <p class="panel-group__title">Level Progress</p>
-      <div id="level-progress-list" class="toggle-list"></div>
-      <div class="panel-group__row">
-        <button id="level-progress-complete" class="shell-button" type="button">Complete selected</button>
-        <button id="level-progress-reset" class="shell-button" type="button">Reset progress</button>
-      </div>
-    </div>
-    <div id="background-lab-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Background Lab</p>
-      <label class="select-row" for="background-fit-mode">
-        <span>Fit</span>
-        <select id="background-fit-mode">
-          ${BACKGROUND_FIT_MODES.map((mode) => `<option value="${mode}">${mode}</option>`).join('')}
-        </select>
-      </label>
-      <label class="toggle-row"><input id="background-show-grid" type="checkbox" /> Grid</label>
-      <label class="toggle-row"><input id="background-show-safe" type="checkbox" /> Safe frame</label>
-      <label class="toggle-row"><input id="background-show-baseline" type="checkbox" /> Baseline</label>
-      <label class="range-row">
-        <span>Scroll</span>
-        <input id="background-scroll-speed" type="range" min="-220" max="220" step="10" />
-        <strong id="background-scroll-readout">0</strong>
-      </label>
-    </div>
-    <div id="runner-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Runner Generator</p>
-      <label class="range-row"><span>Seed</span><input id="runner-seed" type="range" min="1" max="999" step="1" /><strong id="runner-seed-readout">7</strong></label>
-      <label class="range-row"><span>Difficulty</span><input id="runner-difficulty" type="range" min="0" max="1" step="0.01" /><strong id="runner-difficulty-readout">0.42</strong></label>
-      <label class="range-row"><span>Gaps</span><input id="runner-gaps" type="range" min="0" max="1" step="0.01" /><strong id="runner-gaps-readout">0.34</strong></label>
-      <label class="range-row"><span>Lanes</span><input id="runner-lanes" type="range" min="1" max="5" step="1" /><strong id="runner-lanes-readout">3</strong></label>
-      <label class="range-row"><span>Speed</span><input id="runner-speed" type="range" min="0" max="520" step="10" /><strong id="runner-speed-readout">230</strong></label>
-      <label class="toggle-row"><input id="runner-show-plan" type="checkbox" /> Plan view</label>
-      <label class="toggle-row"><input id="runner-show-hitboxes" type="checkbox" /> Hitboxes</label>
-    </div>
-    <div id="baseline-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Baseline Level</p>
-      <label class="select-row" for="baseline-level-select">
-        <span>Level</span>
-        <select id="baseline-level-select">
-          ${DEBUG_LEVELS.map((level) => `<option value="${level.id}">${level.label}</option>`).join('')}
-        </select>
-      </label>
-      <label class="toggle-row"><input id="baseline-show-hitboxes" type="checkbox" /> Hitboxes</label>
-      <label class="toggle-row"><input id="baseline-show-spawn-goal" type="checkbox" /> Spawn / goal</label>
-      <label class="toggle-row"><input id="baseline-show-camera-bands" type="checkbox" /> Camera bands</label>
-    </div>
-    <div id="element-editor-controls" class="panel-group" hidden>
-      <p class="panel-group__title">Element Editor</p>
-      <label class="select-row" for="element-level">
-        <span>Level</span>
-        <select id="element-level">
-          ${DEBUG_LEVELS.map((level) => `<option value="${level.id}">${level.label}</option>`).join('')}
-        </select>
-      </label>
-      <label class="select-row" for="element-kind">
-        <span>Kind</span>
-        <select id="element-kind">
-          ${DEBUG_ELEMENT_KINDS.map((kind) => `<option value="${kind}">${formatElementKind(kind)}</option>`).join('')}
-        </select>
-      </label>
-      <label class="toggle-row"><input id="element-show-grid" type="checkbox" /> Grid</label>
-      <label class="toggle-row"><input id="element-show-labels" type="checkbox" /> Labels</label>
-      <label class="toggle-row"><input id="element-show-collision" type="checkbox" /> Collision inset</label>
-      <div class="panel-group__row">
-        <button id="element-add" class="shell-button" type="button">Add</button>
-        <button id="element-duplicate" class="shell-button" type="button">Duplicate</button>
-        <button id="element-delete" class="shell-button" type="button">Delete</button>
-      </div>
-      <div class="panel-group__row">
-        <button class="shell-button" type="button" data-element-nudge="0,-8">Up</button>
-        <button class="shell-button" type="button" data-element-nudge="-8,0">Left</button>
-        <button class="shell-button" type="button" data-element-nudge="8,0">Right</button>
-        <button class="shell-button" type="button" data-element-nudge="0,8">Down</button>
-      </div>
-      <div class="panel-group__row">
-        <button id="element-save" class="shell-button" data-variant="primary" type="button">Save</button>
-        <button id="element-export" class="shell-button" type="button">Export</button>
-      </div>
-      <p id="element-editor-readout" class="panel-note">Loaded defaults</p>
     </div>
     <div id="gym-controls" class="panel-group" hidden>
       <div class="panel-group__header">

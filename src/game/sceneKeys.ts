@@ -5,11 +5,6 @@ export const SceneKeys = {
   Sandbox: 'Sandbox',
   Gym: 'Gym',
   LaneEditor: 'LaneEditor',
-  LevelProgress: 'LevelProgress',
-  ElementEditor: 'ElementEditor',
-  BackgroundLab: 'BackgroundLab',
-  RunnerLab: 'RunnerLab',
-  BaselineLevel: 'BaselineLevel',
   Settings: 'Settings'
 } as const;
 

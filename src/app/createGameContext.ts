@@ -6,14 +6,10 @@ import {
 import { SceneKeys, type SceneKey } from '../game/sceneKeys';
 import { createGameAudio } from '../game/audio/gameAudio';
 import {
-  DEBUG_ELEMENTS_CONFIG_URL,
   GAMEPLAY_TUNING_CONFIG_URL,
   SANDBOX_LANE_SETTINGS_CONFIG_URL,
-  createDefaultDebugElementsConfig,
   createDefaultSandboxLaneSettingsConfig,
   getSandboxLaneSettingsForProfile,
-  loadLevelProgress,
-  normalizeDebugElementsConfig,
   normalizeGameplayTuning,
   normalizeSandboxLaneSettingsConfig
 } from '../game/debugFeatures';
@@ -60,21 +56,14 @@ export async function createGameContext(
   const profile = getProfileById(profileId);
 
   let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
-  let debugElementsConfig = createDefaultDebugElementsConfig();
 
-  const [
-    loadedNinjaBounds,
-    loadedTuning,
-    loadedLaneSettings,
-    loadedElements
-  ] = await Promise.all([
+  const [loadedNinjaBounds, loadedTuning, loadedLaneSettings] = await Promise.all([
     loadJsonConfig(NINJA_BOUNDS_CONFIG_URL, normalizeNinjaBoundsConfig),
     loadJsonConfig(GAMEPLAY_TUNING_CONFIG_URL, normalizeGameplayTuning),
     loadJsonConfig(
       SANDBOX_LANE_SETTINGS_CONFIG_URL,
       normalizeSandboxLaneSettingsConfig
-    ),
-    loadJsonConfig(DEBUG_ELEMENTS_CONFIG_URL, normalizeDebugElementsConfig)
+    )
   ]);
 
   if (loadedNinjaBounds !== null) {
@@ -85,17 +74,11 @@ export async function createGameContext(
     debugStore.setGameplayTuning(loadedTuning);
   }
 
-  if (loadedElements !== null) {
-    debugElementsConfig = loadedElements;
-  }
-
   let laneSettingsConfig =
     loadedLaneSettings ?? createDefaultSandboxLaneSettingsConfig();
   debugStore.setSandboxLaneSettings(
     getSandboxLaneSettingsForProfile(laneSettingsConfig, profileId, profile.height)
   );
-
-  debugStore.setLevelProgress(loadLevelProgress());
 
   // Mirror the debug console's lane auto-save so the Lane Editor's drag-release
   // also persists to sandbox-lanes.json in the standalone game build. Writes are
@@ -138,10 +121,6 @@ export async function createGameContext(
     audio,
     getProfile: () => profile,
     getNinjaBoundsConfig: () => ninjaBoundsConfig,
-    getDebugElementsConfig: () => debugElementsConfig,
-    setDebugElementsConfig: (config) => {
-      debugElementsConfig = normalizeDebugElementsConfig(config);
-    },
     setSandboxLaneSettings: (settings) => {
       debugStore.setSandboxLaneSettings(settings);
     },
