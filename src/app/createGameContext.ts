@@ -26,6 +26,7 @@ import {
 import { createDebugStore } from '../stores/debugStore';
 import { createSettingsStore } from '../stores/settingsStore';
 import { loadJsonConfig } from './debugConfigIO';
+import { writeSandboxLaneSettings } from './sandboxLaneSettingsIO';
 import type { AppContext } from './context';
 
 export interface CreateGameContextOptions {
@@ -88,13 +89,48 @@ export async function createGameContext(
     debugElementsConfig = loadedElements;
   }
 
-  const laneSettingsConfig =
+  let laneSettingsConfig =
     loadedLaneSettings ?? createDefaultSandboxLaneSettingsConfig();
   debugStore.setSandboxLaneSettings(
     getSandboxLaneSettingsForProfile(laneSettingsConfig, profileId, profile.height)
   );
 
   debugStore.setLevelProgress(loadLevelProgress());
+
+  // Mirror the debug console's lane auto-save so the Lane Editor's drag-release
+  // also persists to sandbox-lanes.json in the standalone game build. Writes are
+  // coalesced; a missing dev-server endpoint (static production build) fails
+  // silently and just keeps the in-memory change.
+  let laneSaveInFlight = false;
+  let laneSavePendingAfterFlight = false;
+  const persistLaneSettings = async (): Promise<void> => {
+    if (laneSaveInFlight) {
+      laneSavePendingAfterFlight = true;
+      return;
+    }
+
+    laneSaveInFlight = true;
+
+    const { ok, payload } = await writeSandboxLaneSettings(
+      laneSettingsConfig,
+      profileId,
+      debugStore.get().sandboxLaneSettings,
+      profile.height
+    );
+
+    if (ok) {
+      laneSettingsConfig = payload;
+    }
+    // On failure (no write endpoint in a static build) keep the in-memory
+    // change only; nothing to persist to.
+
+    laneSaveInFlight = false;
+
+    if (laneSavePendingAfterFlight) {
+      laneSavePendingAfterFlight = false;
+      void persistLaneSettings();
+    }
+  };
 
   return {
     debugStore,
@@ -108,6 +144,9 @@ export async function createGameContext(
     },
     setSandboxLaneSettings: (settings) => {
       debugStore.setSandboxLaneSettings(settings);
+    },
+    persistSandboxLaneSettings: () => {
+      void persistLaneSettings();
     },
     getInitialScene: () => initialScene
   };
