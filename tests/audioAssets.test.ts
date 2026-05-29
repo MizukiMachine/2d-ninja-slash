@@ -108,12 +108,14 @@ describe('audio asset catalog', () => {
       'main-ninja-death',
       'round-clear',
       'round-start',
+      'round-start-taiko',
+      'round-start-gong',
       'hyoshigi-preview',
       'kotsuzumi-preview'
     ]);
     expect(getSfxCue('player-slash').key).toBe('sfx.playerSlash');
-    expect(getSfxCue('enemy-defeat').path).toBe('/assets/sfx/enemy-defeat-loud.mp3');
-    expect(getSfxCue('enemy-defeat').volume).toBe(0.85);
+    expect(getSfxCue('enemy-defeat').path).toBe('/assets/sfx/enemy-defeat-deep.mp3');
+    expect(getSfxCue('enemy-defeat').volume).toBe(0.211);
     expect(getSfxCue('main-ninja-death').key).toBe('sfx.mainNinjaDeath');
     expect(getSfxCue('kotsuzumi-preview').key).toBe('sfx.kotsuzumiPreview');
   });

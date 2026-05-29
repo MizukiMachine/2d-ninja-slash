@@ -244,6 +244,10 @@ export function getDebugConsoleRefs(root: ParentNode) {
     HTMLButtonElement
   );
   const gymSaveStatusElement = requireElement(root, '#gym-save-status', HTMLElement);
+  const sfxAssignControls = requireElement(root, '#sfx-assign-controls', HTMLElement);
+  const sfxAssignSaveButton = requireElement(root, '#sfx-assign-save', HTMLButtonElement);
+  const sfxAssignResetButton = requireElement(root, '#sfx-assign-reset', HTMLButtonElement);
+  const sfxAssignStatus = requireElement(root, '#sfx-assign-status', HTMLElement);
   const sceneReadout = requireElement(root, '#scene-readout', HTMLElement);
   const fpsReadout = requireElement(root, '#fps-readout', HTMLElement);
   const pointerReadout = requireElement(root, '#pointer-readout', HTMLElement);
@@ -333,6 +337,10 @@ export function getDebugConsoleRefs(root: ParentNode) {
     gymMirrorLaneAnchorButton,
     gymApplyLaneAnchorAllButton,
     gymSaveStatusElement,
+    sfxAssignControls,
+    sfxAssignSaveButton,
+    sfxAssignResetButton,
+    sfxAssignStatus,
     sceneReadout,
     fpsReadout,
     pointerReadout,

@@ -683,7 +683,7 @@ export class SandboxScene extends BaseScene {
     this.damagedEnemiesThisAttack.clear();
     this.clearAttackHitArea();
     this.clearAllEnemyAttackHitAreas();
-    this.playSfx('enemy-defeat');
+    this.playSfx('round-start');
 
     this.enemies.forEach((enemy, index) => {
       if (index < enemyCount) {
@@ -2449,12 +2449,10 @@ export class SandboxScene extends BaseScene {
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
 
+    // Enemies have 1 HP, so a hit always results in defeat (no surviving-hit SFX).
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
-      return;
     }
-
-    this.playSfx('hit');
   }
 
   private startEnemyDeath(enemy: EnemyState): void {
@@ -2490,7 +2488,7 @@ export class SandboxScene extends BaseScene {
       enemy.laneMovement.currentY,
       'death'
     );
-    this.playSfx('round-start');
+    this.playSfx('enemy-defeat');
     this.recordEnemyDefeat(enemy);
     this.renderHealthBars(this.time.now);
   }

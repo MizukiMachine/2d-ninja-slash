@@ -2876,18 +2876,18 @@
       "type": "sfx-audio",
       "label": "UI Select",
       "filePath": "public/assets/sfx/ui-select.mp3",
-      "path": "/assets/sfx/ui-select.mp3",
+      "path": "/assets/sfx/ui-select-v2.mp3",
       "format": "mp3",
       "animationUse": "combat and UI sound effect",
       "phaser": {
         "loader": "audio",
         "audioKey": "sfx.uiSelect",
         "urls": [
-          "/assets/sfx/ui-select.mp3"
+          "/assets/sfx/ui-select-v2.mp3"
         ],
         "playback": {
           "loop": false,
-          "volume": 0.36
+          "volume": 0.891
         }
       },
       "metadata": {
@@ -2915,7 +2915,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.24
+          "volume": 0.405
         }
       },
       "metadata": {
@@ -2943,7 +2943,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.22
+          "volume": 0.241
         }
       },
       "metadata": {
@@ -2971,7 +2971,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.41
+          "volume": 0.484
         }
       },
       "metadata": {
@@ -2999,7 +2999,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.43
+          "volume": 2.095
         }
       },
       "metadata": {
@@ -3027,15 +3027,14 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.54
+          "volume": 0.433
         }
       },
       "metadata": {
         "id": "hit",
         "theme": "sharp blade impact on armor",
-        "generatedBy": "ElevenLabs sound-generation",
-        "generatedAt": "2026-05-28",
-        "sizeBytes": 13836,
+        "generatedBy": "ElevenLabs text-to-sound",
+        "generatedAt": "2026-05-29",
         "sfxCue": true
       }
     },
@@ -3055,7 +3054,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.3
+          "volume": 0.309
         }
       },
       "metadata": {
@@ -3072,18 +3071,18 @@
       "type": "sfx-audio",
       "label": "Enemy Defeat",
       "filePath": "public/assets/sfx/enemy-defeat-loud.mp3",
-      "path": "/assets/sfx/enemy-defeat-loud.mp3",
+      "path": "/assets/sfx/enemy-defeat-deep.mp3",
       "format": "mp3",
       "animationUse": "combat and UI sound effect",
       "phaser": {
         "loader": "audio",
         "audioKey": "sfx.enemyDefeat",
         "urls": [
-          "/assets/sfx/enemy-defeat-loud.mp3"
+          "/assets/sfx/enemy-defeat-deep.mp3"
         ],
         "playback": {
           "loop": false,
-          "volume": 0.85
+          "volume": 0.211
         }
       },
       "metadata": {
@@ -3111,7 +3110,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.61
+          "volume": 1.52
         }
       },
       "metadata": {
@@ -3139,7 +3138,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.63
+          "volume": 0.325
         }
       },
       "metadata": {
@@ -3167,7 +3166,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.9
+          "volume": 0.99
         }
       },
       "metadata": {
@@ -3182,7 +3181,7 @@
     {
       "key": "sfx.roundStart",
       "type": "sfx-audio",
-      "label": "Round Start",
+      "label": "Round Start (Hyoshigi)",
       "filePath": "public/assets/sfx/round-start-loud.wav",
       "path": "/assets/sfx/round-start-loud.wav",
       "format": "wav",
@@ -3195,7 +3194,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.82
+          "volume": 0.99
         }
       },
       "metadata": {
@@ -3204,6 +3203,60 @@
         "generatedBy": "local deterministic PCM synthesis",
         "generatedAt": "2026-05-29",
         "sizeBytes": 26504,
+        "sfxCue": true
+      }
+    },
+    {
+      "key": "sfx.roundStartTaiko",
+      "type": "sfx-audio",
+      "label": "Round Start (Taiko)",
+      "filePath": "public/assets/sfx/round-start-v2.mp3",
+      "path": "/assets/sfx/round-start-v2.mp3",
+      "format": "mp3",
+      "animationUse": "combat and UI sound effect",
+      "phaser": {
+        "loader": "audio",
+        "audioKey": "sfx.roundStartTaiko",
+        "urls": [
+          "/assets/sfx/round-start-v2.mp3"
+        ],
+        "playback": {
+          "loop": false,
+          "volume": 0.248
+        }
+      },
+      "metadata": {
+        "id": "round-start-taiko",
+        "theme": "deep taiko boom with hyoshigi clack and rising shakuhachi swell, battle round start",
+        "generatedBy": "ElevenLabs text-to-sound",
+        "generatedAt": "2026-05-29",
+        "sfxCue": true
+      }
+    },
+    {
+      "key": "sfx.roundStartGong",
+      "type": "sfx-audio",
+      "label": "Round Start (Gong)",
+      "filePath": "public/assets/sfx/round-start-B.mp3",
+      "path": "/assets/sfx/round-start-B.mp3",
+      "format": "mp3",
+      "animationUse": "combat and UI sound effect",
+      "phaser": {
+        "loader": "audio",
+        "audioKey": "sfx.roundStartGong",
+        "urls": [
+          "/assets/sfx/round-start-B.mp3"
+        ],
+        "playback": {
+          "loop": false,
+          "volume": 0.391
+        }
+      },
+      "metadata": {
+        "id": "round-start-gong",
+        "theme": "resonant temple gong strike with taiko roll buildup, dramatic moonlit duel start",
+        "generatedBy": "ElevenLabs text-to-sound",
+        "generatedAt": "2026-05-29",
         "sfxCue": true
       }
     },
@@ -3223,7 +3276,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.84
+          "volume": 0.99
         }
       },
       "metadata": {
@@ -3252,7 +3305,7 @@
         ],
         "playback": {
           "loop": false,
-          "volume": 0.78
+          "volume": 0.699
         }
       },
       "metadata": {
@@ -3326,6 +3379,8 @@
       "sfx.mainNinjaDeath",
       "sfx.roundClear",
       "sfx.roundStart",
+      "sfx.roundStartTaiko",
+      "sfx.roundStartGong",
       "sfx.hyoshigiPreview",
       "sfx.kotsuzumiPreview"
     ]

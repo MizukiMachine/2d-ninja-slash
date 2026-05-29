@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { getAppContext, type AppContext } from '../../app/context';
-import type { SfxCueId } from '../assets/audioAssetCatalog';
+import type { SfxTriggerId } from '../audio/sfxBindings';
 import type { GameProfile } from '../profiles';
 import type { SceneKey } from '../sceneKeys';
 import type { ReadableStore, StoreListener, Unsubscribe } from '../../stores/store';
@@ -139,8 +139,14 @@ export abstract class BaseScene extends Phaser.Scene {
     this.app.audio.queueAudioAssets(this);
   }
 
-  protected playSfx(cueId: SfxCueId): void {
-    this.app.audio.playSfx(this, cueId);
+  protected playSfx(triggerId: SfxTriggerId): void {
+    // Resolve the trigger through the (normalized) debug bindings so the
+    // SFX Assign panel can re-route events and tweak per-cue volume. The config
+    // is normalized on load, so both lookups always yield valid values.
+    const { bindings, volumes } = this.app.debugStore.get().sfxBindings;
+    const cueId = bindings[triggerId];
+
+    this.app.audio.playSfx(this, cueId, volumes[cueId]);
   }
 
   protected shouldSyncDebugBgm(): boolean {

@@ -11,6 +11,7 @@ const ninjaBoundsDirectory = resolve(process.cwd(), 'public', 'assets', 'config'
 const ninjaBoundsPath = join(ninjaBoundsDirectory, 'ninja-bounds.json');
 const gameplayTuningPath = join(ninjaBoundsDirectory, 'gameplay-tuning.json');
 const sandboxLanesPath = join(ninjaBoundsDirectory, 'sandbox-lanes.json');
+const sfxBindingsPath = join(ninjaBoundsDirectory, 'sfx-bindings.json');
 
 interface DebugRequest {
   readonly method?: string;
@@ -222,6 +223,7 @@ function debugConfigWriterPlugin(): Plugin {
       });
       writeJsonEndpoint('/__debug/gameplay-tuning', gameplayTuningPath);
       writeJsonEndpoint('/__debug/sandbox-lanes', sandboxLanesPath);
+      writeJsonEndpoint('/__debug/sfx-bindings', sfxBindingsPath);
     }
   };
 }

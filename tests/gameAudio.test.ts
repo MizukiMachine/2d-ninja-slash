@@ -194,7 +194,7 @@ describe('gameAudio', () => {
 
     expect(scene.sound.add).toHaveBeenCalledWith('sfx.enemyDefeat', {
       loop: false,
-      volume: 0.85
+      volume: 0.211
     });
     expect(sound.once).toHaveBeenCalledWith(
       'complete',
@@ -203,9 +203,51 @@ describe('gameAudio', () => {
     );
     expect(sound.play).toHaveBeenCalledWith({
       loop: false,
-      volume: 0.85
+      volume: 0.211
     });
     expect(sound.destroy).not.toHaveBeenCalled();
+  });
+
+  it('plays a one-shot SFX with a finite volume override', async () => {
+    const sound = {
+      once: vi.fn(),
+      play: vi.fn(() => true),
+      destroy: vi.fn()
+    };
+    const scene = {
+      cache: { audio: { exists: vi.fn(() => true) } },
+      sound: { locked: false, add: vi.fn(() => sound) }
+    } as unknown as Phaser.Scene;
+
+    const audio = await createTestGameAudio();
+
+    audio.playSfx(scene, 'enemy-defeat', 1.4);
+
+    expect(scene.sound.add).toHaveBeenCalledWith('sfx.enemyDefeat', {
+      loop: false,
+      volume: 1.4
+    });
+  });
+
+  it('ignores a non-finite volume override and uses the catalog volume', async () => {
+    const sound = {
+      once: vi.fn(),
+      play: vi.fn(() => true),
+      destroy: vi.fn()
+    };
+    const scene = {
+      cache: { audio: { exists: vi.fn(() => true) } },
+      sound: { locked: false, add: vi.fn(() => sound) }
+    } as unknown as Phaser.Scene;
+
+    const audio = await createTestGameAudio();
+
+    audio.playSfx(scene, 'enemy-defeat', Number.NaN);
+
+    expect(scene.sound.add).toHaveBeenCalledWith('sfx.enemyDefeat', {
+      loop: false,
+      volume: 0.211
+    });
   });
 
   it('destroys a one-shot SFX instance if playback cannot start', async () => {

@@ -1,0 +1,31 @@
+{
+  "bindings": {
+    "ui-select": "ui-select",
+    "player-slash": "player-slash",
+    "enemy-slash": "enemy-slash",
+    "jump": "jump",
+    "lane-dash": "lane-dash",
+    "player-hurt": "player-hurt",
+    "enemy-defeat": "hit",
+    "main-ninja-death": "main-ninja-death",
+    "round-start": "round-start-taiko"
+  },
+  "volumes": {
+    "ui-select": 0.891,
+    "player-slash": 0.405,
+    "enemy-slash": 0.241,
+    "jump": 0.484,
+    "lane-dash": 2.095,
+    "hit": 0.433,
+    "player-hurt": 0.309,
+    "enemy-defeat": 1.76,
+    "player-defeat": 1.52,
+    "main-ninja-death": 0.325,
+    "round-clear": 0.99,
+    "round-start": 0.99,
+    "round-start-taiko": 0.87,
+    "round-start-gong": 0.391,
+    "hyoshigi-preview": 0.99,
+    "kotsuzumi-preview": 0.699
+  }
+}

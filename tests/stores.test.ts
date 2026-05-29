@@ -38,13 +38,26 @@ describe('settingsStore', () => {
 
     store.setVolume(0.35);
     store.setMuted(true);
+    store.setBgmEnabled(false);
 
     const reloadedStore = createSettingsStore(storage);
 
     expect(reloadedStore.get()).toEqual({
       volume: 0.35,
-      muted: true
+      muted: true,
+      bgmEnabled: false
     });
+  });
+
+  it('toggles BGM independently of mute', () => {
+    const store = createSettingsStore(new MemoryStorage());
+
+    expect(store.get().bgmEnabled).toBe(true);
+    store.toggleBgm();
+    expect(store.get().bgmEnabled).toBe(false);
+    expect(store.get().muted).toBe(false);
+    store.toggleBgm();
+    expect(store.get().bgmEnabled).toBe(true);
   });
 
   it('resets to defaults', () => {

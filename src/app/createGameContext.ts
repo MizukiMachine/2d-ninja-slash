@@ -6,6 +6,10 @@ import {
 import { SceneKeys, type SceneKey } from '../game/sceneKeys';
 import { createGameAudio } from '../game/audio/gameAudio';
 import {
+  SFX_BINDINGS_CONFIG_URL,
+  normalizeSfxBindingsConfig
+} from '../game/audio/sfxBindings';
+import {
   GAMEPLAY_TUNING_CONFIG_URL,
   SANDBOX_LANE_SETTINGS_CONFIG_URL,
   createDefaultSandboxLaneSettingsConfig,
@@ -28,7 +32,7 @@ import type { AppContext } from './context';
 export interface CreateGameContextOptions {
   /** Profile (canvas size) to play in. Defaults to landscape. */
   readonly profileId?: ProfileId;
-  /** Scene to open after Boot/Splash. Defaults to the Sandbox battle. */
+  /** Scene to open after Boot/Splash. Defaults to the title menu. */
   readonly initialScene?: SceneKey;
 }
 
@@ -38,7 +42,7 @@ export interface CreateGameContextOptions {
  * Unlike {@link createApp}, this creates no debug-console DOM. It simply loads
  * the tuned config JSON from `public/assets/config/` into the in-memory stores
  * so the gameplay scenes run with the same values the debug lab produced, then
- * hands back a context that opens straight into the chosen scene.
+ * hands back a context that opens into the title menu or chosen scene.
  *
  * Config is loaded before the context resolves, so the game starts with the
  * correct values on the very first frame (no flicker from late-arriving JSON).
@@ -47,7 +51,7 @@ export async function createGameContext(
   options: CreateGameContextOptions = {}
 ): Promise<AppContext> {
   const profileId = options.profileId ?? DEFAULT_PROFILE_ID;
-  const initialScene = options.initialScene ?? SceneKeys.Sandbox;
+  const initialScene = options.initialScene ?? SceneKeys.MainMenu;
 
   const debugStore = createDebugStore();
   const settingsStore = createSettingsStore();
@@ -57,14 +61,16 @@ export async function createGameContext(
 
   let ninjaBoundsConfig = cloneNinjaBoundsConfig(DEFAULT_NINJA_BOUNDS_CONFIG);
 
-  const [loadedNinjaBounds, loadedTuning, loadedLaneSettings] = await Promise.all([
-    loadJsonConfig(NINJA_BOUNDS_CONFIG_URL, normalizeNinjaBoundsConfig),
-    loadJsonConfig(GAMEPLAY_TUNING_CONFIG_URL, normalizeGameplayTuning),
-    loadJsonConfig(
-      SANDBOX_LANE_SETTINGS_CONFIG_URL,
-      normalizeSandboxLaneSettingsConfig
-    )
-  ]);
+  const [loadedNinjaBounds, loadedTuning, loadedLaneSettings, loadedSfxBindings] =
+    await Promise.all([
+      loadJsonConfig(NINJA_BOUNDS_CONFIG_URL, normalizeNinjaBoundsConfig),
+      loadJsonConfig(GAMEPLAY_TUNING_CONFIG_URL, normalizeGameplayTuning),
+      loadJsonConfig(
+        SANDBOX_LANE_SETTINGS_CONFIG_URL,
+        normalizeSandboxLaneSettingsConfig
+      ),
+      loadJsonConfig(SFX_BINDINGS_CONFIG_URL, normalizeSfxBindingsConfig)
+    ]);
 
   if (loadedNinjaBounds !== null) {
     ninjaBoundsConfig = loadedNinjaBounds;
@@ -72,6 +78,10 @@ export async function createGameContext(
 
   if (loadedTuning !== null) {
     debugStore.setGameplayTuning(loadedTuning);
+  }
+
+  if (loadedSfxBindings !== null) {
+    debugStore.setSfxBindings(loadedSfxBindings);
   }
 
   let laneSettingsConfig =

@@ -1,8 +1,18 @@
 import {
   BGM_TRACKS,
   SFX_COMPARE_CUE_IDS,
+  SFX_CUES,
   getSfxCue
 } from '../game/assets/audioAssetCatalog';
+import {
+  SFX_TRIGGERS,
+  SFX_VOLUME_LIMITS,
+  isSfxTriggerId
+} from '../game/audio/sfxBindings';
+
+// Cues not wired to any game event by default still get a volume control so
+// nothing becomes unadjustable (e.g. the SFX Compare previews, unused defeat cues).
+const OTHER_SFX_CUES = SFX_CUES.filter((cue) => !isSfxTriggerId(cue.id));
 import {
   GAMEPLAY_TUNING_LIMITS,
   ROUND_ENEMY_GROWTH_MODES
@@ -51,6 +61,49 @@ export function createDebugControlsHtml(): string {
           return `<button class="shell-button" type="button" data-sfx-preview="${cue.id}" title="${cue.theme}">${cue.label}</button>`;
         }).join('')}
       </div>
+    </div>
+    <div id="sfx-assign-controls" class="panel-group">
+      <details class="panel-details">
+        <summary class="panel-group__title">SFX Assign</summary>
+        <p class="panel-note">各イベントの「音源」と「音量」をまとめて調整できます。音量はマスター音量に乗算される相対値です。</p>
+        ${SFX_TRIGGERS.map(
+          (trigger) => `
+        <div class="sfx-event-card">
+          <div class="sfx-event-card__head">
+            <span>${trigger.label}</span>
+            <button class="shell-button sfx-play-button" type="button" data-sfx-test="${trigger.id}" title="このイベントの音を再生">▶</button>
+          </div>
+          <select id="sfx-bind-${trigger.id}" data-sfx-bind="${trigger.id}" aria-label="${trigger.label} の音源">
+            ${SFX_CUES.map(
+              (cue) => `<option value="${cue.id}">${cue.label}</option>`
+            ).join('')}
+          </select>
+          <div class="sfx-event-card__vol">
+            <input type="range" data-sfx-row-vol="${trigger.id}" min="${SFX_VOLUME_LIMITS.min}" max="${SFX_VOLUME_LIMITS.max}" step="${SFX_VOLUME_LIMITS.step}" aria-label="${trigger.label} の音量" />
+            <strong data-sfx-row-readout="${trigger.id}">${getSfxCue(trigger.defaultCueId).volume.toFixed(2)}</strong>
+          </div>
+        </div>`
+        ).join('')}
+        ${
+          OTHER_SFX_CUES.length > 0
+            ? `<p class="panel-subtitle">その他の音源（イベント未割当）</p>
+        ${OTHER_SFX_CUES.map(
+          (cue) => `
+        <label class="sfx-vol-row" title="${cue.theme}">
+          <span>${cue.label}</span>
+          <input type="range" data-sfx-vol="${cue.id}" min="${SFX_VOLUME_LIMITS.min}" max="${SFX_VOLUME_LIMITS.max}" step="${SFX_VOLUME_LIMITS.step}" />
+          <strong data-sfx-vol-readout="${cue.id}">${cue.volume.toFixed(2)}</strong>
+          <button class="shell-button sfx-play-button" type="button" data-sfx-preview="${cue.id}" title="この音源を再生">▶</button>
+        </label>`
+        ).join('')}`
+            : ''
+        }
+        <div class="panel-group__row">
+          <button id="sfx-assign-save" class="shell-button" data-variant="primary" type="button">Save</button>
+          <button id="sfx-assign-reset" class="shell-button" type="button">Reset</button>
+        </div>
+        <p id="sfx-assign-status" class="panel-note">Loaded defaults</p>
+      </details>
     </div>
     <div class="panel-group">
       <p class="panel-group__title">Overlays</p>

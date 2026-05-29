@@ -60,15 +60,20 @@ export type BgmTrackId = (typeof ALL_BGM_TRACKS)[number]['id'];
 
 export const DEFAULT_BGM_TRACK_ID: BgmTrackId = 'boss-duel';
 
+// SFX volumes are loudness-normalized: each `volume` is calibrated so every cue
+// plays at a consistent perceived loudness (~-20 dB windowed RMS) with a -1 dBFS
+// peak ceiling to prevent clipping at master volume 1.0. Values may exceed 1.0 to
+// boost quiet source files (Phaser's WebAudio gain is uncapped). Re-derive these
+// after replacing a source file by measuring its loudness/peak.
 export const SFX_CUES = [
   {
     id: 'ui-select',
     key: 'sfx.uiSelect',
     label: 'UI Select',
-    path: '/assets/sfx/ui-select.mp3',
-    filePath: 'public/assets/sfx/ui-select.mp3',
-    volume: 0.36,
-    theme: 'short wooden menu tap'
+    path: '/assets/sfx/ui-select-v2.mp3',
+    filePath: 'public/assets/sfx/ui-select-v2.mp3',
+    volume: 0.891,
+    theme: 'short crisp wooden menu tap'
   },
   {
     id: 'player-slash',
@@ -76,7 +81,7 @@ export const SFX_CUES = [
     label: 'Player Slash',
     path: '/assets/sfx/player-slash.mp3',
     filePath: 'public/assets/sfx/player-slash.mp3',
-    volume: 0.24,
+    volume: 0.405,
     theme: 'katana slash air whoosh'
   },
   {
@@ -85,7 +90,7 @@ export const SFX_CUES = [
     label: 'Enemy Slash',
     path: '/assets/sfx/enemy-slash.mp3',
     filePath: 'public/assets/sfx/enemy-slash.mp3',
-    volume: 0.22,
+    volume: 0.241,
     theme: 'lower pitched hostile blade swing'
   },
   {
@@ -94,7 +99,7 @@ export const SFX_CUES = [
     label: 'Jump',
     path: '/assets/sfx/jump.mp3',
     filePath: 'public/assets/sfx/jump.mp3',
-    volume: 0.41,
+    volume: 0.484,
     theme: 'cloth burst ninja jump'
   },
   {
@@ -103,7 +108,7 @@ export const SFX_CUES = [
     label: 'Lane Dash',
     path: '/assets/sfx/lane-dash.mp3',
     filePath: 'public/assets/sfx/lane-dash.mp3',
-    volume: 0.43,
+    volume: 2.095,
     theme: 'quick evasive dash with fabric snap'
   },
   {
@@ -112,7 +117,7 @@ export const SFX_CUES = [
     label: 'Hit',
     path: '/assets/sfx/hit.mp3',
     filePath: 'public/assets/sfx/hit.mp3',
-    volume: 0.54,
+    volume: 0.433,
     theme: 'sharp blade impact on armor'
   },
   {
@@ -121,17 +126,17 @@ export const SFX_CUES = [
     label: 'Player Hurt',
     path: '/assets/sfx/player-hurt.mp3',
     filePath: 'public/assets/sfx/player-hurt.mp3',
-    volume: 0.3,
+    volume: 0.309,
     theme: 'impact thud with breath hit'
   },
   {
     id: 'enemy-defeat',
     key: 'sfx.enemyDefeat',
     label: 'Enemy Defeat',
-    path: '/assets/sfx/enemy-defeat-loud.mp3',
-    filePath: 'public/assets/sfx/enemy-defeat-loud.mp3',
-    volume: 0.85,
-    theme: 'defeated ninja fall with metal ring'
+    path: '/assets/sfx/enemy-defeat-deep.mp3',
+    filePath: 'public/assets/sfx/enemy-defeat-deep.mp3',
+    volume: 0.211,
+    theme: 'deep heavy ninja fall with low metallic clang and sub-bass impact'
   },
   {
     id: 'player-defeat',
@@ -139,7 +144,7 @@ export const SFX_CUES = [
     label: 'Player Defeat',
     path: '/assets/sfx/player-defeat.mp3',
     filePath: 'public/assets/sfx/player-defeat.mp3',
-    volume: 0.61,
+    volume: 1.52,
     theme: 'somber defeat hit with low drum'
   },
   {
@@ -148,7 +153,7 @@ export const SFX_CUES = [
     label: 'Main Ninja Death',
     path: '/assets/sfx/main-ninja-death.mp3',
     filePath: 'public/assets/sfx/main-ninja-death.mp3',
-    volume: 0.63,
+    volume: 0.325,
     theme: 'main ninja death fall with cloth slump and low drum'
   },
   {
@@ -157,17 +162,35 @@ export const SFX_CUES = [
     label: 'Round Clear',
     path: '/assets/sfx/round-clear-loud.wav',
     filePath: 'public/assets/sfx/round-clear-loud.wav',
-    volume: 0.9,
+    volume: 0.99,
     theme: 'extra dry sharp hyoshigi wooden clapper double hit round transition'
   },
   {
     id: 'round-start',
     key: 'sfx.roundStart',
-    label: 'Round Start',
+    label: 'Round Start (Hyoshigi)',
     path: '/assets/sfx/round-start-loud.wav',
     filePath: 'public/assets/sfx/round-start-loud.wav',
-    volume: 0.82,
+    volume: 0.99,
     theme: 'extra dry sharp hyoshigi wooden clapper round start cue'
+  },
+  {
+    id: 'round-start-taiko',
+    key: 'sfx.roundStartTaiko',
+    label: 'Round Start (Taiko)',
+    path: '/assets/sfx/round-start-v2.mp3',
+    filePath: 'public/assets/sfx/round-start-v2.mp3',
+    volume: 0.248,
+    theme: 'deep taiko boom with hyoshigi clack and rising shakuhachi swell, battle round start'
+  },
+  {
+    id: 'round-start-gong',
+    key: 'sfx.roundStartGong',
+    label: 'Round Start (Gong)',
+    path: '/assets/sfx/round-start-B.mp3',
+    filePath: 'public/assets/sfx/round-start-B.mp3',
+    volume: 0.391,
+    theme: 'resonant temple gong strike with taiko roll buildup, dramatic moonlit duel start'
   },
   {
     id: 'hyoshigi-preview',
@@ -175,7 +198,7 @@ export const SFX_CUES = [
     label: 'Hyoshigi',
     path: '/assets/sfx/hyoshigi-preview.wav',
     filePath: 'public/assets/sfx/hyoshigi-preview.wav',
-    volume: 0.84,
+    volume: 0.99,
     theme: 'extra dry hyoshigi wooden clapper preview double hit'
   },
   {
@@ -184,7 +207,7 @@ export const SFX_CUES = [
     label: 'Kotsuzumi',
     path: '/assets/sfx/kotsuzumi-preview.wav',
     filePath: 'public/assets/sfx/kotsuzumi-preview.wav',
-    volume: 0.78,
+    volume: 0.699,
     theme: 'dry small kotsuzumi hand drum preview with short skin resonance'
   }
 ] as const satisfies readonly SfxCue[];
