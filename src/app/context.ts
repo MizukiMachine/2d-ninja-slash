@@ -21,8 +21,8 @@ export interface AppContext {
   persistSandboxLaneSettings?(): void;
   /**
    * Optional scene to open after Boot/Splash instead of the MainMenu.
-   * The debug console leaves this undefined (keeps the full menu); the
-   * standalone game build returns the gameplay scene to jump straight in.
+   * The debug console leaves this undefined (keeps the full title menu);
+   * standalone builds can override this for targeted scene launches.
    */
   getInitialScene?(): SceneKey;
 }

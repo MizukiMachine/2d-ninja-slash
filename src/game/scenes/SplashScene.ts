@@ -1,5 +1,6 @@
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
+import { GAME_SUBTITLE, GAME_TITLE } from '../gameTitle';
 
 export class SplashScene extends BaseScene {
   constructor() {
@@ -8,8 +9,8 @@ export class SplashScene extends BaseScene {
 
   create(): void {
     this.cameras.main.setBackgroundColor('#101520');
-    this.addTitle('Phaser 4 Starter', this.centerY - 28);
-    this.addLabel(`${this.profile.label}`, this.centerY + 30);
+    this.addTitle(GAME_TITLE, this.centerY - 28);
+    this.addLabel(GAME_SUBTITLE, this.centerY + 30);
 
     this.time.delayedCall(650, () => {
       this.goTo(this.app.getInitialScene?.() ?? SceneKeys.MainMenu);
