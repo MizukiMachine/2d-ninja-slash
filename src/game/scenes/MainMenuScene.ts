@@ -54,6 +54,7 @@ export class MainMenuScene extends BaseScene {
     this.createTitleLockup();
     this.createStartButton();
     this.createSettingsButton();
+    this.createControlsGuide();
     this.createStartKeyboardInput();
   }
 
@@ -190,6 +191,125 @@ export class MainMenuScene extends BaseScene {
       this.playSfx('ui-select');
       this.goTo(SceneKeys.Settings);
     });
+  }
+
+  private createControlsGuide(): void {
+    const { width, height } = this.profile;
+    const controls: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
+      { keys: ['←', '→'], label: '左右移動' },
+      { keys: ['↑', '↓'], label: '上下レーン移動' },
+      { keys: ['A'], label: '斬撃' },
+      { keys: ['Space'], label: '跳躍' }
+    ];
+
+    const items = controls.map((control) =>
+      this.buildControlItem(control.keys, control.label)
+    );
+
+    // Pack items into centered rows, wrapping when a row would exceed the
+    // usable width — keeps the guide tidy in both portrait and landscape.
+    const itemSpacing = 26;
+    const maxRowWidth = width * 0.92;
+    const rows: Array<Array<{ container: Phaser.GameObjects.Container; width: number }>> = [];
+    let currentRow: Array<{ container: Phaser.GameObjects.Container; width: number }> = [];
+    let currentRowWidth = 0;
+
+    items.forEach((item) => {
+      const added = (currentRow.length > 0 ? itemSpacing : 0) + item.width;
+
+      if (currentRow.length > 0 && currentRowWidth + added > maxRowWidth) {
+        rows.push(currentRow);
+        currentRow = [];
+        currentRowWidth = 0;
+      }
+
+      currentRow.push(item);
+      currentRowWidth += (currentRow.length > 1 ? itemSpacing : 0) + item.width;
+    });
+
+    if (currentRow.length > 0) {
+      rows.push(currentRow);
+    }
+
+    const rowGap = 46;
+    const lastRowY = height * 0.955;
+    const firstRowY = lastRowY - (rows.length - 1) * rowGap;
+
+    rows.forEach((rowItems, rowIndex) => {
+      const rowY = firstRowY + rowIndex * rowGap;
+      const totalWidth =
+        rowItems.reduce((sum, item) => sum + item.width, 0) +
+        itemSpacing * (rowItems.length - 1);
+      let cursor = this.centerX - totalWidth / 2;
+
+      rowItems.forEach((item) => {
+        item.container.setPosition(cursor + item.width / 2, rowY);
+        item.container.setDepth(TITLE_CONTENT_DEPTH);
+        cursor += item.width + itemSpacing;
+      });
+    });
+  }
+
+  private buildControlItem(
+    keys: readonly string[],
+    label: string
+  ): { container: Phaser.GameObjects.Container; width: number } {
+    const keyGap = 6;
+    const labelGap = 12;
+    const caps = keys.map((key) => this.buildKeyCap(key));
+    const labelText = this.add
+      .text(0, 0, label, {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: '18px',
+        color: '#e7d6a8'
+      })
+      .setOrigin(0, 0.5);
+
+    const keysWidth =
+      caps.reduce((sum, cap) => sum + cap.width, 0) + keyGap * (caps.length - 1);
+    const totalWidth = keysWidth + labelGap + labelText.width;
+    const left = -totalWidth / 2;
+
+    let cursor = left;
+    caps.forEach((cap, index) => {
+      cap.container.setX(cursor + cap.width / 2);
+      cursor += cap.width + (index < caps.length - 1 ? keyGap : 0);
+    });
+    labelText.setX(left + keysWidth + labelGap);
+
+    const container = this.add.container(0, 0, [
+      ...caps.map((cap) => cap.container),
+      labelText
+    ]);
+
+    return { container, width: totalWidth };
+  }
+
+  private buildKeyCap(glyph: string): {
+    container: Phaser.GameObjects.Container;
+    width: number;
+  } {
+    const capHeight = 34;
+    const paddingX = 13;
+    const radius = 7;
+    const text = this.add
+      .text(0, 0, glyph, {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: '17px',
+        color: '#fff7df'
+      })
+      .setOrigin(0.5);
+    const capWidth = Math.max(capHeight, text.width + paddingX * 2);
+
+    const cap = this.add.graphics();
+    cap.fillStyle(0x10151d, 0.86);
+    cap.fillRoundedRect(-capWidth / 2, -capHeight / 2, capWidth, capHeight, radius);
+    cap.lineStyle(1.5, 0xd6b76f, 0.68);
+    cap.strokeRoundedRect(-capWidth / 2, -capHeight / 2, capWidth, capHeight, radius);
+
+    const container = this.add.container(0, 0, [cap, text]);
+
+    return { container, width: capWidth };
   }
 
   private createStartKeyboardInput(): void {
