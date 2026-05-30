@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
+import { getBackgroundCoverScale } from '../backgroundFit';
 import { SceneKeys, type SceneKey } from '../sceneKeys';
 import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
@@ -150,7 +151,10 @@ export abstract class DebugLabScene extends BaseScene {
 
     const { width, height } = this.profile;
     const frame = this.backgroundImage.frame;
-    const coverScale = Math.max(width / frame.width, height / frame.height);
+    // 'cover' must match the gameplay stage exactly (same over-scan), so the
+    // Lane Editor's floor sits where it does in-game and lanes aligned here map
+    // to the real gameplay foot positions.
+    const coverScale = getBackgroundCoverScale(frame.width, frame.height, width, height);
     const containScale = Math.min(width / frame.width, height / frame.height);
     const scale = fitMode === 'cover' ? coverScale : fitMode === 'contain' ? containScale : 1;
 

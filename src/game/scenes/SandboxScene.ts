@@ -28,6 +28,7 @@ import {
   normalizeSandboxLaneSettings
 } from '../debugFeatures';
 import { getAnimationFallbackDelayMs } from '../animationTiming';
+import { getBackgroundCoverScale } from '../backgroundFit';
 import {
   PLAYER_LANE_DOUBLE_TAP_SECONDS,
   PLAYER_LANE_JUMP_ARC_HEIGHT,
@@ -179,8 +180,6 @@ const PLAYER_DAMAGE_FLASH_ALPHA = 0.55;
 const PLAYER_DAMAGE_FLASH_MS = 220;
 const PLAYER_INVULNERABILITY_MS = 1000;
 const PLAYER_INVULNERABILITY_BLINK_MS = 110;
-// Slight over-scan so the camera shake never reveals the background edges.
-const BACKGROUND_SHAKE_OVERSCAN = 1.08;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -1137,9 +1136,12 @@ export class SandboxScene extends BaseScene {
 
     const { width, height } = this.profile;
     const backgroundFrame = this.background.frame;
-    const scale =
-      Math.max(width / backgroundFrame.width, height / backgroundFrame.height) *
-      BACKGROUND_SHAKE_OVERSCAN;
+    const scale = getBackgroundCoverScale(
+      backgroundFrame.width,
+      backgroundFrame.height,
+      width,
+      height
+    );
 
     this.background.setScale(scale);
   }
