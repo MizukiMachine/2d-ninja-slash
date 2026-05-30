@@ -616,7 +616,8 @@ export class SandboxScene extends BaseScene {
   private playEnemyDefeatFeedback(enemy: EnemyState): void {
     const center = this.getActorCenter(enemy.sprite);
     const scale = this.getActorScaleFromSprite(enemy.sprite);
-    this.juice?.burstEnemyDefeat(center.x, center.y, scale);
+    const directionX = this.facingDirection === 'left' ? -1 : 1;
+    this.juice?.burstEnemyDefeat(center.x, center.y, scale, directionX);
     this.juice?.shake(DEFEAT_SHAKE_TRAUMA);
     this.juice?.hitstop(DEFEAT_HITSTOP_MS);
   }
@@ -2585,13 +2586,14 @@ export class SandboxScene extends BaseScene {
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
 
-    // Light feedback on every connecting blade (kept distinct from the heavier
-    // defeat burst so future multi-HP enemies read a survived hit differently).
-    this.playEnemyHitFeedback(enemy);
-
-    // Enemies have 1 HP, so a hit always results in defeat (no surviving-hit SFX).
+    // A killing blow plays the heavier defeat burst only — the light hit spark
+    // is reserved for blows the enemy survives, so the two never stack on the
+    // same frame. (Enemies currently have 1 HP, so this is always a defeat;
+    // multi-HP enemies will read a survived hit distinctly.)
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
+    } else {
+      this.playEnemyHitFeedback(enemy);
     }
   }
 

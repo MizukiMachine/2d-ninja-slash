@@ -13,7 +13,7 @@ import Phaser from 'phaser';
  */
 
 const SPARK_TEXTURE_KEY = 'fx.juice.spark';
-const SHARD_TEXTURE_KEY = 'fx.juice.shard';
+const GLINT_TEXTURE_KEY = 'fx.juice.glint';
 
 const FX_DEPTH = 100;
 const FLASH_DEPTH = 200;
@@ -25,7 +25,11 @@ const SHAKE_FREQUENCY_HZ = 24;
 const SHAKE_SEED_X = 1.37;
 const SHAKE_SEED_Y = 8.91;
 
-const DEFEAT_DEBRIS_TINTS = [0xff5a3c, 0xffb24a, 0xfff0c2, 0xffffff];
+// Low-saturation silver/white — a moonlit blade glint rather than confetti.
+const DEFEAT_GLINT_TINTS = [0xffffff, 0xeaf2ff, 0xcfd6e0, 0xaab8d0];
+
+// The glint streaks fire as a tight cone along the slash; ±X by facing.
+const GLINT_CONE_HALF_ANGLE = 22;
 
 export class SceneJuice {
   private readonly scene: Phaser.Scene;
@@ -41,7 +45,7 @@ export class SceneJuice {
   private flashTween: Phaser.Tweens.Tween | null = null;
 
   private readonly sparkEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
-  private readonly debrisEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly glintEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -69,16 +73,18 @@ export class SceneJuice {
       })
       .setDepth(FX_DEPTH);
 
-    this.debrisEmitter = scene.add
-      .particles(0, 0, SHARD_TEXTURE_KEY, {
-        lifespan: { min: 360, max: 680 },
-        speed: { min: 150, max: 440 },
-        angle: { min: 0, max: 360 },
-        gravityY: 760,
-        scale: { start: 1, end: 0.1 },
-        alpha: { start: 1, end: 0 },
-        rotate: { min: 0, max: 360 },
-        tint: DEFEAT_DEBRIS_TINTS,
+    // Few, fast, short-lived silver streaks fired in a tight directional cone:
+    // a blade glint that flicks along the cut and fades, not a confetti pop.
+    this.glintEmitter = scene.add
+      .particles(0, 0, GLINT_TEXTURE_KEY, {
+        lifespan: { min: 100, max: 200 },
+        speed: { min: 260, max: 480 },
+        angle: { min: -GLINT_CONE_HALF_ANGLE, max: GLINT_CONE_HALF_ANGLE },
+        scale: 1,
+        alpha: { start: 0.95, end: 0 },
+        rotate: { min: -GLINT_CONE_HALF_ANGLE, max: GLINT_CONE_HALF_ANGLE },
+        blendMode: 'ADD',
+        tint: DEFEAT_GLINT_TINTS,
         emitting: false
       })
       .setDepth(FX_DEPTH + 1);
@@ -130,12 +136,25 @@ export class SceneJuice {
     this.sparkEmitter.explode(Phaser.Math.Between(6, 9), x, y);
   }
 
-  /** Larger debris + spark burst for an enemy defeat. */
-  burstEnemyDefeat(x: number, y: number, scale = 1): void {
-    this.debrisEmitter.setParticleScale(scale, scale);
-    this.debrisEmitter.explode(Phaser.Math.Between(16, 22), x, y);
-    this.sparkEmitter.setParticleScale(scale, scale);
-    this.sparkEmitter.explode(Phaser.Math.Between(8, 12), x, y);
+  /**
+   * Enemy defeat: a directional silver blade-glint along the slash plus a tight
+   * core flash at the point of impact. `directionX` is the slash direction
+   * (sign of X); positive fires the streaks rightward, negative leftward.
+   */
+  burstEnemyDefeat(x: number, y: number, scale = 1, directionX = 1): void {
+    const rightward = directionX >= 0;
+    this.glintEmitter.setEmitterAngle(
+      rightward
+        ? { min: -GLINT_CONE_HALF_ANGLE, max: GLINT_CONE_HALF_ANGLE }
+        : { min: 180 - GLINT_CONE_HALF_ANGLE, max: 180 + GLINT_CONE_HALF_ANGLE }
+    );
+    this.glintEmitter.setParticleScale(scale, scale);
+    this.glintEmitter.explode(Phaser.Math.Between(2, 4), x, y);
+
+    // Small, tight core flash — the spark of the cut, not a burst of debris.
+    const coreScale = 0.16 * scale;
+    this.sparkEmitter.setParticleScale(coreScale, coreScale);
+    this.sparkEmitter.explode(Phaser.Math.Between(1, 2), x, y);
   }
 
   update(deltaMs: number): void {
@@ -195,7 +214,7 @@ export class SceneJuice {
     this.scene.anims.globalTimeScale = timeScale;
     this.scene.tweens.timeScale = timeScale;
     this.sparkEmitter.timeScale = timeScale;
-    this.debrisEmitter.timeScale = timeScale;
+    this.glintEmitter.timeScale = timeScale;
   }
 
   private updateShake(deltaMs: number): void {
@@ -248,12 +267,16 @@ export class SceneJuice {
       spark.destroy();
     }
 
-    if (!textures.exists(SHARD_TEXTURE_KEY)) {
-      const shard = this.scene.make.graphics({ x: 0, y: 0 }, false);
-      shard.fillStyle(0xffffff, 1);
-      shard.fillRect(0, 0, 8, 8);
-      shard.generateTexture(SHARD_TEXTURE_KEY, 8, 8);
-      shard.destroy();
+    if (!textures.exists(GLINT_TEXTURE_KEY)) {
+      // An elongated horizontal lens: soft halo around a thin bright core, so a
+      // tinted, additively-blended particle reads as a sharp blade streak.
+      const glint = this.scene.make.graphics({ x: 0, y: 0 }, false);
+      glint.fillStyle(0xffffff, 0.25);
+      glint.fillEllipse(24, 8, 40, 4);
+      glint.fillStyle(0xffffff, 1);
+      glint.fillEllipse(24, 8, 30, 1.4);
+      glint.generateTexture(GLINT_TEXTURE_KEY, 48, 16);
+      glint.destroy();
     }
   }
 }
