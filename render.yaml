@@ -7,11 +7,11 @@ services:
     # devDependencies（vite / typescript）も必要なので --include=dev を付ける
     buildCommand: npm ci --include=dev && npm run build:game
     staticPublishPath: ./dist
-    # SPA / 単一HTML のフォールバック。実ファイルが優先され、無ければ index.html を返す。
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    # このゲームは単一ページ（canvas のみ・クライアントルーティング無し）。
+    # SPA フォールバックの rewrite はあえて付けない。
+    # 付けると、存在しないアセット/JSON へのリクエストにも 200 + index.html(HTML) を返してしまい、
+    # Phaser の画像/スプライトデコード失敗（=ゲーム画面が真っ黒）の原因になりうる。
+    # rewrite が無ければ実在しないパスは素直に 404 になり、原因の切り分けもしやすい。
     envVars:
       - key: NODE_VERSION
         value: 20.19.0
