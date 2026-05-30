@@ -28,13 +28,14 @@ import {
   normalizeSandboxLaneSettings
 } from '../debugFeatures';
 import { getAnimationFallbackDelayMs } from '../animationTiming';
+import { getBackgroundCoverScale } from '../backgroundFit';
 import {
   PLAYER_LANE_DOUBLE_TAP_SECONDS,
   PLAYER_LANE_JUMP_ARC_HEIGHT,
   PLAYER_LANE_TRANSITION_SECONDS,
   PlayerLaneMovementController,
   createThreeLaneLayoutFromYSettings,
-  getThreeLaneEdgeSpawnPlacement,
+  getThreeLaneSpawnPlacement,
   type LaneTapDirection,
   type PlayerLaneId,
   type ThreeLaneLayout,
@@ -150,8 +151,12 @@ const ENEMY_CORPSE_BLINK_REPEAT = 8;
 const PLAYER_DAMAGE_KNOCKBACK_DISTANCE = 160;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 24;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 9;
-const ENEMY_LANE_EDGE_SPAWN_INSET = 150;
-const ENEMY_LANE_EDGE_SPAWN_COLUMN_SPACING = 44;
+// Enemies spawn scattered across the field (centre-out bisection) rather than
+// clustered at the edges; the inset keeps them off the very screen edges.
+const ENEMY_LANE_SPAWN_INSET = 150;
+// Never spawn an enemy on top of the player: a spawn landing within this X
+// distance of the player on the player's own lane is pushed just outside it.
+const ENEMY_SPAWN_PLAYER_SAFE_RADIUS = 160;
 const ENEMY_FRONT_DETECTION_DISTANCE = 320;
 const ENEMY_PATROL_WORLD_PADDING = 90;
 const ENEMY_PATROL_MIN_DECISION_MS = 850;
@@ -160,11 +165,14 @@ const ENEMY_PATROL_MAX_DECISION_MS = 2200;
 // --- Game feel / juice tuning -------------------------------------------------
 // A connecting blade gives a light punch; a defeat hits harder and lingers.
 const HIT_SHAKE_TRAUMA = 0.26;
-const DEFEAT_SHAKE_TRAUMA = 0.62;
+const DEFEAT_SHAKE_TRAUMA = 0.44;
 const PLAYER_HIT_SHAKE_TRAUMA = 0.46;
 const HIT_HITSTOP_MS = 45;
 const DEFEAT_HITSTOP_MS = 120;
 const PLAYER_HIT_HITSTOP_MS = 70;
+// A defeat keeps the world shake gentle but jolts the HUD, so the kill stays
+// noticeable without making the playfield queasy.
+const DEFEAT_HUD_SHAKE_TRAUMA = 0.7;
 // When the player is struck the screen flashes white and a brief invulnerability
 // window (with a blink) prevents being stun-locked by overlapping enemies.
 const PLAYER_DAMAGE_FLASH_COLOR = 0xffffff;
@@ -172,8 +180,6 @@ const PLAYER_DAMAGE_FLASH_ALPHA = 0.55;
 const PLAYER_DAMAGE_FLASH_MS = 220;
 const PLAYER_INVULNERABILITY_MS = 1000;
 const PLAYER_INVULNERABILITY_BLINK_MS = 110;
-// Slight over-scan so the camera shake never reveals the background edges.
-const BACKGROUND_SHAKE_OVERSCAN = 1.08;
 
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
@@ -422,6 +428,7 @@ export class SandboxScene extends BaseScene {
   private playerHealthLabel: Phaser.GameObjects.Text | null = null;
   private progressionLabel: Phaser.GameObjects.Text | null = null;
   private roundBannerLabel: Phaser.GameObjects.Text | null = null;
+  private hudContainer: Phaser.GameObjects.Container | null = null;
   private pauseLabel: Phaser.GameObjects.Text | null = null;
   private gameOverOverlay: Phaser.GameObjects.Container | null = null;
   private playerDeathOverlayTimer: Phaser.Time.TimerEvent | null = null;
@@ -510,6 +517,9 @@ export class SandboxScene extends BaseScene {
       .setVisible(false);
     this.createHealthHud();
     this.juice = new SceneJuice(this);
+    if (this.hudContainer !== null) {
+      this.juice.attachHud(this.hudContainer);
+    }
     this.trackCleanup(() => {
       this.juice?.destroy();
       this.juice = null;
@@ -616,9 +626,12 @@ export class SandboxScene extends BaseScene {
   private playEnemyDefeatFeedback(enemy: EnemyState): void {
     const center = this.getActorCenter(enemy.sprite);
     const scale = this.getActorScaleFromSprite(enemy.sprite);
-    this.juice?.burstEnemyDefeat(center.x, center.y, scale);
+    const directionX = this.facingDirection === 'left' ? -1 : 1;
+    this.juice?.burstEnemyDefeat(center.x, center.y, scale, directionX);
     this.juice?.shake(DEFEAT_SHAKE_TRAUMA);
     this.juice?.hitstop(DEFEAT_HITSTOP_MS);
+    // Draw the eye to the kill without a big world shake: jolt the HUD instead.
+    this.juice?.shakeHud(DEFEAT_HUD_SHAKE_TRAUMA);
   }
 
   /** White flash + screen punch when the player is struck. */
@@ -732,6 +745,18 @@ export class SandboxScene extends BaseScene {
       () => this.shouldCollideWithEnemy(enemy),
       this
     );
+    // Enemies on the same lane block each other so they queue up instead of
+    // stacking on a single point. One collider per pair, gated the same way as
+    // the player collision (same lane, neither mid lane-change or dead).
+    for (const other of this.enemies) {
+      this.physics.add.collider(
+        enemy.sprite,
+        other.sprite,
+        undefined,
+        () => this.shouldEnemiesCollide(enemy, other),
+        this
+      );
+    }
     this.registerEnemyAnimationEvents(enemy);
     this.deactivateEnemy(enemy);
 
@@ -755,6 +780,32 @@ export class SandboxScene extends BaseScene {
     }
 
     return this.playerLaneMovement.currentLaneId === enemy.laneMovement.currentLaneId;
+  }
+
+  /**
+   * Lane-aware gate for enemy-vs-enemy separation. Two enemies push each other
+   * only when both are live, settled on the same lane, and neither is mid
+   * lane-change — so they queue along a lane but still pass freely across lanes
+   * and never collide with corpses or pooled (inactive) actors.
+   */
+  private shouldEnemiesCollide(a: EnemyState, b: EnemyState): boolean {
+    if (a.action === 'dead' || b.action === 'dead') {
+      return false;
+    }
+
+    if (!a.roundActive || !b.roundActive) {
+      return false;
+    }
+
+    if (!a.sprite.active || !b.sprite.active) {
+      return false;
+    }
+
+    if (a.laneMovement.isTransitioning || b.laneMovement.isTransitioning) {
+      return false;
+    }
+
+    return a.laneMovement.currentLaneId === b.laneMovement.currentLaneId;
   }
 
   private ensureEnemyPoolSize(enemyCount: number): void {
@@ -862,19 +913,62 @@ export class SandboxScene extends BaseScene {
   }
 
   private getEnemySpawnPoint(index: number): EnemySpawnPoint {
-    const spawn = getThreeLaneEdgeSpawnPlacement({
+    const spawn = getThreeLaneSpawnPlacement({
       index,
       worldWidth: this.profile.width,
-      edgeInset: ENEMY_LANE_EDGE_SPAWN_INSET,
-      columnSpacing: ENEMY_LANE_EDGE_SPAWN_COLUMN_SPACING,
+      edgeInset: ENEMY_LANE_SPAWN_INSET,
       layout: this.getLaneLayout()
     });
 
     return {
-      x: spawn.x,
+      x: this.applyPlayerSpawnSafeZone(spawn.x, spawn.laneId),
       y: spawn.y,
       laneId: spawn.laneId
     };
+  }
+
+  /**
+   * Keep the scatter distribution but never drop an enemy onto the player: a
+   * spawn that lands within the safe radius of the player on the player's own
+   * lane is nudged out to the edge of that radius (toward the side it already
+   * leans, falling back to whichever side has room). Spawns on other lanes are
+   * left untouched, since lane-separated actors pass through each other.
+   */
+  private applyPlayerSpawnSafeZone(x: number, laneId: PlayerLaneId): number {
+    if (this.player === null || this.playerLaneMovement === null) {
+      return x;
+    }
+
+    if (this.playerLaneMovement.currentLaneId !== laneId) {
+      return x;
+    }
+
+    const playerX = this.player.x;
+
+    if (Math.abs(x - playerX) >= ENEMY_SPAWN_PLAYER_SAFE_RADIUS) {
+      return x;
+    }
+
+    const minX = ENEMY_LANE_SPAWN_INSET;
+    const maxX = this.profile.width - ENEMY_LANE_SPAWN_INSET;
+    const leftTarget = playerX - ENEMY_SPAWN_PLAYER_SAFE_RADIUS;
+    const rightTarget = playerX + ENEMY_SPAWN_PLAYER_SAFE_RADIUS;
+    const leftFits = leftTarget >= minX;
+    const rightFits = rightTarget <= maxX;
+
+    if (leftFits && rightFits) {
+      return x <= playerX ? leftTarget : rightTarget;
+    }
+
+    if (leftFits) {
+      return leftTarget;
+    }
+
+    if (rightFits) {
+      return rightTarget;
+    }
+
+    return Phaser.Math.Clamp(x, minX, maxX);
   }
 
   private updateRoundTransition(delta: number): void {
@@ -911,6 +1005,7 @@ export class SandboxScene extends BaseScene {
     this.playerHealthLabel = null;
     this.progressionLabel = null;
     this.roundBannerLabel = null;
+    this.hudContainer = null;
     this.pauseLabel = null;
     this.gameOverOverlay = null;
     this.playerDeathOverlayTimer?.remove(false);
@@ -1041,9 +1136,12 @@ export class SandboxScene extends BaseScene {
 
     const { width, height } = this.profile;
     const backgroundFrame = this.background.frame;
-    const scale =
-      Math.max(width / backgroundFrame.width, height / backgroundFrame.height) *
-      BACKGROUND_SHAKE_OVERSCAN;
+    const scale = getBackgroundCoverScale(
+      backgroundFrame.width,
+      backgroundFrame.height,
+      width,
+      height
+    );
 
     this.background.setScale(scale);
   }
@@ -1097,6 +1195,19 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 1);
+    // Group the HUD into one camera-pinned container so SceneJuice can shake the
+    // whole readout independently of the world (a defeat jolts the HUD without
+    // jolting the playfield). Children render in add order; the health graphic
+    // sits behind the labels.
+    this.hudContainer = this.add
+      .container(0, 0, [
+        this.healthGraphic,
+        this.playerHealthLabel,
+        this.progressionLabel,
+        this.roundBannerLabel
+      ])
+      .setScrollFactor(0)
+      .setDepth(HUD_DEPTH);
     this.renderHealthBars(this.time.now);
     this.renderProgressionHud();
   }
@@ -2585,13 +2696,14 @@ export class SandboxScene extends BaseScene {
     enemy.health = applyAttackDamage(enemy.health);
     this.renderHealthBars(this.time.now);
 
-    // Light feedback on every connecting blade (kept distinct from the heavier
-    // defeat burst so future multi-HP enemies read a survived hit differently).
-    this.playEnemyHitFeedback(enemy);
-
-    // Enemies have 1 HP, so a hit always results in defeat (no surviving-hit SFX).
+    // A killing blow plays the heavier defeat burst only — the light hit spark
+    // is reserved for blows the enemy survives, so the two never stack on the
+    // same frame. (Enemies currently have 1 HP, so this is always a defeat;
+    // multi-HP enemies will read a survived hit distinctly.)
     if (enemy.health <= 0) {
       this.startEnemyDeath(enemy);
+    } else {
+      this.playEnemyHitFeedback(enemy);
     }
   }
 
