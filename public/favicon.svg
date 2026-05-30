@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1224"/>
+      <stop offset="100%" stop-color="#243250"/>
+    </linearGradient>
+    <filter id="backgroundShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0.60" stdDeviation="0.70" flood-color="#000000" flood-opacity="0.140"/>
+    </filter>
+    <filter id="contentShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0.23" stdDeviation="0.28" flood-color="#000000" flood-opacity="0.120"/>
+    </filter>
+    <radialGradient id="innerGlow" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.140"/>
+      <stop offset="58%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.070"/>
+    </radialGradient>
+    <filter id="surfaceNoise" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+  </defs>
+  <rect width="32" height="32" rx="7.0" fill="url(#bg)" filter="url(#backgroundShadow)"/>
+  <rect width="32" height="32" rx="7.0" fill="url(#innerGlow)"/>
+  <rect width="32" height="32" rx="7.0" filter="url(#surfaceNoise)" opacity="0.007" style="mix-blend-mode:overlay"/>
+  <g transform="translate(4.8, 4.8) scale(0.933)"
+     stroke="#eaf2ff" stroke-width="2" fill="none"
+     stroke-linecap="round" stroke-linejoin="round" filter="url(#contentShadow)">
+    <path fill="#eaf2ff" fill-rule="evenodd" d="M12 1.8 L14.4 9.6 L22.2 12 L14.4 14.4 L12 22.2 L9.6 14.4 L1.8 12 L9.6 9.6 Z M8.9 12 a3.1 3.1 0 1 0 6.2 0 a3.1 3.1 0 1 0 -6.2 0 Z"/>
+  </g>
+</svg>
