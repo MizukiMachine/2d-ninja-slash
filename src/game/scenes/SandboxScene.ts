@@ -626,8 +626,7 @@ export class SandboxScene extends BaseScene {
   private playEnemyDefeatFeedback(enemy: EnemyState): void {
     const center = this.getActorCenter(enemy.sprite);
     const scale = this.getActorScaleFromSprite(enemy.sprite);
-    const directionX = this.facingDirection === 'left' ? -1 : 1;
-    this.juice?.burstEnemyDefeat(center.x, center.y, scale, directionX);
+    this.juice?.burstEnemyDefeat(center.x, center.y, scale);
     this.juice?.shake(DEFEAT_SHAKE_TRAUMA);
     this.juice?.hitstop(DEFEAT_HITSTOP_MS);
     // Draw the eye to the kill without a big world shake: jolt the HUD instead.
