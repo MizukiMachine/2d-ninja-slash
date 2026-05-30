@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "savedAt": "2026-05-28T03:56:57.727Z",
+  "savedAt": "2026-05-30T03:43:22.901Z",
   "boundsByActor": {
     "mainNinja": {
       "left": {
@@ -600,10 +600,10 @@
             "height": 102
           },
           "collision": {
-            "x": 48,
-            "y": 82,
-            "width": 34,
-            "height": 37
+            "x": 56,
+            "y": 46,
+            "width": 26,
+            "height": 45
           },
           "attack": {
             "x": 77,
