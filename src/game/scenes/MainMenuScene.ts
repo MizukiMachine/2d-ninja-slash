@@ -53,7 +53,7 @@ export class MainMenuScene extends BaseScene {
     this.createBackground();
     this.createTitleLockup();
     this.createStartButton();
-    this.createSettingsButton();
+    this.createBgmToggleButton();
     this.createControlsGuide();
     this.createStartKeyboardInput();
   }
@@ -158,7 +158,7 @@ export class MainMenuScene extends BaseScene {
     button.on('pointerup', startGame);
   }
 
-  private createSettingsButton(): void {
+  private createBgmToggleButton(): void {
     const { width, height } = this.profile;
     const buttonWidth = Math.min(width * 0.32, 220);
     const buttonHeight = height > width ? 50 : 46;
@@ -171,7 +171,7 @@ export class MainMenuScene extends BaseScene {
       .setDepth(TITLE_CONTENT_DEPTH)
       .setInteractive({ useHandCursor: true });
     const label = this.add
-      .text(this.centerX, buttonY, 'Settings', {
+      .text(this.centerX, buttonY, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '20px',
         color: '#d6b76f'
@@ -179,17 +179,30 @@ export class MainMenuScene extends BaseScene {
       .setOrigin(0.5)
       .setDepth(TITLE_CONTENT_DEPTH + 1);
 
+    let hovered = false;
+    const refreshColor = (bgmEnabled: boolean): void => {
+      label.setColor(hovered ? '#fff7df' : bgmEnabled ? '#d6b76f' : '#8a8f99');
+    };
+
     button.on('pointerover', () => {
+      hovered = true;
       button.setFillStyle(0x1c242f, 0.9);
-      label.setColor('#fff7df');
+      refreshColor(this.settings.get().bgmEnabled);
     });
     button.on('pointerout', () => {
+      hovered = false;
       button.setFillStyle(0x10151d, 0.78);
-      label.setColor('#d6b76f');
+      refreshColor(this.settings.get().bgmEnabled);
     });
     button.on('pointerup', () => {
       this.playSfx('ui-select');
-      this.goTo(SceneKeys.Settings);
+      this.settings.toggleBgm();
+    });
+
+    this.onStore(this.settings, (settings) => {
+      // ラベルは「押した後に変化する状態」を表示する: 再生中なら次は止まるので 'BGM Off'
+      label.setText(settings.bgmEnabled ? 'BGM Off' : 'BGM On');
+      refreshColor(settings.bgmEnabled);
     });
   }
 

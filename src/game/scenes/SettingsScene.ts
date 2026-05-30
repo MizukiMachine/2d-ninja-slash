@@ -75,6 +75,7 @@ export class SettingsScene extends BaseScene {
     const volumePercent = Math.round(settings.volume * 100);
     this.volumeText?.setText(`Volume ${volumePercent}%`);
     this.mutedText?.setText(settings.muted ? 'Muted On' : 'Muted Off');
-    this.bgmText?.setText(settings.bgmEnabled ? 'BGM On' : 'BGM Off');
+    // 「押した後の状態」を表示: 再生中は 'BGM Off'、停止中は 'BGM On'
+    this.bgmText?.setText(settings.bgmEnabled ? 'BGM Off' : 'BGM On');
   }
 }
