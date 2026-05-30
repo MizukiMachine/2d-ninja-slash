@@ -1472,23 +1472,37 @@ export class SandboxScene extends BaseScene {
     return new Phaser.Math.Vector2(point.x, point.y);
   }
 
-  private queueAssets(backgroundFileName: DebugBackgroundFileName): boolean {
+  /**
+   * Queue every gameplay actor spritesheet (and the given background) onto a
+   * scene's loader, skipping anything already cached.
+   *
+   * Exposed as a static so {@link BootScene} can front-load these during the
+   * boot/loading phase. Without that, the first SandboxScene entry pays the
+   * entire spritesheet network-load + PNG-decode cost in a single synchronous
+   * burst — the visible "startup slowdown". Because every entry here is guarded
+   * by a cache check, running it early makes the in-scene {@link queueAssets}
+   * find everything already loaded and queue nothing.
+   */
+  static queueGameplayAssets(
+    scene: Phaser.Scene,
+    backgroundFileName: DebugBackgroundFileName
+  ): boolean {
     let queued = false;
     const backgroundTextureKey = getBackgroundTextureKey(backgroundFileName);
 
-    if (!this.textures.exists(backgroundTextureKey)) {
-      this.load.image(backgroundTextureKey, getBackgroundUrl(backgroundFileName));
+    if (!scene.textures.exists(backgroundTextureKey)) {
+      scene.load.image(backgroundTextureKey, getBackgroundUrl(backgroundFileName));
       queued = true;
     }
 
     for (const animation of NINJA_ANIMATIONS) {
       const textureKey = getMainNinjaTextureKey(animation.action, animation.direction);
 
-      if (this.textures.exists(textureKey)) {
+      if (scene.textures.exists(textureKey)) {
         continue;
       }
 
-      this.load.spritesheet(
+      scene.load.spritesheet(
         textureKey,
         getMainNinjaSpriteSheetUrl(animation.action, animation.direction),
         {
@@ -1506,11 +1520,11 @@ export class SandboxScene extends BaseScene {
     for (const animation of ENEMY_NINJA_ANIMATIONS) {
       const textureKey = getEnemyNinjaTextureKey(animation.action, animation.direction);
 
-      if (this.textures.exists(textureKey)) {
+      if (scene.textures.exists(textureKey)) {
         continue;
       }
 
-      this.load.spritesheet(
+      scene.load.spritesheet(
         textureKey,
         getEnemyNinjaSpriteSheetUrl(animation.action, animation.direction),
         {
@@ -1528,17 +1542,23 @@ export class SandboxScene extends BaseScene {
     return queued;
   }
 
-  private createAnimations(): void {
+  /**
+   * Build every gameplay actor animation on a scene's (shared) animation
+   * manager, skipping any that already exist. Like {@link queueGameplayAssets}
+   * this is static so BootScene can run it once during boot; animations live on
+   * the global manager, so SandboxScene then finds them ready.
+   */
+  static createGameplayAnimations(scene: Phaser.Scene): void {
     for (const animation of NINJA_ANIMATIONS) {
       const animationKey = getMainNinjaAnimationKey(animation.action, animation.direction);
 
-      if (this.anims.exists(animationKey)) {
+      if (scene.anims.exists(animationKey)) {
         continue;
       }
 
-      this.anims.create({
+      scene.anims.create({
         key: animationKey,
-        frames: this.anims.generateFrameNumbers(
+        frames: scene.anims.generateFrameNumbers(
           getMainNinjaTextureKey(animation.action, animation.direction),
           {
             start: 0,
@@ -1553,13 +1573,13 @@ export class SandboxScene extends BaseScene {
     for (const animation of ENEMY_NINJA_ANIMATIONS) {
       const animationKey = getEnemyNinjaAnimationKey(animation.action, animation.direction);
 
-      if (this.anims.exists(animationKey)) {
+      if (scene.anims.exists(animationKey)) {
         continue;
       }
 
-      this.anims.create({
+      scene.anims.create({
         key: animationKey,
-        frames: this.anims.generateFrameNumbers(
+        frames: scene.anims.generateFrameNumbers(
           getEnemyNinjaTextureKey(animation.action, animation.direction),
           {
             start: 0,
@@ -1570,6 +1590,14 @@ export class SandboxScene extends BaseScene {
         repeat: animation.repeat
       });
     }
+  }
+
+  private queueAssets(backgroundFileName: DebugBackgroundFileName): boolean {
+    return SandboxScene.queueGameplayAssets(this, backgroundFileName);
+  }
+
+  private createAnimations(): void {
+    SandboxScene.createGameplayAnimations(this);
   }
 
   private isBackgroundLoaded(backgroundFileName: DebugBackgroundFileName): boolean {
@@ -2093,7 +2121,7 @@ export class SandboxScene extends BaseScene {
       });
 
       enemy.patrolDirection = approachDirection;
-      this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(approachDirection, 0));
+      this.updateEnemyFacingFromDirectionX(enemy, approachDirection);
       enemy.sprite.setVelocity(approachDirection * enemySpeed, 0);
       this.playEnemyAnimation(enemy, 'run');
       return;
@@ -2111,7 +2139,7 @@ export class SandboxScene extends BaseScene {
       )
     });
 
-    this.updateEnemyFacingFromVector(enemy, new Phaser.Math.Vector2(direction, 0));
+    this.updateEnemyFacingFromDirectionX(enemy, direction);
     enemy.sprite.setVelocity(direction * enemySpeed, 0);
     this.playEnemyAnimation(enemy, 'walk');
   }
@@ -2594,12 +2622,22 @@ export class SandboxScene extends BaseScene {
   }
 
   private updateEnemyFacingFromVector(enemy: EnemyState, vector: Phaser.Math.Vector2): void {
-    if (vector.x < 0) {
+    this.updateEnemyFacingFromDirectionX(enemy, vector.x);
+  }
+
+  /**
+   * Set an enemy's facing from a horizontal direction sign. The per-frame
+   * patrol/approach paths use this instead of allocating a throwaway Vector2
+   * each frame just to read its x sign — that garbage adds up across many
+   * enemies and shows up as intermittent GC stutter during combat.
+   */
+  private updateEnemyFacingFromDirectionX(enemy: EnemyState, directionX: number): void {
+    if (directionX < 0) {
       enemy.facingDirection = 'left';
       return;
     }
 
-    if (vector.x > 0) {
+    if (directionX > 0) {
       enemy.facingDirection = 'right';
     }
   }
