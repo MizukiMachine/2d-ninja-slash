@@ -71,15 +71,11 @@ type EnemyAction = Exclude<EnemyNinjaAction, 'death'> | 'recover' | 'dead';
 type RoundPhase = 'fighting' | 'cleared';
 
 interface MoveKeys {
-  readonly w: Phaser.Input.Keyboard.Key;
   readonly a: Phaser.Input.Keyboard.Key;
-  readonly s: Phaser.Input.Keyboard.Key;
-  readonly d: Phaser.Input.Keyboard.Key;
   readonly up: Phaser.Input.Keyboard.Key;
   readonly down: Phaser.Input.Keyboard.Key;
   readonly left: Phaser.Input.Keyboard.Key;
   readonly right: Phaser.Input.Keyboard.Key;
-  readonly z: Phaser.Input.Keyboard.Key;
   readonly space: Phaser.Input.Keyboard.Key;
   readonly esc: Phaser.Input.Keyboard.Key;
 }
@@ -1214,6 +1210,19 @@ export class SandboxScene extends BaseScene {
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH + 1);
+    const escHintLabel = this.add
+      .text(16, this.profile.height - 14, 'Esc  ゲーム終了', {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '17px',
+        fontStyle: '700',
+        color: '#d6b76f',
+        stroke: '#05080d',
+        strokeThickness: 3
+      })
+      .setOrigin(0, 1)
+      .setAlpha(0.82)
+      .setScrollFactor(0)
+      .setDepth(HUD_DEPTH + 1);
     // Group the HUD into one camera-pinned container so SceneJuice can shake the
     // whole readout independently of the world (a defeat jolts the HUD without
     // jolting the playfield). Children render in add order; the health graphic
@@ -1223,7 +1232,8 @@ export class SandboxScene extends BaseScene {
         this.healthGraphic,
         this.playerHealthLabel,
         this.progressionLabel,
-        this.roundBannerLabel
+        this.roundBannerLabel,
+        escHintLabel
       ])
       .setScrollFactor(0)
       .setDepth(HUD_DEPTH);
@@ -1686,15 +1696,11 @@ export class SandboxScene extends BaseScene {
     }
 
     this.moveKeys = {
-      w: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
       a: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      s: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      d: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       up: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
       down: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
       left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT),
       right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT),
-      z: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z),
       space: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       esc: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     };
@@ -1722,21 +1728,17 @@ export class SandboxScene extends BaseScene {
 
     keyboard.on('keydown', syncLastKey);
     escKey.on('down', goBackToMenu);
-    this.moveKeys.z.on('down', startAttack);
+    this.moveKeys.a.on('down', startAttack);
     this.moveKeys.space.on('down', startJump);
-    this.moveKeys.w.on('down', requestLaneUp);
     this.moveKeys.up.on('down', requestLaneUp);
-    this.moveKeys.s.on('down', requestLaneDown);
     this.moveKeys.down.on('down', requestLaneDown);
 
     this.trackCleanup(() => {
       keyboard.off('keydown', syncLastKey);
       escKey.off('down', goBackToMenu);
-      this.moveKeys?.z.off('down', startAttack);
+      this.moveKeys?.a.off('down', startAttack);
       this.moveKeys?.space.off('down', startJump);
-      this.moveKeys?.w.off('down', requestLaneUp);
       this.moveKeys?.up.off('down', requestLaneUp);
-      this.moveKeys?.s.off('down', requestLaneDown);
       this.moveKeys?.down.off('down', requestLaneDown);
     });
   }
@@ -1809,10 +1811,10 @@ export class SandboxScene extends BaseScene {
       };
     }
 
-    const left = this.moveKeys.a.isDown || this.moveKeys.left.isDown;
-    const right = this.moveKeys.d.isDown || this.moveKeys.right.isDown;
-    const up = this.moveKeys.w.isDown || this.moveKeys.up.isDown;
-    const down = this.moveKeys.s.isDown || this.moveKeys.down.isDown;
+    const left = this.moveKeys.left.isDown;
+    const right = this.moveKeys.right.isDown;
+    const up = this.moveKeys.up.isDown;
+    const down = this.moveKeys.down.isDown;
 
     return {
       left,
@@ -1854,7 +1856,7 @@ export class SandboxScene extends BaseScene {
       return;
     }
 
-    if (!this.playerLaneMovement.tapLane(direction, this.time.now / 1000)) {
+    if (!this.playerLaneMovement.stepLane(direction)) {
       return;
     }
 

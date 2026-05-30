@@ -486,6 +486,14 @@ export class PlayerLaneMovementController {
     return true;
   }
 
+  stepLane(direction: LaneTapDirection): boolean {
+    if (this.activeTransition !== null) {
+      return false;
+    }
+
+    return this.startLaneTransition(direction);
+  }
+
   requestLaneStepToward(targetLaneId: PlayerLaneId): boolean {
     if (this.activeTransition !== null) {
       return false;
