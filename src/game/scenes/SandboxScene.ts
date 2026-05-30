@@ -466,11 +466,27 @@ export class SandboxScene extends BaseScene {
 
   preload(): void {
     const state = this.debug.get();
-    this.queueAssets(state.backgroundFileName);
+    // queueAssets returns true when something still needs loading (i.e. it was
+    // not pre-cached by BootScene — first load over a cold CDN, or after a failed
+    // boot fetch). In that case show a loading overlay while the spritesheets
+    // stream in, so pressing Start shows progress instead of a black screen.
+    // Phaser runs the loader after preload() and enters create() on COMPLETE.
+    if (this.queueAssets(state.backgroundFileName)) {
+      this.showLoadingOverlay();
+    }
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor('#101722');
+    this.hideLoadingOverlay();
+
+    // If an asset failed mid-load, building the scene now would render broken
+    // (black) sprites with no explanation. Surface a tappable retry instead.
+    if (this.didLoadFail()) {
+      this.showLoadErrorOverlay();
+      return;
+    }
+
     const state = this.debug.get();
     this.activeBackgroundFileName = state.backgroundFileName;
     this.resetSceneState();

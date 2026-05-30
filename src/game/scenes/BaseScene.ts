@@ -15,8 +15,15 @@ interface TextButtonConfig {
   readonly height?: number;
 }
 
+const LOADING_TEXT = '読み込み中…';
+const LOAD_ERROR_TEXT = '読み込みに失敗しました\n画面をタップして再読み込み';
+
 export abstract class BaseScene extends Phaser.Scene {
   private cleanupCallbacks: Unsubscribe[] = [];
+  /** Centered loading / error overlay shown while assets stream in. */
+  private loadingOverlay: Phaser.GameObjects.Text | null = null;
+  /** Set when any file errors during the current load batch. */
+  private loadHadError = false;
 
   protected constructor(sceneKey: SceneKey) {
     super(sceneKey);
@@ -163,6 +170,81 @@ export abstract class BaseScene extends Phaser.Scene {
 
   protected onStore<T>(store: ReadableStore<T>, listener: StoreListener<T>, immediate = true): void {
     this.trackCleanup(store.subscribe(listener, { immediate }));
+  }
+
+  /**
+   * Show a centered "loading" overlay and keep its percentage synced with the
+   * scene loader, so a slow first load (or a cold CDN on a fresh deploy) shows
+   * visible feedback instead of a blank/black screen. Also tracks per-file load
+   * errors so {@link didLoadFail} can report whether assets actually arrived.
+   *
+   * Call from a scene's preload() (the loader auto-runs afterward) or right
+   * before a manual load.start(). Listeners self-clean on the loader's COMPLETE.
+   */
+  protected showLoadingOverlay(): void {
+    this.loadHadError = false;
+
+    if (!this.loadingOverlay) {
+      this.loadingOverlay = this.add
+        .text(this.centerX, this.centerY, LOADING_TEXT, {
+          fontFamily: GAME_UI_FONT_FAMILY,
+          fontSize: '24px',
+          color: '#f5e6c8',
+          align: 'center'
+        })
+        .setOrigin(0.5)
+        .setDepth(10_000);
+    }
+
+    const onProgress = (value: number): void => {
+      const percent = Math.round(Phaser.Math.Clamp(value, 0, 1) * 100);
+      this.loadingOverlay?.setText(`${LOADING_TEXT} ${percent}%`);
+    };
+    const onError = (): void => {
+      this.loadHadError = true;
+    };
+
+    this.load.on(Phaser.Loader.Events.PROGRESS, onProgress);
+    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.load.off(Phaser.Loader.Events.PROGRESS, onProgress);
+      this.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+    });
+  }
+
+  /** Remove the loading overlay (no-op if none is showing). */
+  protected hideLoadingOverlay(): void {
+    this.loadingOverlay?.destroy();
+    this.loadingOverlay = null;
+  }
+
+  /** True when at least one file errored during the last load batch. */
+  protected didLoadFail(): boolean {
+    return this.loadHadError;
+  }
+
+  /**
+   * Replace the loading overlay with a tappable retry message. Used when assets
+   * fail to arrive (network blip / misconfigured host) so the player sees a clear
+   * prompt instead of a silent black screen. Tapping reloads the page, which
+   * re-fetches against a now-warm cache.
+   */
+  protected showLoadErrorOverlay(message: string = LOAD_ERROR_TEXT): void {
+    this.hideLoadingOverlay();
+    this.loadingOverlay = this.add
+      .text(this.centerX, this.centerY, message, {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: '22px',
+        color: '#c9b48a',
+        align: 'center',
+        lineSpacing: 8
+      })
+      .setOrigin(0.5)
+      .setDepth(10_000);
+
+    this.input.once(Phaser.Input.Events.POINTER_DOWN, () => {
+      window.location.reload();
+    });
   }
 
   private disposeScene(): void {

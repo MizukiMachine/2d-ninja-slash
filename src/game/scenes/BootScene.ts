@@ -9,6 +9,13 @@ export class BootScene extends BaseScene {
   }
 
   preload(): void {
+    // Paint the loading background immediately and show a progress overlay, so
+    // the first load (the longest one — ~30 PNGs + audio, possibly over a cold
+    // CDN on a fresh deploy) shows visible feedback instead of a blank/black
+    // screen. The loader auto-runs after preload(); the overlay tracks its %.
+    this.cameras.main.setBackgroundColor('#101520');
+    this.showLoadingOverlay();
+
     this.preloadAudioAssets();
     // Front-load the gameplay actor spritesheets and the active background here,
     // during the dedicated boot/loading phase, alongside the audio. Otherwise
@@ -19,8 +26,18 @@ export class BootScene extends BaseScene {
   }
 
   create(): void {
-    this.debug.resetRuntime();
+    this.hideLoadingOverlay();
     this.cameras.main.setBackgroundColor('#101520');
+
+    // If a gameplay asset failed to arrive, building the animations now would
+    // create broken/empty frames and every later scene would render black with
+    // no explanation. Surface a retry prompt instead of proceeding silently.
+    if (this.didLoadFail()) {
+      this.showLoadErrorOverlay();
+      return;
+    }
+
+    this.debug.resetRuntime();
     // Build the actor animations now (on the shared animation manager) so the
     // first SandboxScene entry has nothing to construct on its first frame.
     SandboxScene.createGameplayAnimations(this);
