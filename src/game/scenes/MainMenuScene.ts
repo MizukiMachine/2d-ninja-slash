@@ -200,7 +200,8 @@ export class MainMenuScene extends BaseScene {
     });
 
     this.onStore(this.settings, (settings) => {
-      label.setText(settings.bgmEnabled ? 'BGM On' : 'BGM Off');
+      // ラベルは「押した後に変化する状態」を表示する: 再生中なら次は止まるので 'BGM Off'
+      label.setText(settings.bgmEnabled ? 'BGM Off' : 'BGM On');
       refreshColor(settings.bgmEnabled);
     });
   }
