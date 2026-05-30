@@ -160,7 +160,7 @@ const ENEMY_PATROL_MAX_DECISION_MS = 2200;
 // --- Game feel / juice tuning -------------------------------------------------
 // A connecting blade gives a light punch; a defeat hits harder and lingers.
 const HIT_SHAKE_TRAUMA = 0.26;
-const DEFEAT_SHAKE_TRAUMA = 0.62;
+const DEFEAT_SHAKE_TRAUMA = 0.44;
 const PLAYER_HIT_SHAKE_TRAUMA = 0.46;
 const HIT_HITSTOP_MS = 45;
 const DEFEAT_HITSTOP_MS = 120;
