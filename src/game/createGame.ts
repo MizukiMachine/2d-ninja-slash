@@ -39,6 +39,18 @@ export function createGame({ parent, context }: CreateGameOptions): Phaser.Game 
     height: profile.height,
     backgroundColor: '#101520',
     roundPixels: true,
+    // Disable Phaser's delta smoothing. With smoothStep on (the default), every
+    // `focus`/visibility event re-arms a 120-frame "cooldown" during which the
+    // per-frame delta is clamped down to the 60fps target (see TimeStep.smoothDelta).
+    // Clicking "Start" fires a window focus event right as SandboxScene does its
+    // heaviest first-frame work (spritesheet GPU uploads, BGM start, HUD build),
+    // briefly dropping below 60fps — and the clamp then advances game time slower
+    // than real time, which reads as a whole-screen slow-motion for ~2-4s at start.
+    // Measured: 61% speed across the cooldown window. Turning smoothing off makes a
+    // startup hitch a single small skip instead (invisible while actors stand idle).
+    fps: {
+      smoothStep: false
+    },
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.NO_CENTER

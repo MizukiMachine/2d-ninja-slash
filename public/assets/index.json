@@ -2846,28 +2846,28 @@
       "key": "bgm.gameOverLament",
       "type": "bgm-audio",
       "label": "Game Over Lament",
-      "filePath": "public/assets/bgm/game-over-lament-loud.mp3",
-      "path": "/assets/bgm/game-over-lament-loud.mp3",
-      "format": "mp3",
+      "filePath": "public/assets/bgm/game-over-lament.wav",
+      "path": "/assets/bgm/game-over-lament.wav",
+      "format": "wav",
       "animationUse": "looping Game Over background music",
       "phaser": {
         "loader": "audio",
         "audioKey": "bgm.gameOverLament",
         "urls": [
-          "/assets/bgm/game-over-lament-loud.mp3"
+          "/assets/bgm/game-over-lament.wav"
         ],
         "playback": {
           "loop": true,
-          "volume": 1
+          "volume": 0.15
         }
       },
       "metadata": {
         "id": "game-over-lament",
         "theme": "somber shinobi defeat lament with low taiko and distant flute",
         "generatedBy": "ElevenLabs music.compose",
-        "generatedAt": "2026-05-28",
+        "generatedAt": "2026-05-30",
         "requestedDurationMs": 60000,
-        "sizeBytes": 1441342,
+        "sizeBytes": 2431370,
         "gameOverBgm": true
       }
     },
