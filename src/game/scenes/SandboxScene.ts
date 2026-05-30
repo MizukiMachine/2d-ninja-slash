@@ -482,6 +482,15 @@ export class SandboxScene extends BaseScene {
     this.createAnimations();
     this.createBackground();
     this.physics.world.setBounds(0, 0, this.profile.width, this.profile.height);
+    // Lane actors own their Y entirely: setEnemyToLaneY / setPlayerPositionForLane
+    // re-snap the sprite onto its lane every scene update, and no actor ever uses
+    // vertical physics (no gravity, vy stays 0). The world's top/bottom bounds must
+    // therefore stay OUT of the Y axis — otherwise a body whose collision box dips
+    // below the world floor (e.g. a large front-lane actor) gets shoved up by
+    // collideWorldBounds each physics step and snapped back down each scene update,
+    // a tug-of-war that renders as a vertical judder. Keep left/right so actors are
+    // still contained horizontally.
+    this.physics.world.setBoundsCollision(true, true, false, false);
     this.playerLaneMovement = this.createLaneMovementController('middle');
 
     this.player = this.physics.add.sprite(
@@ -736,6 +745,17 @@ export class SandboxScene extends BaseScene {
       .setScale(this.getActorScaleForLaneY(this.centerY + 108))
       .setCollideWorldBounds(true)
       .setDepth(this.getActorDepthForLaneY(this.centerY + 108, ENEMY_DEPTH_BIAS));
+    // Same "lane owns Y" rule as the world-bounds change in create(): the lane
+    // system snaps each actor's Y every scene update, so physics must never move an
+    // actor vertically. Body-vs-body separation is the other vertical source —
+    // Arcade resolves overlaps on whichever axis penetrates least, so two bunched
+    // same-lane actors get pushed apart on Y, then snapped straight back, judder.
+    // Disabling the vertical collision faces stops Arcade from ever separating on Y
+    // while leaving horizontal queuing (left/right) intact. The flag persists across
+    // pool reuse (enableBody/reset don't touch checkCollision), and because every
+    // collider here involves an enemy body, it also covers the player-vs-enemy pair.
+    enemySprite.body.checkCollision.up = false;
+    enemySprite.body.checkCollision.down = false;
     const enemy = this.createEnemyState(enemySprite, 'left');
     this.physics.add.collider(
       this.player,
