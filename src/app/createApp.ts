@@ -1374,6 +1374,15 @@ export function createApp(root: HTMLDivElement | null): void {
       return;
     }
 
+    // This fetch was issued on page load and can resolve AFTER the user has
+    // already saved a lane edit. In that case a save already made the in-memory
+    // config authoritative and wrote it to disk, so the fetched copy is stale —
+    // adopting it would clobber the saved edit (and re-apply the old values),
+    // which is why the first saved lane was lost and only later edits survived.
+    if (sandboxLaneSettingsLoadedFromFile) {
+      return;
+    }
+
     sandboxLaneSettingsLoadedFromFile = true;
     if (sandboxLaneSettingsDirty) {
       sandboxLaneSettingsConfig = setSandboxLaneSettingsForProfile(

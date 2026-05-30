@@ -37,7 +37,8 @@ const HUD_SHAKE_SEED_Y = 6.53;
 // Low-saturation silver/white — a moonlit blade glint rather than confetti.
 const DEFEAT_GLINT_TINTS = [0xffffff, 0xeaf2ff, 0xcfd6e0, 0xaab8d0];
 
-// The glint streaks fire as a tight cone along the slash; ±X by facing.
+// The glint streaks bloom in place at the cut; each is randomly tilted within
+// this half-angle so the few lines don't look stamped from one template.
 const GLINT_CONE_HALF_ANGLE = 22;
 
 export class SceneJuice {
@@ -60,6 +61,7 @@ export class SceneJuice {
 
   private readonly sparkEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly glintEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly coreEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -87,13 +89,12 @@ export class SceneJuice {
       })
       .setDepth(FX_DEPTH);
 
-    // Few, fast, short-lived silver streaks fired in a tight directional cone:
-    // a blade glint that flicks along the cut and fades, not a confetti pop.
+    // A couple of short-lived silver streaks that bloom in place at the cut and
+    // fade — speed 0 so they pop where the blade lands instead of sliding off.
     this.glintEmitter = scene.add
       .particles(0, 0, GLINT_TEXTURE_KEY, {
         lifespan: { min: 100, max: 200 },
-        speed: { min: 260, max: 480 },
-        angle: { min: -GLINT_CONE_HALF_ANGLE, max: GLINT_CONE_HALF_ANGLE },
+        speed: 0,
         scale: 1,
         alpha: { start: 0.95, end: 0 },
         rotate: { min: -GLINT_CONE_HALF_ANGLE, max: GLINT_CONE_HALF_ANGLE },
@@ -102,6 +103,21 @@ export class SceneJuice {
         emitting: false
       })
       .setDepth(FX_DEPTH + 1);
+
+    // The core flash of the cut: a single small dot that blooms in place and
+    // fades. Its own emitter (speed 0, static scale) so it stays put rather than
+    // shooting off like the flying hit-sparks. Scale is a plain number so it can
+    // be set per-burst (a ranged scale would ignore setParticleScale).
+    this.coreEmitter = scene.add
+      .particles(0, 0, SPARK_TEXTURE_KEY, {
+        lifespan: { min: 120, max: 200 },
+        speed: 0,
+        scale: 0.22,
+        alpha: { start: 1, end: 0 },
+        blendMode: 'ADD',
+        emitting: false
+      })
+      .setDepth(FX_DEPTH);
   }
 
   /** Add camera-shake trauma (0..1). Multiple hits accumulate up to 1. */
@@ -165,24 +181,17 @@ export class SceneJuice {
   }
 
   /**
-   * Enemy defeat: a directional silver blade-glint along the slash plus a tight
-   * core flash at the point of impact. `directionX` is the slash direction
-   * (sign of X); positive fires the streaks rightward, negative leftward.
+   * Enemy defeat: a couple of silver blade-glints plus a single small core
+   * flash that bloom at the point of impact and fade in place. Nothing is given
+   * outward velocity, so the burst pops where the cut lands instead of sliding
+   * off in a random direction.
    */
-  burstEnemyDefeat(x: number, y: number, scale = 1, directionX = 1): void {
-    const rightward = directionX >= 0;
-    this.glintEmitter.setEmitterAngle(
-      rightward
-        ? { min: -GLINT_CONE_HALF_ANGLE, max: GLINT_CONE_HALF_ANGLE }
-        : { min: 180 - GLINT_CONE_HALF_ANGLE, max: 180 + GLINT_CONE_HALF_ANGLE }
-    );
+  burstEnemyDefeat(x: number, y: number, scale = 1): void {
     this.glintEmitter.setParticleScale(scale, scale);
-    this.glintEmitter.explode(Phaser.Math.Between(2, 4), x, y);
+    this.glintEmitter.explode(Phaser.Math.Between(1, 2), x, y);
 
-    // Small, tight core flash — the spark of the cut, not a burst of debris.
-    const coreScale = 0.16 * scale;
-    this.sparkEmitter.setParticleScale(coreScale, coreScale);
-    this.sparkEmitter.explode(Phaser.Math.Between(1, 2), x, y);
+    this.coreEmitter.setParticleScale(0.22 * scale, 0.22 * scale);
+    this.coreEmitter.explode(1, x, y);
   }
 
   update(deltaMs: number): void {
@@ -247,6 +256,7 @@ export class SceneJuice {
     this.scene.tweens.timeScale = timeScale;
     this.sparkEmitter.timeScale = timeScale;
     this.glintEmitter.timeScale = timeScale;
+    this.coreEmitter.timeScale = timeScale;
   }
 
   private updateShake(deltaMs: number): void {
