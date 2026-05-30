@@ -20,7 +20,7 @@
     "player-hurt": 0.16,
     "enemy-defeat": 1.76,
     "player-defeat": 1.52,
-    "main-ninja-death": 0.51,
+    "main-ninja-death": 0.61,
     "round-clear": 0.99,
     "round-start": 0.99,
     "round-start-taiko": 0.38,
