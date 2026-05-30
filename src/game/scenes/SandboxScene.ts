@@ -177,7 +177,7 @@ const DEFEAT_HUD_SHAKE_TRAUMA = 0.7;
 // window (with a blink) prevents being stun-locked by overlapping enemies.
 const PLAYER_DAMAGE_FLASH_COLOR = 0xffffff;
 const PLAYER_DAMAGE_FLASH_ALPHA = 0.55;
-const PLAYER_DAMAGE_FLASH_MS = 220;
+const PLAYER_DAMAGE_FLASH_MS = 70;
 const PLAYER_INVULNERABILITY_MS = 1000;
 const PLAYER_INVULNERABILITY_BLINK_MS = 110;
 
