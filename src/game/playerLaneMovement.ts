@@ -78,32 +78,29 @@ interface ActiveLaneTransition {
   elapsedSeconds: number;
 }
 
-export type LaneEdgeSpawnSide = 'left' | 'right';
-
-export interface ThreeLaneEdgeSpawnInput {
+export interface ThreeLaneSpawnInput {
   readonly index: number;
   readonly worldWidth: number;
   readonly edgeInset: number;
-  readonly columnSpacing?: number;
-  readonly maxColumnsPerSide?: number;
 }
 
-export interface ThreeLaneEdgeSpawnPoint {
+export interface ThreeLaneSpawnPoint {
   readonly laneId: PlayerLaneId;
-  readonly side: LaneEdgeSpawnSide;
   readonly x: number;
 }
 
-export interface ThreeLaneEdgeSpawnPlacementInput extends ThreeLaneEdgeSpawnInput {
+export interface ThreeLaneSpawnPlacementInput extends ThreeLaneSpawnInput {
   readonly layout: ThreeLaneLayout;
 }
 
-export interface ThreeLaneEdgeSpawnPlacement extends ThreeLaneEdgeSpawnPoint {
+export interface ThreeLaneSpawnPlacement extends ThreeLaneSpawnPoint {
   readonly y: number;
 }
 
 export const PLAYER_LANE_IDS = ['upper', 'middle', 'lower'] as const;
-export const THREE_LANE_EDGE_SPAWN_LANE_ORDER = ['middle', 'upper', 'lower'] as const;
+export const THREE_LANE_SPAWN_LANE_ORDER = ['middle', 'upper', 'lower'] as const;
+// One left + one right edge slot per lane fills before overflow scatters inward.
+export const THREE_LANE_EDGE_SLOT_COUNT = THREE_LANE_SPAWN_LANE_ORDER.length * 2;
 export const PLAYER_LANE_DOUBLE_TAP_SECONDS = 0.3;
 export const PLAYER_LANE_TRANSITION_SECONDS = 0.28;
 export const PLAYER_LANE_JUMP_ARC_HEIGHT = 34;
@@ -229,39 +226,59 @@ export function getThreeLaneLayoutY(
   }
 }
 
-export function getThreeLaneEdgeSpawnPoint({
+/**
+ * Bisection (van der Corput, base 2) fraction in (0, 1): 1/2, 1/4, 3/4, 1/8,
+ * 3/8, 5/8, 7/8, 1/16, … Each successive index lands in the middle of the
+ * largest remaining gap, so overflow spawns stay evenly spread across the
+ * interior instead of stacking.
+ */
+function getBisectionFraction(index: number): number {
+  const n = Math.max(0, Math.trunc(index)) + 1;
+  const level = 31 - Math.clz32(n);
+  const countAtLevel = 1 << level;
+  const offsetInLevel = n - countAtLevel;
+
+  return (2 * offsetInLevel + 1) / (countAtLevel * 2);
+}
+
+/**
+ * Enemy spawn X by index. The first {@link THREE_LANE_EDGE_SLOT_COUNT} spawns
+ * fill the left/right edge of each lane (alternating right, left, …). Once the
+ * edges are taken, further spawns scatter across the interior via a centre-out
+ * bisection so a crowded wave spreads through the middle instead of stacking
+ * more columns at the edges. The lane cycles middle → upper → lower throughout.
+ */
+export function getThreeLaneSpawnPoint({
   index,
   worldWidth,
-  edgeInset,
-  columnSpacing = 44,
-  maxColumnsPerSide = 2
-}: ThreeLaneEdgeSpawnInput): ThreeLaneEdgeSpawnPoint {
+  edgeInset
+}: ThreeLaneSpawnInput): ThreeLaneSpawnPoint {
   const spawnIndex = Math.max(0, Math.trunc(index));
   const safeWorldWidth = Math.max(0, worldWidth);
   const safeEdgeInset = Math.max(0, Math.min(edgeInset, safeWorldWidth / 2));
-  const safeColumnSpacing = Math.max(0, columnSpacing);
-  const safeMaxColumnsPerSide = Math.max(1, Math.trunc(maxColumnsPerSide));
-  const side: LaneEdgeSpawnSide = spawnIndex % 2 === 0 ? 'right' : 'left';
-  const laneId = THREE_LANE_EDGE_SPAWN_LANE_ORDER[
-    spawnIndex % THREE_LANE_EDGE_SPAWN_LANE_ORDER.length
+  const laneId = THREE_LANE_SPAWN_LANE_ORDER[
+    spawnIndex % THREE_LANE_SPAWN_LANE_ORDER.length
   ];
-  const columnIndex = Math.min(
-    safeMaxColumnsPerSide - 1,
-    Math.floor(spawnIndex / (THREE_LANE_EDGE_SPAWN_LANE_ORDER.length * 2))
-  );
-  const columnOffset = columnIndex * safeColumnSpacing;
-  const x = side === 'left'
-    ? safeEdgeInset + columnOffset
-    : safeWorldWidth - safeEdgeInset - columnOffset;
 
-  return { laneId, side, x };
+  if (spawnIndex < THREE_LANE_EDGE_SLOT_COUNT) {
+    const onLeftEdge = spawnIndex % 2 !== 0;
+    const x = onLeftEdge ? safeEdgeInset : safeWorldWidth - safeEdgeInset;
+
+    return { laneId, x };
+  }
+
+  const overflowIndex = spawnIndex - THREE_LANE_EDGE_SLOT_COUNT;
+  const usableWidth = safeWorldWidth - safeEdgeInset * 2;
+  const x = safeEdgeInset + getBisectionFraction(overflowIndex) * usableWidth;
+
+  return { laneId, x };
 }
 
-export function getThreeLaneEdgeSpawnPlacement({
+export function getThreeLaneSpawnPlacement({
   layout,
   ...input
-}: ThreeLaneEdgeSpawnPlacementInput): ThreeLaneEdgeSpawnPlacement {
-  const spawnPoint = getThreeLaneEdgeSpawnPoint(input);
+}: ThreeLaneSpawnPlacementInput): ThreeLaneSpawnPlacement {
+  const spawnPoint = getThreeLaneSpawnPoint(input);
 
   return {
     ...spawnPoint,

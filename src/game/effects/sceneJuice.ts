@@ -25,6 +25,15 @@ const SHAKE_FREQUENCY_HZ = 24;
 const SHAKE_SEED_X = 1.37;
 const SHAKE_SEED_Y = 8.91;
 
+// HUD shake is independent of the world shake: the world can stay calm while
+// the HUD gives a noticeable jolt to flag a defeat. Slightly snappier and a
+// touch larger, with its own noise seeds so the two never move in lockstep.
+const HUD_SHAKE_MAX_OFFSET = 13;
+const HUD_SHAKE_DECAY_PER_SECOND = 2.4;
+const HUD_SHAKE_FREQUENCY_HZ = 26;
+const HUD_SHAKE_SEED_X = 4.21;
+const HUD_SHAKE_SEED_Y = 6.53;
+
 // Low-saturation silver/white — a moonlit blade glint rather than confetti.
 const DEFEAT_GLINT_TINTS = [0xffffff, 0xeaf2ff, 0xcfd6e0, 0xaab8d0];
 
@@ -37,6 +46,11 @@ export class SceneJuice {
 
   private shakeTrauma = 0;
   private shakeTimeMs = 0;
+
+  // Optional HUD layer shaken separately from the world (see attachHud).
+  private hudContainer: Phaser.GameObjects.Container | null = null;
+  private hudShakeTrauma = 0;
+  private hudShakeTimeMs = 0;
 
   private hitstopRemainingMs = 0;
   private frozen = false;
@@ -93,6 +107,20 @@ export class SceneJuice {
   /** Add camera-shake trauma (0..1). Multiple hits accumulate up to 1. */
   shake(trauma: number): void {
     this.shakeTrauma = Phaser.Math.Clamp(this.shakeTrauma + trauma, 0, 1);
+  }
+
+  /**
+   * Register a HUD container (positioned at the origin) to be shaken
+   * independently of the world via {@link shakeHud}. Its base position is
+   * assumed to be (0, 0); the shake writes a small offset onto it each frame.
+   */
+  attachHud(container: Phaser.GameObjects.Container): void {
+    this.hudContainer = container;
+  }
+
+  /** Add HUD-shake trauma (0..1). Independent of the world camera shake. */
+  shakeHud(trauma: number): void {
+    this.hudShakeTrauma = Phaser.Math.Clamp(this.hudShakeTrauma + trauma, 0, 1);
   }
 
   /** Freeze gameplay for the given duration. The longest pending request wins. */
@@ -160,6 +188,7 @@ export class SceneJuice {
   update(deltaMs: number): void {
     this.updateHitstop(deltaMs);
     this.updateShake(deltaMs);
+    this.updateHudShake(deltaMs);
   }
 
   /** Reset transient runtime state (freeze, shake, flash) without tearing down. */
@@ -169,6 +198,9 @@ export class SceneJuice {
     this.shakeTrauma = 0;
     this.shakeTimeMs = 0;
     this.camera.setScroll(0, 0);
+    this.hudShakeTrauma = 0;
+    this.hudShakeTimeMs = 0;
+    this.hudContainer?.setPosition(0, 0);
     this.flashTween?.stop();
     this.flashTween = null;
     this.flashRect.setAlpha(0).setVisible(false);
@@ -237,6 +269,33 @@ export class SceneJuice {
     const offsetY = SHAKE_MAX_OFFSET * amount * this.noise(SHAKE_SEED_Y, phase);
 
     this.camera.setScroll(offsetX, offsetY);
+  }
+
+  private updateHudShake(deltaMs: number): void {
+    const hud = this.hudContainer;
+    if (hud === null) {
+      return;
+    }
+
+    if (this.hudShakeTrauma <= 0) {
+      if (hud.x !== 0 || hud.y !== 0) {
+        hud.setPosition(0, 0);
+      }
+      return;
+    }
+
+    this.hudShakeTimeMs += deltaMs;
+    this.hudShakeTrauma = Math.max(
+      0,
+      this.hudShakeTrauma - (HUD_SHAKE_DECAY_PER_SECOND * deltaMs) / 1000
+    );
+
+    const amount = this.hudShakeTrauma * this.hudShakeTrauma;
+    const phase = (this.hudShakeTimeMs / 1000) * HUD_SHAKE_FREQUENCY_HZ;
+    const offsetX = HUD_SHAKE_MAX_OFFSET * amount * this.noise(HUD_SHAKE_SEED_X, phase);
+    const offsetY = HUD_SHAKE_MAX_OFFSET * amount * this.noise(HUD_SHAKE_SEED_Y, phase);
+
+    hud.setPosition(offsetX, offsetY);
   }
 
   /** Smooth 1D value noise in [-1, 1] so the shake reads organic, not jittery. */

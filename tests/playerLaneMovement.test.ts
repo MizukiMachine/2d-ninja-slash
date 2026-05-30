@@ -4,8 +4,8 @@ import {
   createDefaultThreeLaneYSettings,
   createThreeLaneLayout,
   createThreeLaneLayoutFromYSettings,
-  getThreeLaneEdgeSpawnPoint,
-  getThreeLaneEdgeSpawnPlacement,
+  getThreeLaneSpawnPoint,
+  getThreeLaneSpawnPlacement,
   normalizeThreeLaneYSettings
 } from '../src/game/playerLaneMovement';
 
@@ -187,14 +187,13 @@ describe('player lane movement', () => {
   });
 });
 
-describe('three lane edge spawning', () => {
-  it('assigns enemy spawns to left or right edge slots on one of the three lanes', () => {
+describe('three lane spawning', () => {
+  it('fills the left/right edge of each lane for the first six spawns', () => {
     const spawns = Array.from({ length: 6 }, (_, index) =>
-      getThreeLaneEdgeSpawnPoint({
+      getThreeLaneSpawnPoint({
         index,
         worldWidth: 1280,
-        edgeInset: 150,
-        columnSpacing: 44
+        edgeInset: 150
       })
     );
 
@@ -206,14 +205,7 @@ describe('three lane edge spawning', () => {
       'upper',
       'lower'
     ]);
-    expect(spawns.map((spawn) => spawn.side)).toEqual([
-      'right',
-      'left',
-      'right',
-      'left',
-      'right',
-      'left'
-    ]);
+    // Alternating right edge (1130) / left edge (150) — one slot per lane side.
     expect(spawns.map((spawn) => spawn.x)).toEqual([
       1130,
       150,
@@ -224,19 +216,24 @@ describe('three lane edge spawning', () => {
     ]);
   });
 
-  it('keeps repeated lane spawns near the stage edge instead of drifting into the center', () => {
-    const seventhSpawn = getThreeLaneEdgeSpawnPoint({
-      index: 6,
-      worldWidth: 1280,
-      edgeInset: 150,
-      columnSpacing: 44
-    });
+  it('scatters overflow spawns across the interior once the edges are full', () => {
+    const overflow = Array.from({ length: 4 }, (_, offset) =>
+      getThreeLaneSpawnPoint({
+        index: 6 + offset,
+        worldWidth: 1280,
+        edgeInset: 150
+      })
+    );
 
-    expect(seventhSpawn).toEqual({
-      laneId: 'middle',
-      side: 'right',
-      x: 1086
-    });
+    expect(overflow.map((spawn) => spawn.laneId)).toEqual([
+      'middle',
+      'upper',
+      'lower',
+      'middle'
+    ]);
+    // Centre-out bisection: centre (640), then quarter points (395, 885), then
+    // an eighth (272.5) — each overflow spawn lands in the largest gap.
+    expect(overflow.map((spawn) => spawn.x)).toEqual([640, 395, 885, 272.5]);
   });
 });
 
@@ -284,7 +281,7 @@ describe('three lane y settings', () => {
     });
   });
 
-  it('uses adjusted lane y settings for enemy edge spawn placement', () => {
+  it('uses adjusted lane y settings for enemy spawn placement', () => {
     const adjustedLayout = createThreeLaneLayoutFromYSettings({
       upperY: 310,
       middleY: 455,
@@ -292,7 +289,7 @@ describe('three lane y settings', () => {
     });
 
     expect(
-      getThreeLaneEdgeSpawnPlacement({
+      getThreeLaneSpawnPlacement({
         index: 0,
         worldWidth: 1280,
         edgeInset: 150,
@@ -300,12 +297,11 @@ describe('three lane y settings', () => {
       })
     ).toEqual({
       laneId: 'middle',
-      side: 'right',
       x: 1130,
       y: 455
     });
     expect(
-      getThreeLaneEdgeSpawnPlacement({
+      getThreeLaneSpawnPlacement({
         index: 1,
         worldWidth: 1280,
         edgeInset: 150,
@@ -313,7 +309,6 @@ describe('three lane y settings', () => {
       })
     ).toEqual({
       laneId: 'upper',
-      side: 'left',
       x: 150,
       y: 310
     });
