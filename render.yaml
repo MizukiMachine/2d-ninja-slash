@@ -1,0 +1,22 @@
+# Render Blueprint - ゲーム単体（game.html）を静的サイトとして配信
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: 2d-ninja-slash
+    runtime: static
+    # devDependencies（vite / typescript）も必要なので --include=dev を付ける
+    buildCommand: npm ci --include=dev && npm run build:game
+    staticPublishPath: ./dist
+    # SPA / 単一HTML のフォールバック。実ファイルが優先され、無ければ index.html を返す。
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+    headers:
+      # 静的アセット（ハッシュ付きJS / 画像 / 音声）は長期キャッシュ
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

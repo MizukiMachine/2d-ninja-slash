@@ -228,29 +228,63 @@ function debugConfigWriterPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [debugBackgroundsPlugin(), debugConfigWriterPlugin()],
-  build: {
-    rollupOptions: {
-      input: {
+// ゲーム単体ビルドで出力される game.html を index.html にリネームするプラグイン。
+// fs を直接触らず Rollup の generateBundle 内でファイル名を書き換えるので、
+// 静的ホスティング（Render 等）のルート `/` でそのままゲームが起動する。
+function renameGameHtmlToIndexPlugin(): Plugin {
+  return {
+    name: 'rename-game-html-to-index',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const gameHtml = bundle['game.html'];
+
+      if (gameHtml) {
+        gameHtml.fileName = 'index.html';
+      }
+    }
+  };
+}
+
+// `vite build --mode game`（= npm run build:game）のときだけ game.html 単体を出力する。
+export default defineConfig(({ mode }) => {
+  const isGameOnlyBuild = mode === 'game';
+
+  const buildInput: Record<string, string> = isGameOnlyBuild
+    ? // 本番: ゲーム単体のみ
+      { game: resolve(projectRoot, 'game.html') }
+    : {
         // Debug console (open http://localhost:5190/)
         main: resolve(projectRoot, 'index.html'),
         // Standalone game (open http://localhost:5190/game.html)
         game: resolve(projectRoot, 'game.html')
+      };
+
+  return {
+    base: '/',
+    plugins: [
+      debugBackgroundsPlugin(),
+      debugConfigWriterPlugin(),
+      ...(isGameOnlyBuild ? [renameGameHtmlToIndexPlugin()] : [])
+    ],
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      rollupOptions: {
+        input: buildInput
       }
+    },
+    server: {
+      host: '0.0.0.0',
+      port: 5190,
+      watch: {
+        usePolling: true,
+        interval: 500,
+        ignored: ['**/old/**', '**/dist/**']
+      }
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: 4173
     }
-  },
-  server: {
-    host: '0.0.0.0',
-    port: 5190,
-    watch: {
-      usePolling: true,
-      interval: 500,
-      ignored: ['**/old/**', '**/dist/**']
-    }
-  },
-  preview: {
-    host: '0.0.0.0',
-    port: 4173
-  }
+  };
 });
