@@ -76,6 +76,13 @@ export abstract class BaseScene extends Phaser.Scene {
     return this.profile.height / 2;
   }
 
+  protected isTouchPrimaryInput(): boolean {
+    return (
+      window.matchMedia('(pointer: coarse)').matches ||
+      navigator.maxTouchPoints > 0
+    );
+  }
+
   protected addTitle(text: string, y: number): Phaser.GameObjects.Text {
     return this.add
       .text(this.centerX, y, text, {
