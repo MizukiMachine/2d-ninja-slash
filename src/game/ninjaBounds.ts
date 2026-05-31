@@ -24,7 +24,7 @@ export const NINJA_PLAYBACK_RATE_LIMITS = {
 } as const;
 
 export type FacingDirection = 'left' | 'right';
-export type NinjaActorId = 'mainNinja' | 'enemyNinja';
+export type NinjaActorId = 'mainNinja' | 'mainNinja2p' | 'enemyNinja';
 export type NinjaBoundsKind = 'visual' | 'collision' | 'attack';
 export type NinjaHitFrameKind = 'attack';
 
@@ -197,6 +197,13 @@ export const NINJA_ACTORS: readonly NinjaActorDefinition[] = [
     id: 'mainNinja',
     label: 'Main Ninja',
     folder: 'main-ninja',
+    defaultActionId: 'idle',
+    actions: MAIN_NINJA_ACTIONS
+  },
+  {
+    id: 'mainNinja2p',
+    label: 'Main Ninja 2P',
+    folder: 'main-ninja-2p',
     defaultActionId: 'idle',
     actions: MAIN_NINJA_ACTIONS
   },
@@ -845,9 +852,9 @@ function createDefaultAttackRect(
   actionId: string
 ): NinjaRect {
   const baseWidth = getDefaultAttackWidth(actorId, actionId);
-  const baseHeight = actorId === 'mainNinja' ? 12 : 11;
-  const y = actorId === 'mainNinja' ? 77 : 78;
-  const rightX = actorId === 'mainNinja' ? 78 : 77;
+  const baseHeight = isMainNinjaVariant(actorId) ? 12 : 11;
+  const y = isMainNinjaVariant(actorId) ? 77 : 78;
+  const rightX = isMainNinjaVariant(actorId) ? 78 : 77;
   const x = direction === 'right' ? rightX : NINJA_FRAME_SIZE - rightX - baseWidth;
 
   return {
@@ -877,7 +884,7 @@ function createDefaultAttackFrames(
 ): boolean[] {
   const attackFrames = Array.from({ length: frameCount }, () => false);
   const activeFrameIndexes =
-    actorId === 'mainNinja'
+    isMainNinjaVariant(actorId)
       ? getMainNinjaDefaultAttackFrames(actionId)
       : getEnemyNinjaDefaultAttackFrames(actionId);
 
@@ -898,6 +905,14 @@ function getEnemyNinjaDefaultAttackFrames(actionId: string): readonly number[] {
   return actionId === 'slash' ? [15, 16] : [];
 }
 
+function isMainNinjaVariant(actorId: NinjaActorId): boolean {
+  return actorId === 'mainNinja' || actorId === 'mainNinja2p';
+}
+
+function getConfigFallbackActorId(actorId: NinjaActorId): NinjaActorId | undefined {
+  return actorId === 'mainNinja2p' ? 'mainNinja' : undefined;
+}
+
 function normalizeBoundsByActor(
   boundsByActor: Partial<NinjaBoundsByActor> | undefined,
   defaults: NinjaBoundsByActor
@@ -911,10 +926,26 @@ function normalizeBoundsByActor(
           Object.fromEntries(
             actorDefinition.actions.map((actionDefinition) => [
               actionDefinition.id,
-              normalizeAnimationBounds(
-                boundsByActor?.[actorDefinition.id]?.[direction]?.[actionDefinition.id],
-                defaults[actorDefinition.id][direction][actionDefinition.id]
-              )
+              (() => {
+                const fallbackActorId = getConfigFallbackActorId(actorDefinition.id);
+                const inheritedBounds =
+                  fallbackActorId === undefined
+                    ? undefined
+                    : boundsByActor?.[fallbackActorId]?.[direction]?.[
+                        actionDefinition.id
+                      ];
+                const fallbackBounds = normalizeAnimationBounds(
+                  inheritedBounds,
+                  defaults[actorDefinition.id][direction][actionDefinition.id]
+                );
+
+                return normalizeAnimationBounds(
+                  boundsByActor?.[actorDefinition.id]?.[direction]?.[
+                    actionDefinition.id
+                  ],
+                  fallbackBounds
+                );
+              })()
             ])
           )
         ])
@@ -947,15 +978,30 @@ function normalizeHitFramesByActor(
           Object.fromEntries(
             actorDefinition.actions.map((actionDefinition) => [
               actionDefinition.id,
-              {
-                attack: normalizeFrameFlags(
-                  hitFramesByActor?.[actorDefinition.id]?.[direction]?.[
-                    actionDefinition.id
-                  ]?.attack,
+              (() => {
+                const fallbackActorId = getConfigFallbackActorId(actorDefinition.id);
+                const inheritedFrames =
+                  fallbackActorId === undefined
+                    ? undefined
+                    : hitFramesByActor?.[fallbackActorId]?.[direction]?.[
+                        actionDefinition.id
+                      ]?.attack;
+                const fallbackFrames = normalizeFrameFlags(
+                  inheritedFrames,
                   actionDefinition.frameCount,
                   defaults[actorDefinition.id][direction][actionDefinition.id].attack
-                )
-              }
+                );
+
+                return {
+                  attack: normalizeFrameFlags(
+                    hitFramesByActor?.[actorDefinition.id]?.[direction]?.[
+                      actionDefinition.id
+                    ]?.attack,
+                    actionDefinition.frameCount,
+                    fallbackFrames
+                  )
+                };
+              })()
             ])
           )
         ])
@@ -974,10 +1020,20 @@ function normalizePlaybackRatesByActor(
       Object.fromEntries(
         actorDefinition.actions.map((actionDefinition) => [
           actionDefinition.id,
-          normalizeNinjaPlaybackRate(
-            playbackRatesByActor?.[actorDefinition.id]?.[actionDefinition.id],
-            defaults[actorDefinition.id][actionDefinition.id]
-          )
+          (() => {
+            const fallbackActorId = getConfigFallbackActorId(actorDefinition.id);
+            const fallbackPlaybackRate = normalizeNinjaPlaybackRate(
+              fallbackActorId === undefined
+                ? undefined
+                : playbackRatesByActor?.[fallbackActorId]?.[actionDefinition.id],
+              defaults[actorDefinition.id][actionDefinition.id]
+            );
+
+            return normalizeNinjaPlaybackRate(
+              playbackRatesByActor?.[actorDefinition.id]?.[actionDefinition.id],
+              fallbackPlaybackRate
+            );
+          })()
         ])
       )
     ])
@@ -997,12 +1053,26 @@ function normalizeLaneAnchorsByActor(
           Object.fromEntries(
             actorDefinition.actions.map((actionDefinition) => [
               actionDefinition.id,
-              normalizeLaneAnchor(
-                laneAnchorsByActor?.[actorDefinition.id]?.[direction]?.[
-                  actionDefinition.id
-                ],
-                defaults[actorDefinition.id][direction][actionDefinition.id]
-              )
+              (() => {
+                const fallbackActorId = getConfigFallbackActorId(actorDefinition.id);
+                const inheritedAnchor =
+                  fallbackActorId === undefined
+                    ? undefined
+                    : laneAnchorsByActor?.[fallbackActorId]?.[direction]?.[
+                        actionDefinition.id
+                      ];
+                const fallbackAnchor = normalizeLaneAnchor(
+                  inheritedAnchor,
+                  defaults[actorDefinition.id][direction][actionDefinition.id]
+                );
+
+                return normalizeLaneAnchor(
+                  laneAnchorsByActor?.[actorDefinition.id]?.[direction]?.[
+                    actionDefinition.id
+                  ],
+                  fallbackAnchor
+                );
+              })()
             ])
           )
         ])
