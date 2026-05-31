@@ -180,6 +180,15 @@ export class SceneJuice {
     this.sparkEmitter.explode(Phaser.Math.Between(6, 9), x, y);
   }
 
+  /** Silver blade-glint lines that bloom at a cut point and fade in place. */
+  burstBladeGlint(x: number, y: number, scale = 1): void {
+    this.glintEmitter.setParticleScale(scale, scale);
+    this.glintEmitter.explode(Phaser.Math.Between(1, 2), x, y);
+
+    this.coreEmitter.setParticleScale(0.22 * scale, 0.22 * scale);
+    this.coreEmitter.explode(1, x, y);
+  }
+
   /**
    * Enemy defeat: a couple of silver blade-glints plus a single small core
    * flash that bloom at the point of impact and fade in place. Nothing is given
@@ -187,11 +196,7 @@ export class SceneJuice {
    * off in a random direction.
    */
   burstEnemyDefeat(x: number, y: number, scale = 1): void {
-    this.glintEmitter.setParticleScale(scale, scale);
-    this.glintEmitter.explode(Phaser.Math.Between(1, 2), x, y);
-
-    this.coreEmitter.setParticleScale(0.22 * scale, 0.22 * scale);
-    this.coreEmitter.explode(1, x, y);
+    this.burstBladeGlint(x, y, scale);
   }
 
   update(deltaMs: number): void {

@@ -2,6 +2,7 @@ import { Callbacks } from '@colyseus/sdk';
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
+import { SceneJuice } from '../effects/sceneJuice';
 import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
   getDebugBackgroundUrl,
@@ -147,6 +148,7 @@ export class MultiplayerScene extends BaseScene {
   private lastInputSignature = '';
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
+  private juice: SceneJuice | null = null;
 
   constructor() {
     super(SceneKeys.Multiplayer);
@@ -189,16 +191,20 @@ export class MultiplayerScene extends BaseScene {
     );
     this.createBackground();
     this.createHud();
+    this.juice = new SceneJuice(this);
     this.registerKeyboard();
     void this.joinRoom();
 
     this.trackCleanup(() => {
       this.disconnectRoom();
       this.destroyVisuals();
+      this.juice?.destroy();
+      this.juice = null;
     });
   }
 
   update(time: number, delta: number): void {
+    this.juice?.update(delta);
     this.sendMovementInput(time);
     this.updatePlayerVisuals(delta);
     this.renderHud();
@@ -386,6 +392,7 @@ export class MultiplayerScene extends BaseScene {
     this.roomUnsubscribers.push(
       room.onMessage<HitMessage>('hit', (message) => {
         this.logMultiplayer('message:hit', message);
+        this.playHitFeedback(message);
         this.playHitSfx(message);
       }),
       room.onMessage<SwingMessage>('swing', (message) => {
@@ -761,6 +768,46 @@ export class MultiplayerScene extends BaseScene {
       message
     });
     this.playSfx('hit');
+  }
+
+  private playHitFeedback(message: HitMessage): void {
+    const room = this.room;
+
+    if (room === null || room.state.phase !== 'fighting') {
+      this.logMultiplayer('fx:hit-skip', {
+        reason: room === null ? 'no-room' : 'not-fighting',
+        phase: room?.state.phase,
+        message
+      });
+      return;
+    }
+
+    const visual = this.visualsBySessionId.get(message.targetId);
+
+    if (visual === undefined || !visual.sprite.active) {
+      this.logMultiplayer('fx:hit-skip', {
+        reason: 'missing-target-visual',
+        message
+      });
+      return;
+    }
+
+    const center = this.getVisualCenter(visual);
+
+    this.juice?.burstBladeGlint(center.x, center.y, this.getVisualScale(visual));
+  }
+
+  private getVisualCenter(visual: PlayerVisual): { readonly x: number; readonly y: number } {
+    return {
+      x: visual.sprite.x,
+      y: visual.sprite.y - visual.sprite.displayHeight * 0.5
+    };
+  }
+
+  private getVisualScale(visual: PlayerVisual): number {
+    const scale = Math.abs(visual.sprite.scaleX);
+
+    return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
   }
 
   private getActorScaleForLaneY(laneY: number): number {
