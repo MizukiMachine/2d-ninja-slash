@@ -318,15 +318,22 @@ export class MultiplayerScene extends BaseScene {
 
   private async joinRoom(): Promise<void> {
     try {
+      this.logMultiplayer('join-room:start');
       const room = await joinDuelRoom();
 
       this.room = room;
       this.bindRoom(room);
       this.roomText?.setText(`Room ${room.roomId}`);
+      this.logMultiplayer('join-room:success', {
+        roomId: room.roomId,
+        sessionId: room.sessionId,
+        reconnectionToken: room.reconnectionToken
+      });
     } catch {
       this.hasConnectionError = true;
       this.statusText?.setText('Connection failed');
       this.detailText?.setText('Start the Colyseus server and try again');
+      this.logMultiplayer('join-room:error');
       this.createTextButton({
         x: this.centerX,
         y: this.centerY + 86,
@@ -343,45 +350,81 @@ export class MultiplayerScene extends BaseScene {
 
     this.roomUnsubscribers.push(
       callbacks.onAdd('players', (player, sessionId) => {
+        this.logMultiplayer('players:add', {
+          sessionId,
+          isLocal: sessionId === room.sessionId,
+          player: this.summarizePlayer(player)
+        });
         this.addPlayerVisual(sessionId, player, callbacks);
       }, true),
-      callbacks.onRemove('players', (_player, sessionId) => {
+      callbacks.onRemove('players', (player, sessionId) => {
+        this.logMultiplayer('players:remove', {
+          sessionId,
+          isLocal: sessionId === room.sessionId,
+          player: this.summarizePlayer(player)
+        });
         this.removePlayerVisual(sessionId);
       }),
-      callbacks.listen('phase', () => {
+      callbacks.listen('phase', (value, previousValue) => {
+        this.logMultiplayer('state:phase', { value, previousValue });
         this.renderHud();
       }, true),
-      callbacks.listen('winnerId', () => {
+      callbacks.listen('winnerId', (value, previousValue) => {
+        this.logMultiplayer('state:winnerId', { value, previousValue });
         this.renderHud();
       }),
       callbacks.listen('countdownMs', () => {
         this.renderHud();
       }),
-      callbacks.listen('status', () => {
+      callbacks.listen('status', (value, previousValue) => {
+        this.logMultiplayer('state:status', { value, previousValue });
         this.renderHud();
       })
     );
 
     this.roomUnsubscribers.push(
       room.onMessage<HitMessage>('hit', (message) => {
+        this.logMultiplayer('message:hit', message);
         this.playHitSfx(message);
       }),
       room.onMessage<SwingMessage>('swing', (message) => {
-        if (this.visualsBySessionId.has(message.attackerId)) {
+        this.logMultiplayer('message:swing', message);
+        if (
+          this.room?.state.phase === 'fighting' &&
+          this.visualsBySessionId.has(message.attackerId)
+        ) {
           this.playSfx('player-slash');
         }
       })
     );
 
-    room.onError((code, message) => {
+    const handleRoomError = (code: number, message?: string): void => {
+      this.logMultiplayer('room:error', { code, message });
       this.statusText?.setText(`Room error ${code}`);
       this.detailText?.setText(message ?? '');
-    });
-    room.onLeave((code) => {
-      if (code !== 1000 && !this.hasConnectionError) {
-        this.statusText?.setText('Disconnected');
+    };
+    const handleRoomLeave = (code: number): void => {
+      this.logMultiplayer('room:leave', {
+        code,
+        phase: this.room?.state.phase,
+        winnerId: this.room?.state.winnerId
+      });
+      if (
+        code !== 1000 &&
+        !this.hasConnectionError &&
+        this.statusText !== null &&
+        this.statusText.active
+      ) {
+        this.statusText.setText('Disconnected');
       }
-    });
+    };
+
+    room.onError(handleRoomError);
+    room.onLeave(handleRoomLeave);
+    this.roomUnsubscribers.push(
+      () => room.onError.remove(handleRoomError),
+      () => room.onLeave.remove(handleRoomLeave)
+    );
   }
 
   private addPlayerVisual(
@@ -672,12 +715,31 @@ export class MultiplayerScene extends BaseScene {
   }
 
   private playHitSfx(message: HitMessage): void {
-    if (message.targetId === this.room?.sessionId) {
+    const room = this.room;
+
+    if (room === null || room.state.phase !== 'fighting') {
+      this.logMultiplayer('sfx:hit-skip', {
+        reason: room === null ? 'no-room' : 'not-fighting',
+        phase: room?.state.phase,
+        message
+      });
+      return;
+    }
+
+    if (message.targetId === room.sessionId) {
+      this.logMultiplayer('sfx:hit-play', {
+        triggerId: 'player-hurt',
+        message
+      });
       this.playSfx('player-hurt');
       return;
     }
 
-    this.playSfx('enemy-defeat');
+    this.logMultiplayer('sfx:hit-play', {
+      triggerId: 'hit',
+      message
+    });
+    this.playSfx('hit');
   }
 
   private getActorScaleForLaneY(laneY: number): number {
@@ -735,6 +797,12 @@ export class MultiplayerScene extends BaseScene {
   }
 
   private disconnectRoom(): void {
+    this.logMultiplayer('disconnect-room:start', {
+      roomId: this.room?.roomId,
+      sessionId: this.room?.sessionId,
+      phase: this.room?.state.phase,
+      winnerId: this.room?.state.winnerId
+    });
     for (const unsubscribe of this.roomUnsubscribers.splice(0)) {
       unsubscribe();
     }
@@ -744,9 +812,58 @@ export class MultiplayerScene extends BaseScene {
 
     if (room !== null) {
       void room.leave(true).finally(() => {
+        this.logMultiplayer('disconnect-room:left', {
+          roomId: room.roomId,
+          sessionId: room.sessionId
+        });
         room.removeAllListeners();
       });
     }
+  }
+
+  private logMultiplayer(event: string, details: object = {}): void {
+    const payload = {
+      event,
+      sceneKey: this.scene.key,
+      localSessionId: this.room?.sessionId,
+      roomId: this.room?.roomId,
+      phase: this.room?.state.phase,
+      winnerId: this.room?.state.winnerId,
+      at: Date.now(),
+      ...details
+    };
+    const targetWindow = window as Window & {
+      __ninjaSlashMultiplayerEvents?: Array<typeof payload>;
+    };
+
+    targetWindow.__ninjaSlashMultiplayerEvents = [
+      ...(targetWindow.__ninjaSlashMultiplayerEvents ?? []),
+      payload
+    ].slice(-80);
+
+    console.info(
+      `[ninja-slash:multiplayer] event=${event} phase=${payload.phase ?? ''} winner=${payload.winnerId ?? ''} local=${payload.localSessionId ?? ''} room=${payload.roomId ?? ''} details=${this.formatDebugDetails(details)} at=${payload.at}`,
+      payload
+    );
+  }
+
+  private formatDebugDetails(details: object): string {
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+
+  private summarizePlayer(player: MultiplayerPlayerState): Record<string, unknown> {
+    return {
+      id: player.id,
+      slot: player.slot,
+      connected: player.connected,
+      hp: player.hp,
+      action: player.action,
+      readyForRematch: player.readyForRematch
+    };
   }
 
   private destroyVisuals(): void {

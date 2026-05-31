@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   COMBAT_BGM_VOLUME,
   GAME_OVER_BGM_VOLUME
@@ -108,6 +108,10 @@ function createAudioScene(initialSounds: MockSound[] = []) {
 }
 
 describe('gameAudio', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('updates the active BGM volume even when the same track is already playing', async () => {
     const { add, scene, sounds } = createAudioScene();
     const audio = await createTestGameAudio();
@@ -208,7 +212,7 @@ describe('gameAudio', () => {
     expect(sound.destroy).not.toHaveBeenCalled();
   });
 
-  it('plays a one-shot SFX with a finite volume override', async () => {
+  it('caps a one-shot SFX with a loud finite volume override', async () => {
     const sound = {
       once: vi.fn(),
       play: vi.fn(() => true),
@@ -225,8 +229,34 @@ describe('gameAudio', () => {
 
     expect(scene.sound.add).toHaveBeenCalledWith('sfx.enemyDefeat', {
       loop: false,
-      volume: 1.4
+      volume: 0.75
     });
+  });
+
+  it('skips SFX playback while the document is inactive', async () => {
+    vi.stubGlobal('document', {
+      hidden: true,
+      hasFocus: vi.fn(() => false)
+    });
+    vi.stubGlobal('window', {});
+
+    const sound = {
+      once: vi.fn(),
+      play: vi.fn(() => true),
+      destroy: vi.fn()
+    };
+    const scene = {
+      scene: { key: 'Multiplayer' },
+      cache: { audio: { exists: vi.fn(() => true) } },
+      sound: { locked: false, add: vi.fn(() => sound) }
+    } as unknown as Phaser.Scene;
+
+    const audio = await createTestGameAudio();
+
+    audio.playSfx(scene, 'player-hurt', 0.16);
+
+    expect(scene.sound.add).not.toHaveBeenCalled();
+    expect(sound.play).not.toHaveBeenCalled();
   });
 
   it('ignores a non-finite volume override and uses the catalog volume', async () => {
