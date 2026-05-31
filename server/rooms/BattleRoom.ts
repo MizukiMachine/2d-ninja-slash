@@ -121,6 +121,11 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     player.facing = spawn.facing;
     this.state.players.set(client.sessionId, player);
     this.inputsBySessionId.set(client.sessionId, { left: false, right: false });
+    this.logRoom('join', {
+      sessionId: client.sessionId,
+      slot,
+      playerCount: this.state.players.size
+    });
 
     if (this.state.players.size >= 2) {
       this.startCountdown();
@@ -139,10 +144,20 @@ export class BattleRoom extends Room<{ state: BattleState }> {
 
     player.connected = false;
     this.reconnectingSessionIds.add(client.sessionId);
+    this.logRoom('drop:start', {
+      sessionId: client.sessionId,
+      phase: this.state.phase,
+      winnerId: this.state.winnerId
+    });
 
     try {
       await this.allowReconnection(client, RECONNECT_SECONDS);
     } catch {
+      this.logRoom('drop:reconnect-expired', {
+        sessionId: client.sessionId,
+        phase: this.state.phase,
+        winnerId: this.state.winnerId
+      });
       this.removePlayer(client.sessionId);
     } finally {
       this.reconnectingSessionIds.delete(client.sessionId);
@@ -155,10 +170,22 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     if (player !== undefined) {
       player.connected = true;
       this.inputsBySessionId.set(client.sessionId, { left: false, right: false });
+      this.logRoom('reconnect', {
+        sessionId: client.sessionId,
+        phase: this.state.phase,
+        winnerId: this.state.winnerId
+      });
     }
   }
 
   onLeave(client: Client): void {
+    this.logRoom('leave', {
+      sessionId: client.sessionId,
+      reconnecting: this.reconnectingSessionIds.has(client.sessionId),
+      phase: this.state.phase,
+      winnerId: this.state.winnerId
+    });
+
     if (this.reconnectingSessionIds.has(client.sessionId)) {
       return;
     }
@@ -363,6 +390,15 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     this.state.phase = 'finished';
     this.state.winnerId = winnerId;
     this.state.status = 'Match finished';
+    this.logRoom('finish-match', {
+      winnerId,
+      players: this.getPlayers().map((player) => ({
+        id: player.id,
+        hp: player.hp,
+        connected: player.connected,
+        action: player.action
+      }))
+    });
   }
 
   private removePlayer(sessionId: string): void {
@@ -376,12 +412,20 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     );
 
     if (player === undefined) {
+      this.logRoom('remove-player:missing', { sessionId });
       return;
     }
 
     const opponent = this.getOpponent(sessionId);
 
     this.state.players.delete(sessionId);
+    this.logRoom('remove-player', {
+      sessionId,
+      opponentId: opponent?.id,
+      phase: this.state.phase,
+      winnerId: this.state.winnerId,
+      playerCount: this.state.players.size
+    });
 
     if (
       opponent !== undefined &&
@@ -481,6 +525,12 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       targetId: target.id,
       hp: target.hp
     });
+    this.logRoom('hit', {
+      attackerId: attacker.id,
+      targetId: target.id,
+      targetHp: target.hp,
+      phase: this.state.phase
+    });
 
     if (target.hp <= 0) {
       target.action = 'dead';
@@ -545,5 +595,31 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     });
 
     return players;
+  }
+
+  private logRoom(event: string, details: Record<string, unknown> = {}): void {
+    const payload = {
+      event,
+      roomId: this.roomId,
+      phase: this.state.phase,
+      winnerId: this.state.winnerId,
+      playerCount: this.state.players.size,
+      clockMs: this.clockMs,
+      at: Date.now(),
+      ...details
+    };
+
+    console.info(
+      `[ninja-slash:room] event=${event} phase=${payload.phase} winner=${payload.winnerId} players=${payload.playerCount} room=${payload.roomId} details=${this.formatDebugDetails(details)} at=${payload.at}`,
+      payload
+    );
+  }
+
+  private formatDebugDetails(details: object): string {
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return '[unserializable]';
+    }
   }
 }

@@ -152,7 +152,20 @@ export abstract class BaseScene extends Phaser.Scene {
     // is normalized on load, so both lookups always yield valid values.
     const { bindings, volumes } = this.app.debugStore.get().sfxBindings;
     const cueId = bindings[triggerId];
+    const event = {
+      sceneKey: this.scene.key,
+      triggerId,
+      cueId,
+      configuredVolume: volumes[cueId],
+      masterVolume: this.settings.get().volume,
+      muted: this.settings.get().muted,
+      at: Date.now()
+    };
 
+    console.info(
+      `[ninja-slash:sfx-trigger] scene=${event.sceneKey} trigger=${triggerId} cue=${cueId} configured=${event.configuredVolume} master=${event.masterVolume} muted=${event.muted} at=${event.at}`,
+      event
+    );
     this.app.audio.playSfx(this, cueId, volumes[cueId]);
   }
 

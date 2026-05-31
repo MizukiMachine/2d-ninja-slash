@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { SFX_CUES } from '../src/game/assets/audioAssetCatalog';
 import {
@@ -26,7 +27,7 @@ describe('sfx bindings config', () => {
     expect(clampSfxVolume(-1)).toBe(SFX_VOLUME_LIMITS.min);
     expect(clampSfxVolume(99)).toBe(SFX_VOLUME_LIMITS.max);
     expect(clampSfxVolume(Number.NaN)).toBe(SFX_VOLUME_LIMITS.min);
-    expect(clampSfxVolume(1.23)).toBe(1.23);
+    expect(clampSfxVolume(0.23)).toBe(0.23);
   });
 
   it('falls back to defaults for non-object input', () => {
@@ -79,8 +80,28 @@ describe('sfx bindings config', () => {
   });
 
   it('recognizes valid trigger ids', () => {
+    expect(isSfxTriggerId('hit')).toBe(true);
     expect(isSfxTriggerId('enemy-defeat')).toBe(true);
     expect(isSfxTriggerId('player-defeat')).toBe(false); // a cue, not a trigger
     expect(isSfxTriggerId('nope')).toBe(false);
+  });
+
+  it('keeps public multiplayer hit and defeat cues at safe levels', () => {
+    const rawConfig = JSON.parse(
+      readFileSync(
+        new URL('../public/assets/config/sfx-bindings.json', import.meta.url),
+        'utf8'
+      )
+    ) as unknown;
+    const config = normalizeSfxBindingsConfig(rawConfig);
+
+    expect(config.bindings.hit).toBe('hit');
+    expect(config.bindings['enemy-defeat']).toBe('hit');
+    expect(config.volumes.hit).toBeLessThanOrEqual(0.1);
+    expect(config.volumes['enemy-defeat']).toBeLessThanOrEqual(0.25);
+
+    for (const volume of Object.values(config.volumes)) {
+      expect(volume).toBeLessThanOrEqual(SFX_VOLUME_LIMITS.max);
+    }
   });
 });

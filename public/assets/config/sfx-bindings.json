@@ -5,6 +5,7 @@
     "enemy-slash": "enemy-slash",
     "jump": "jump",
     "lane-dash": "lane-dash",
+    "hit": "hit",
     "player-hurt": "player-hurt",
     "enemy-defeat": "hit",
     "main-ninja-death": "main-ninja-death",
@@ -18,14 +19,14 @@
     "lane-dash": 0.33,
     "hit": 0.03,
     "player-hurt": 0.16,
-    "enemy-defeat": 1.76,
-    "player-defeat": 1.52,
+    "enemy-defeat": 0.211,
+    "player-defeat": 0.75,
     "main-ninja-death": 0.61,
-    "round-clear": 0.99,
-    "round-start": 0.99,
+    "round-clear": 0.75,
+    "round-start": 0.75,
     "round-start-taiko": 0.38,
     "round-start-gong": 0.391,
-    "hyoshigi-preview": 0.99,
+    "hyoshigi-preview": 0.75,
     "kotsuzumi-preview": 0.699
   }
 }

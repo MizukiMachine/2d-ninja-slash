@@ -8,11 +8,50 @@ import {
   type BgmTrackId,
   type SfxCueId
 } from '../assets/audioAssetCatalog';
+import { SFX_VOLUME_LIMITS } from './sfxBindings';
 
 type VolumeAdjustableSound = Phaser.Sound.BaseSound & {
   setVolume?: (value: number) => unknown;
   volume?: number;
 };
+
+interface SfxPlaybackEvent {
+  readonly type: 'sfx';
+  readonly cueId: SfxCueId;
+  readonly audioKey: string;
+  readonly sceneKey: string;
+  readonly requestedVolume: number;
+  readonly volume: number;
+  readonly capped: boolean;
+  readonly at: number;
+}
+
+interface BgmPlaybackEvent {
+  readonly type: 'bgm';
+  readonly action: 'request' | 'play' | 'stop' | 'skip-disabled' | 'wait-unlock';
+  readonly trackId?: BgmTrackId;
+  readonly audioKey?: string;
+  readonly sceneKey?: string;
+  readonly volume?: number;
+  readonly at: number;
+}
+
+type AudioDebugEvent = SfxPlaybackEvent | BgmPlaybackEvent;
+
+type AudioDebugWindow = Window & {
+  __ninjaSlashAudioEvents?: AudioDebugEvent[];
+};
+
+export const MAX_SFX_PLAYBACK_VOLUME = SFX_VOLUME_LIMITS.max;
+const AUDIO_DEBUG_EVENT_LIMIT = 40;
+
+function formatDebugDetails(details: object): string {
+  try {
+    return JSON.stringify(details);
+  } catch {
+    return '[unserializable]';
+  }
+}
 
 export interface GameAudio {
   queueAudioAssets(scene: Phaser.Scene): void;
@@ -74,9 +113,11 @@ class PhaserGameAudio implements GameAudio {
   playBgm(scene: Phaser.Scene, trackId: BgmTrackId): void {
     const track = getBgmTrack(trackId);
 
+    this.recordBgmEvent(scene, 'request', trackId, track.key, track.volume);
     this.desiredBgmTrackId = trackId;
 
     if (!this.bgmEnabled) {
+      this.recordBgmEvent(scene, 'skip-disabled', trackId, track.key, track.volume);
       return;
     }
 
@@ -88,6 +129,7 @@ class PhaserGameAudio implements GameAudio {
     }
 
     if (scene.sound.locked) {
+      this.recordBgmEvent(scene, 'wait-unlock', trackId, track.key, track.volume);
       this.waitForUnlock(scene);
       return;
     }
@@ -102,6 +144,7 @@ class PhaserGameAudio implements GameAudio {
     this.setBgmVolume(bgmSound, track.volume);
 
     if (!bgmSound.isPlaying) {
+      this.recordBgmEvent(scene, 'play', trackId, track.key, track.volume);
       bgmSound.play({
         loop: track.loop,
         volume: track.volume
@@ -161,19 +204,39 @@ class PhaserGameAudio implements GameAudio {
   playSfx(scene: Phaser.Scene, cueId: SfxCueId, volumeOverride?: number): void {
     const cue = getSfxCue(cueId);
 
+    const activeState = this.getDocumentActiveState();
+
+    if (!activeState.active) {
+      this.recordSfxSkipped(scene, cueId, cue.key, {
+        reason: 'inactive-document',
+        hidden: activeState.hidden,
+        focused: activeState.focused
+      });
+      return;
+    }
+
     if (scene.sound.locked || !scene.cache.audio.exists(cue.key)) {
+      this.recordSfxSkipped(scene, cueId, cue.key, {
+        reason: 'audio-unavailable',
+        locked: scene.sound.locked,
+        cached: scene.cache.audio.exists(cue.key)
+      });
       return;
     }
 
     // Defensive: only honour a finite override, otherwise fall back to the
     // catalog volume so a corrupt stored value can never mute or blow out a cue.
-    const volume = Number.isFinite(volumeOverride)
+    const requestedVolume = Number.isFinite(volumeOverride)
       ? (volumeOverride as number)
       : cue.volume;
+    const volume = this.getSafeSfxVolume(requestedVolume);
     const config = {
       loop: false,
       volume
     };
+
+    this.recordSfxPlayback(scene, cueId, cue.key, requestedVolume, volume);
+
     const sound = scene.sound.add(cue.key, config);
 
     sound.once(Phaser.Sound.Events.COMPLETE, sound.destroy, sound);
@@ -183,7 +246,124 @@ class PhaserGameAudio implements GameAudio {
     }
   }
 
+  private getSafeSfxVolume(volume: number): number {
+    return Math.min(MAX_SFX_PLAYBACK_VOLUME, Math.max(0, volume));
+  }
+
+  private getDocumentActiveState(): {
+    readonly active: boolean;
+    readonly hidden: boolean;
+    readonly focused: boolean;
+  } {
+    if (typeof document === 'undefined') {
+      return { active: true, hidden: false, focused: true };
+    }
+
+    const hidden = document.hidden;
+    const focused =
+      typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+
+    return {
+      active: !hidden && focused,
+      hidden,
+      focused
+    };
+  }
+
+  private recordSfxPlayback(
+    scene: Phaser.Scene,
+    cueId: SfxCueId,
+    audioKey: string,
+    requestedVolume: number,
+    volume: number
+  ): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const event: SfxPlaybackEvent = {
+      type: 'sfx',
+      cueId,
+      audioKey,
+      sceneKey: scene.scene.key,
+      requestedVolume,
+      volume,
+      capped: volume !== requestedVolume,
+      at: Date.now()
+    };
+    const targetWindow = window as AudioDebugWindow;
+
+    targetWindow.__ninjaSlashAudioEvents = [
+      ...(targetWindow.__ninjaSlashAudioEvents ?? []),
+      event
+    ].slice(-AUDIO_DEBUG_EVENT_LIMIT);
+    targetWindow.dispatchEvent(
+      new CustomEvent('ninja-slash:sfx', { detail: event })
+    );
+    console.info(
+      `[ninja-slash:sfx] cue=${event.cueId} key=${event.audioKey} scene=${event.sceneKey} requested=${event.requestedVolume} volume=${event.volume} capped=${event.capped} at=${event.at}`,
+      event
+    );
+  }
+
+  private recordSfxSkipped(
+    scene: Phaser.Scene,
+    cueId: SfxCueId,
+    audioKey: string,
+    reason: object
+  ): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const event = {
+      cueId,
+      audioKey,
+      sceneKey: scene.scene.key,
+      reason,
+      at: Date.now()
+    };
+
+    console.info(
+      `[ninja-slash:sfx-skip] cue=${cueId} key=${audioKey} scene=${scene.scene.key} reason=${formatDebugDetails(reason)} at=${event.at}`,
+      event
+    );
+  }
+
+  private recordBgmEvent(
+    scene: Phaser.Scene | null,
+    action: BgmPlaybackEvent['action'],
+    trackId?: BgmTrackId,
+    audioKey?: string,
+    volume?: number
+  ): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const event: BgmPlaybackEvent = {
+      type: 'bgm',
+      action,
+      trackId,
+      audioKey,
+      sceneKey: scene?.scene.key,
+      volume,
+      at: Date.now()
+    };
+    const targetWindow = window as AudioDebugWindow;
+
+    targetWindow.__ninjaSlashAudioEvents = [
+      ...(targetWindow.__ninjaSlashAudioEvents ?? []),
+      event
+    ].slice(-AUDIO_DEBUG_EVENT_LIMIT);
+    console.info(
+      `[ninja-slash:bgm] action=${event.action} track=${event.trackId ?? ''} key=${event.audioKey ?? ''} scene=${event.sceneKey ?? ''} volume=${event.volume ?? ''} at=${event.at}`,
+      event
+    );
+  }
+
   stopBgm(): void {
+    this.recordBgmEvent(null, 'stop', this.activeBgmTrackId ?? undefined);
     this.activeBgmSound?.stop();
     this.activeBgmSound?.destroy();
     this.activeBgmSound = null;

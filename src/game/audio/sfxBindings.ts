@@ -22,6 +22,7 @@ export const SFX_TRIGGERS = [
   { id: 'enemy-slash', label: '敵の斬撃', defaultCueId: 'enemy-slash' },
   { id: 'jump', label: 'ジャンプ', defaultCueId: 'jump' },
   { id: 'lane-dash', label: 'レーン移動(回避)', defaultCueId: 'lane-dash' },
+  { id: 'hit', label: '命中', defaultCueId: 'hit' },
   { id: 'player-hurt', label: '自機被弾', defaultCueId: 'player-hurt' },
   { id: 'enemy-defeat', label: '敵を倒した', defaultCueId: 'enemy-defeat' },
   { id: 'main-ninja-death', label: '自機死亡', defaultCueId: 'main-ninja-death' },
@@ -43,7 +44,7 @@ export const SFX_BINDINGS_SAVE_ENDPOINT = '/__debug/sfx-bindings';
 
 export const SFX_VOLUME_LIMITS = {
   min: 0,
-  max: 2.5,
+  max: 0.75,
   step: 0.01
 } as const;
 
