@@ -53,6 +53,7 @@ export class MainMenuScene extends BaseScene {
     this.createBackground();
     this.createTitleLockup();
     this.createStartButton();
+    this.createMultiplayerButton();
     this.createBgmToggleButton();
     this.createControlsGuide();
     this.createStartKeyboardInput();
@@ -158,12 +159,48 @@ export class MainMenuScene extends BaseScene {
     button.on('pointerup', startGame);
   }
 
+  private createMultiplayerButton(): void {
+    const { width, height } = this.profile;
+    const buttonWidth = Math.min(width * 0.42, 286);
+    const buttonHeight = height > width ? 62 : 56;
+    const startButtonY = height > width ? height * 0.61 : height * 0.64;
+    const buttonY = startButtonY + (height > width ? 82 : 70);
+    const startMultiplayer = (): void => this.startMultiplayer();
+
+    const button = this.add
+      .rectangle(this.centerX, buttonY, buttonWidth, buttonHeight, 0x1a2230, 0.88)
+      .setStrokeStyle(2, 0x35d08f, 0.82)
+      .setDepth(TITLE_CONTENT_DEPTH)
+      .setInteractive({ useHandCursor: true });
+    const label = this.add
+      .text(this.centerX, buttonY, '2P Duel', {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: '24px',
+        color: '#fff7df'
+      })
+      .setOrigin(0.5)
+      .setDepth(TITLE_CONTENT_DEPTH + 1);
+
+    button.on('pointerover', () => {
+      button.setFillStyle(0x243044, 0.96);
+      label.setColor('#ffffff');
+    });
+    button.on('pointerout', () => {
+      button.setFillStyle(0x1a2230, 0.88);
+      label.setColor('#fff7df');
+    });
+    button.on('pointerdown', () => {
+      button.setFillStyle(0x1f3a31, 0.98);
+    });
+    button.on('pointerup', startMultiplayer);
+  }
+
   private createBgmToggleButton(): void {
     const { width, height } = this.profile;
     const buttonWidth = Math.min(width * 0.32, 220);
     const buttonHeight = height > width ? 50 : 46;
     const startButtonY = height > width ? height * 0.61 : height * 0.64;
-    const buttonY = startButtonY + (height > width ? 88 : 82);
+    const buttonY = startButtonY + (height > width ? 160 : 132);
 
     const button = this.add
       .rectangle(this.centerX, buttonY, buttonWidth, buttonHeight, 0x10151d, 0.78)
@@ -342,5 +379,10 @@ export class MainMenuScene extends BaseScene {
   private startGame(): void {
     this.playSfx('ui-select');
     this.goTo(SceneKeys.Sandbox);
+  }
+
+  private startMultiplayer(): void {
+    this.playSfx('ui-select');
+    this.goTo(SceneKeys.Multiplayer);
   }
 }
