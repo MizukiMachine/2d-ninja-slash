@@ -15,12 +15,15 @@ public/assets/*
 !public/assets/sfx/**
 
 node_modules/
+build/
+.colyseus-cloud.json
 .env
 .env.*
 .vite/
 .tsbuildinfo/
 .mcpheadlessbrowser/
 .browser-observer/
+.local-logs/
 .claude/
 dist/
 npm-debug.log*
