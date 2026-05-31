@@ -2,6 +2,7 @@ import { Callbacks } from '@colyseus/sdk';
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
+import { SceneJuice } from '../effects/sceneJuice';
 import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
   getDebugBackgroundUrl,
@@ -65,7 +66,7 @@ interface MultiplayerCallbacks {
   onChange(player: MultiplayerPlayerState, handler: () => void): Unsubscribe;
   listen(
     property: 'phase' | 'winnerId' | 'countdownMs' | 'status',
-    handler: (value: string | number, previousValue: string | number) => void,
+    handler: (value: string | number, previousValue?: string | number) => void,
     immediate?: boolean
   ): Unsubscribe;
 }
@@ -94,6 +95,9 @@ const NINJA_SPRITE_SCALE = 2.1;
 const INPUT_SEND_INTERVAL_MS = 50;
 const HEALTH_BAR_WIDTH = 292;
 const HEALTH_BAR_HEIGHT = 24;
+const HUD_DETAIL_WRAP_INSET = 96;
+const WAITING_STATUS_TEXT = 'マッチング待ち';
+const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
 
 function getBackgroundTextureKey(backgroundFileName: DebugBackgroundFileName): string {
   return `multiplayer.background.${backgroundFileName}`;
@@ -147,6 +151,7 @@ export class MultiplayerScene extends BaseScene {
   private lastInputSignature = '';
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
+  private juice: SceneJuice | null = null;
 
   constructor() {
     super(SceneKeys.Multiplayer);
@@ -189,16 +194,20 @@ export class MultiplayerScene extends BaseScene {
     );
     this.createBackground();
     this.createHud();
+    this.juice = new SceneJuice(this);
     this.registerKeyboard();
     void this.joinRoom();
 
     this.trackCleanup(() => {
       this.disconnectRoom();
       this.destroyVisuals();
+      this.juice?.destroy();
+      this.juice = null;
     });
   }
 
   update(time: number, delta: number): void {
+    this.juice?.update(delta);
     this.sendMovementInput(time);
     this.updatePlayerVisuals(delta);
     this.renderHud();
@@ -234,7 +243,13 @@ export class MultiplayerScene extends BaseScene {
       .text(this.centerX, 72, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '18px',
-        color: '#d6b76f'
+        color: '#d6b76f',
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: {
+          width: this.profile.width - HUD_DETAIL_WRAP_INSET,
+          useAdvancedWrap: true
+        }
       })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
@@ -367,6 +382,7 @@ export class MultiplayerScene extends BaseScene {
       }),
       callbacks.listen('phase', (value, previousValue) => {
         this.logMultiplayer('state:phase', { value, previousValue });
+        this.playRoundStartSfxForPhase(value, previousValue);
         this.renderHud();
       }, true),
       callbacks.listen('winnerId', (value, previousValue) => {
@@ -385,6 +401,7 @@ export class MultiplayerScene extends BaseScene {
     this.roomUnsubscribers.push(
       room.onMessage<HitMessage>('hit', (message) => {
         this.logMultiplayer('message:hit', message);
+        this.playHitFeedback(message);
         this.playHitSfx(message);
       }),
       room.onMessage<SwingMessage>('swing', (message) => {
@@ -584,8 +601,8 @@ export class MultiplayerScene extends BaseScene {
 
     switch (state.phase) {
       case 'waiting':
-        this.statusText?.setText('Waiting');
-        this.detailText?.setText('Opponent needed');
+        this.statusText?.setText(WAITING_STATUS_TEXT);
+        this.detailText?.setText(WAITING_DETAIL_TEXT);
         break;
       case 'countdown':
         this.statusText?.setText(String(Math.max(1, Math.ceil(state.countdownMs / 1000))));
@@ -600,6 +617,26 @@ export class MultiplayerScene extends BaseScene {
         this.detailText?.setText('Press R for rematch');
         break;
     }
+  }
+
+  private playRoundStartSfxForPhase(
+    phase: string | number,
+    previousPhase?: string | number
+  ): void {
+    if (phase === previousPhase) {
+      return;
+    }
+
+    if (phase !== 'countdown' && phase !== 'fighting') {
+      return;
+    }
+
+    if (phase === 'fighting' && previousPhase !== 'countdown') {
+      return;
+    }
+
+    this.logMultiplayer('sfx:round-start-play', { phase, previousPhase });
+    this.playSfx('round-start');
   }
 
   private renderHealthBars(): void {
@@ -740,6 +777,46 @@ export class MultiplayerScene extends BaseScene {
       message
     });
     this.playSfx('hit');
+  }
+
+  private playHitFeedback(message: HitMessage): void {
+    const room = this.room;
+
+    if (room === null || room.state.phase !== 'fighting') {
+      this.logMultiplayer('fx:hit-skip', {
+        reason: room === null ? 'no-room' : 'not-fighting',
+        phase: room?.state.phase,
+        message
+      });
+      return;
+    }
+
+    const visual = this.visualsBySessionId.get(message.targetId);
+
+    if (visual === undefined || !visual.sprite.active) {
+      this.logMultiplayer('fx:hit-skip', {
+        reason: 'missing-target-visual',
+        message
+      });
+      return;
+    }
+
+    const center = this.getVisualCenter(visual);
+
+    this.juice?.burstBladeGlint(center.x, center.y, this.getVisualScale(visual));
+  }
+
+  private getVisualCenter(visual: PlayerVisual): { readonly x: number; readonly y: number } {
+    return {
+      x: visual.sprite.x,
+      y: visual.sprite.y - visual.sprite.displayHeight * 0.5
+    };
+  }
+
+  private getVisualScale(visual: PlayerVisual): number {
+    const scale = Math.abs(visual.sprite.scaleX);
+
+    return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
   }
 
   private getActorScaleForLaneY(laneY: number): number {
