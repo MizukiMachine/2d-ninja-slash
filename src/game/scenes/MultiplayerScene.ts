@@ -65,7 +65,7 @@ interface MultiplayerCallbacks {
   onChange(player: MultiplayerPlayerState, handler: () => void): Unsubscribe;
   listen(
     property: 'phase' | 'winnerId' | 'countdownMs' | 'status',
-    handler: (value: string | number, previousValue: string | number) => void,
+    handler: (value: string | number, previousValue?: string | number) => void,
     immediate?: boolean
   ): Unsubscribe;
 }
@@ -367,6 +367,7 @@ export class MultiplayerScene extends BaseScene {
       }),
       callbacks.listen('phase', (value, previousValue) => {
         this.logMultiplayer('state:phase', { value, previousValue });
+        this.playRoundStartSfxForPhase(value, previousValue);
         this.renderHud();
       }, true),
       callbacks.listen('winnerId', (value, previousValue) => {
@@ -600,6 +601,26 @@ export class MultiplayerScene extends BaseScene {
         this.detailText?.setText('Press R for rematch');
         break;
     }
+  }
+
+  private playRoundStartSfxForPhase(
+    phase: string | number,
+    previousPhase?: string | number
+  ): void {
+    if (phase === previousPhase) {
+      return;
+    }
+
+    if (phase !== 'countdown' && phase !== 'fighting') {
+      return;
+    }
+
+    if (phase === 'fighting' && previousPhase !== 'countdown') {
+      return;
+    }
+
+    this.logMultiplayer('sfx:round-start-play', { phase, previousPhase });
+    this.playSfx('round-start');
   }
 
   private renderHealthBars(): void {
