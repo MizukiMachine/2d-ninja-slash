@@ -11,10 +11,28 @@ const SPRITE_SHEET_SIZE = {
   width: 1024,
   height: 512
 } as const;
-const MAIN_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'impact', 'death'] as const;
-const ENEMY_NINJA_ACTIONS = ['idle', 'run', 'jump', 'slash', 'death'] as const;
+const MAIN_NINJA_ACTIONS = [
+  'attack',
+  'death',
+  'idle',
+  'impact',
+  'jump',
+  'run',
+  'slash',
+  'walk'
+] as const;
+const ENEMY_NINJA_ACTIONS = [
+  'crouching',
+  'death',
+  'idle',
+  'jump',
+  'run',
+  'slash',
+  'walk'
+] as const;
 const DIRECTIONS = ['left', 'right'] as const;
-const ACTORS = ['main-ninja', 'enemy-ninja'] as const;
+const MAIN_NINJA_ACTORS = ['main-ninja', 'main-ninja-2p'] as const;
+const ACTORS = [...MAIN_NINJA_ACTORS, 'enemy-ninja'] as const;
 const STANDALONE_ANCHOR_FILES = ['anchor-left-native.png', 'anchor-right-native.png'] as const;
 
 interface AssetIndexEntry {
@@ -59,14 +77,16 @@ function getBackgroundFileNamesFromDirectory(directory: URL): readonly string[] 
 
 describe('ninja sprite sheet assets', () => {
   it('has complete 128px sprite sheets with expected dimensions', () => {
-    for (const action of MAIN_NINJA_ACTIONS) {
-      for (const direction of DIRECTIONS) {
-        const filePath = new URL(
-          `../public/assets/actors/main-ninja/${action}-${direction}.png`,
-          import.meta.url
-        );
+    for (const actor of MAIN_NINJA_ACTORS) {
+      for (const action of MAIN_NINJA_ACTIONS) {
+        for (const direction of DIRECTIONS) {
+          const filePath = new URL(
+            `../public/assets/actors/${actor}/${action}-${direction}.png`,
+            import.meta.url
+          );
 
-        expect(getPngSize(filePath)).toEqual(SPRITE_SHEET_SIZE);
+          expect(getPngSize(filePath)).toEqual(SPRITE_SHEET_SIZE);
+        }
       }
     }
 
@@ -97,13 +117,15 @@ describe('ninja sprite sheet assets', () => {
       'character.mainNinja.right.crouching.spritesheet'
     );
 
-    for (const direction of DIRECTIONS) {
-      const filePath = new URL(
-        `../public/assets/actors/main-ninja/crouching-${direction}.png`,
-        import.meta.url
-      );
+    for (const actor of MAIN_NINJA_ACTORS) {
+      for (const direction of DIRECTIONS) {
+        const filePath = new URL(
+          `../public/assets/actors/${actor}/crouching-${direction}.png`,
+          import.meta.url
+        );
 
-      expect(() => readFileSync(filePath)).toThrow();
+        expect(() => readFileSync(filePath)).toThrow();
+      }
     }
   });
 

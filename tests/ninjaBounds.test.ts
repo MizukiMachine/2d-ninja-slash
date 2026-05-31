@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NINJA_BOUNDS_CONFIG,
   FACING_DIRECTIONS,
+  NINJA_ANIMATION_ASSETS,
   NINJA_ACTORS,
   applyNinjaLaneAnchorToAllActions,
   buildNinjaBoundsExport,
@@ -44,14 +45,107 @@ describe('ninja bounds config', () => {
 
   it('falls back to runtime-safe default animation selections', () => {
     expect(getDefaultNinjaActionId('mainNinja')).toBe('idle');
+    expect(getDefaultNinjaActionId('mainNinja2p')).toBe('idle');
     expect(getDefaultNinjaActionId('enemyNinja')).toBe('idle');
     expect(getNinjaAction('mainNinja', 'missing').id).toBe('idle');
+    expect(getNinjaAction('mainNinja2p', 'missing').id).toBe('idle');
   });
 
-  it('does not expose crouching as a main ninja action', () => {
-    const mainNinja = NINJA_ACTORS.find((actor) => actor.id === 'mainNinja');
+  it('does not expose crouching as a main ninja variant action', () => {
+    const mainNinjaVariants = NINJA_ACTORS.filter((actor) =>
+      actor.id === 'mainNinja' || actor.id === 'mainNinja2p'
+    );
 
-    expect(mainNinja?.actions.map((action) => action.id)).not.toContain('crouching');
+    expect(mainNinjaVariants).toHaveLength(2);
+
+    for (const actor of mainNinjaVariants) {
+      expect(actor.actions.map((action) => action.id)).not.toContain('crouching');
+    }
+  });
+
+  it('uses main ninja defaults for the 2P color variant', () => {
+    for (const direction of FACING_DIRECTIONS) {
+      for (const action of getNinjaActionIds('mainNinja')) {
+        expect(
+          getNinjaAnimationBounds(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja2p', direction, action)
+        ).toEqual(
+          getNinjaAnimationBounds(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja', direction, action)
+        );
+        expect(
+          getNinjaLaneAnchor(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja2p', direction, action)
+        ).toEqual(
+          getNinjaLaneAnchor(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja', direction, action)
+        );
+        expect(getNinjaAnimationPlaybackRate(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja2p', action))
+          .toBe(getNinjaAnimationPlaybackRate(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja', action));
+      }
+    }
+
+    expect(isNinjaHitFrameActive(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja2p', 'right', 'slash', 13))
+      .toBe(true);
+    expect(isNinjaHitFrameActive(DEFAULT_NINJA_BOUNDS_CONFIG, 'mainNinja2p', 'right', 'attack', 13))
+      .toBe(true);
+  });
+
+  it('registers main ninja 2P animation assets from the 2P color folder', () => {
+    const asset = NINJA_ANIMATION_ASSETS.find((candidate) =>
+      candidate.actorId === 'mainNinja2p' &&
+      candidate.direction === 'right' &&
+      candidate.actionId === 'idle'
+    );
+
+    expect(asset).toMatchObject({
+      textureKey: 'character.mainNinja2p.right.idle.spritesheet',
+      animationKey: 'anim.mainNinja2p.right.idle',
+      url: '/assets/actors/main-ninja-2p/idle-right.png'
+    });
+  });
+
+  it('inherits saved main ninja config for the 2P color variant when absent', () => {
+    const slashHitFrames = Array.from({ length: 32 }, (_value, index) => index === 9);
+    const config = normalizeNinjaBoundsConfig({
+      boundsByActor: {
+        mainNinja: {
+          right: {
+            idle: {
+              visual: { x: 49, y: 37, width: 34, height: 48 },
+              collision: { x: 47, y: 47, width: 38, height: 45 },
+              attack: { x: 80, y: 59, width: 35, height: 12 }
+            }
+          }
+        }
+      },
+      hitFramesByActor: {
+        mainNinja: {
+          right: {
+            slash: { attack: slashHitFrames }
+          }
+        }
+      },
+      playbackRatesByActor: {
+        mainNinja: {
+          run: 1.5
+        }
+      },
+      laneAnchorsByActor: {
+        mainNinja: {
+          right: {
+            idle: { x: 63, y: 91 }
+          }
+        }
+      }
+    });
+
+    expect(getNinjaAnimationBounds(config, 'mainNinja2p', 'right', 'idle')).toEqual(
+      getNinjaAnimationBounds(config, 'mainNinja', 'right', 'idle')
+    );
+    expect(getNinjaLaneAnchor(config, 'mainNinja2p', 'right', 'idle')).toEqual({
+      x: 63,
+      y: 91
+    });
+    expect(getNinjaAnimationPlaybackRate(config, 'mainNinja2p', 'run')).toBe(1.5);
+    expect(isNinjaHitFrameActive(config, 'mainNinja2p', 'right', 'slash', 9))
+      .toBe(true);
   });
 
   it('clamps edited bounds to the 128px source frame', () => {
@@ -209,3 +303,10 @@ describe('ninja bounds config', () => {
     });
   });
 });
+
+function getNinjaActionIds(actorId: string): readonly string[] {
+  return (
+    NINJA_ACTORS.find((actor) => actor.id === actorId)?.actions.map((action) => action.id) ??
+    []
+  );
+}

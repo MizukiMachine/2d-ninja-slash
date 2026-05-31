@@ -110,7 +110,7 @@ function getBackgroundUrl(backgroundFileName: DebugBackgroundFileName): string {
 }
 
 function getActorIdForSlot(slot: number): NinjaActorId {
-  return slot === 0 ? 'mainNinja' : 'enemyNinja';
+  return slot === 0 ? 'mainNinja' : 'mainNinja2p';
 }
 
 function getRenderableAction(
@@ -122,7 +122,7 @@ function getRenderableAction(
   }
 
   if (action === 'hurt') {
-    return actorId === 'mainNinja' ? 'impact' : 'crouching';
+    return actorId === 'enemyNinja' ? 'crouching' : 'impact';
   }
 
   return action;
