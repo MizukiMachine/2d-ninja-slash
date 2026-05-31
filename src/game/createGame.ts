@@ -64,6 +64,7 @@ export function createGame({ parent, context }: CreateGameOptions): Phaser.Game 
       }
     },
     input: {
+      activePointers: 4,
       keyboard: {
         capture: [...KEYBOARD_CAPTURE_KEYS]
       },

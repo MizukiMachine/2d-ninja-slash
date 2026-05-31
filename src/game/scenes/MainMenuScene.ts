@@ -126,9 +126,10 @@ export class MainMenuScene extends BaseScene {
 
   private createStartButton(): void {
     const { width, height } = this.profile;
-    const buttonWidth = Math.min(width * 0.46, 320);
-    const buttonHeight = height > width ? 68 : 62;
-    const buttonY = height > width ? height * 0.61 : height * 0.64;
+    const touch = this.isTouchPrimaryInput();
+    const buttonWidth = Math.min(width * (touch ? 0.5 : 0.46), touch ? 360 : 320);
+    const buttonHeight = touch ? 84 : height > width ? 68 : 62;
+    const buttonY = height > width ? height * 0.61 : touch ? height * 0.61 : height * 0.64;
     const startGame = (): void => this.startGame();
 
     const button = this.add
@@ -161,10 +162,11 @@ export class MainMenuScene extends BaseScene {
 
   private createMultiplayerButton(): void {
     const { width, height } = this.profile;
-    const buttonWidth = Math.min(width * 0.42, 286);
-    const buttonHeight = height > width ? 62 : 56;
-    const startButtonY = height > width ? height * 0.61 : height * 0.64;
-    const buttonY = startButtonY + (height > width ? 82 : 70);
+    const touch = this.isTouchPrimaryInput();
+    const buttonWidth = Math.min(width * (touch ? 0.46 : 0.42), touch ? 328 : 286);
+    const buttonHeight = touch ? 78 : height > width ? 62 : 56;
+    const startButtonY = height > width ? height * 0.61 : touch ? height * 0.61 : height * 0.64;
+    const buttonY = startButtonY + (touch ? 92 : height > width ? 82 : 70);
     const startMultiplayer = (): void => this.startMultiplayer();
 
     const button = this.add
@@ -197,10 +199,11 @@ export class MainMenuScene extends BaseScene {
 
   private createBgmToggleButton(): void {
     const { width, height } = this.profile;
-    const buttonWidth = Math.min(width * 0.32, 220);
-    const buttonHeight = height > width ? 50 : 46;
-    const startButtonY = height > width ? height * 0.61 : height * 0.64;
-    const buttonY = startButtonY + (height > width ? 160 : 132);
+    const touch = this.isTouchPrimaryInput();
+    const buttonWidth = Math.min(width * (touch ? 0.38 : 0.32), touch ? 270 : 220);
+    const buttonHeight = touch ? 66 : height > width ? 50 : 46;
+    const startButtonY = height > width ? height * 0.61 : touch ? height * 0.61 : height * 0.64;
+    const buttonY = startButtonY + (touch ? 174 : height > width ? 160 : 132);
 
     const button = this.add
       .rectangle(this.centerX, buttonY, buttonWidth, buttonHeight, 0x10151d, 0.78)
@@ -244,6 +247,10 @@ export class MainMenuScene extends BaseScene {
   }
 
   private createControlsGuide(): void {
+    if (this.isTouchPrimaryInput()) {
+      return;
+    }
+
     const { width, height } = this.profile;
     const controls: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
       { keys: ['←', '→'], label: '左右移動' },
