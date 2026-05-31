@@ -12,11 +12,16 @@
     "build:server": "tsc -p tsconfig.server.build.json",
     "build:web": "npm run typecheck && vite build",
     "build:game": "npm run typecheck && vite build --mode game",
+    "android:sync": "npm run build:game && npx cap sync android",
+    "android:run": "npm run build:game && npx cap sync android && npx cap run android",
+    "android:open": "npm run build:game && npx cap sync android && npx cap open android",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
     "test": "vitest run"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@colyseus/schema": "^4.0.26",
     "@colyseus/sdk": "^0.17.42",
     "@fontsource/shojumaru": "^5.2.8",
@@ -24,6 +29,7 @@
     "phaser": "^4.1.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
     "@types/node": "^25.9.1",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
