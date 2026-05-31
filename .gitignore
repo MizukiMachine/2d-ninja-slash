@@ -23,6 +23,7 @@ build/
 .tsbuildinfo/
 .mcpheadlessbrowser/
 .browser-observer/
+.local-logs/
 .claude/
 dist/
 npm-debug.log*
