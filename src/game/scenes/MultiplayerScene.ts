@@ -95,6 +95,9 @@ const NINJA_SPRITE_SCALE = 2.1;
 const INPUT_SEND_INTERVAL_MS = 50;
 const HEALTH_BAR_WIDTH = 292;
 const HEALTH_BAR_HEIGHT = 24;
+const HUD_DETAIL_WRAP_INSET = 96;
+const WAITING_STATUS_TEXT = 'マッチング待ち';
+const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
 
 function getBackgroundTextureKey(backgroundFileName: DebugBackgroundFileName): string {
   return `multiplayer.background.${backgroundFileName}`;
@@ -240,7 +243,13 @@ export class MultiplayerScene extends BaseScene {
       .text(this.centerX, 72, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '18px',
-        color: '#d6b76f'
+        color: '#d6b76f',
+        align: 'center',
+        lineSpacing: 4,
+        wordWrap: {
+          width: this.profile.width - HUD_DETAIL_WRAP_INSET,
+          useAdvancedWrap: true
+        }
       })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
@@ -592,8 +601,8 @@ export class MultiplayerScene extends BaseScene {
 
     switch (state.phase) {
       case 'waiting':
-        this.statusText?.setText('Waiting');
-        this.detailText?.setText('Opponent needed');
+        this.statusText?.setText(WAITING_STATUS_TEXT);
+        this.detailText?.setText(WAITING_DETAIL_TEXT);
         break;
       case 'countdown':
         this.statusText?.setText(String(Math.max(1, Math.ceil(state.countdownMs / 1000))));
