@@ -3,6 +3,7 @@ export const SceneKeys = {
   Splash: 'Splash',
   MainMenu: 'MainMenu',
   Sandbox: 'Sandbox',
+  Multiplayer: 'Multiplayer',
   Gym: 'Gym',
   LaneEditor: 'LaneEditor',
   Settings: 'Settings'

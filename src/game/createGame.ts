@@ -4,6 +4,7 @@ import { BootScene } from './scenes/BootScene';
 import { GymScene } from './scenes/GymScene';
 import { LaneEditorScene } from './scenes/LaneEditorScene';
 import { MainMenuScene } from './scenes/MainMenuScene';
+import { MultiplayerScene } from './scenes/MultiplayerScene';
 import { SandboxScene } from './scenes/SandboxScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { SplashScene } from './scenes/SplashScene';
@@ -75,6 +76,7 @@ export function createGame({ parent, context }: CreateGameOptions): Phaser.Game 
       SplashScene,
       MainMenuScene,
       SandboxScene,
+      MultiplayerScene,
       GymScene,
       LaneEditorScene,
       SettingsScene
