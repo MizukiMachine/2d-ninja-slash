@@ -85,12 +85,48 @@ interface PlayerVisual {
   readonly unsubscribers: Unsubscribe[];
 }
 
+type TouchControlId = 'attack' | 'jump' | 'menu';
+type JoystickLaneDirection = 'up' | 'down';
+
+interface TouchControlButtonConfig {
+  readonly id: TouchControlId;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly label: string;
+  readonly fontSize?: number;
+  readonly onPress: () => void;
+}
+
+interface TouchControlBackground {
+  readonly graphic: Phaser.GameObjects.Graphics;
+  readonly width: number;
+  readonly height: number;
+}
+
 const BACKGROUND_DEPTH = -30;
 const ACTOR_DEPTH_BASE = 20;
 const ACTOR_DEPTH_RANGE = 30;
 const PLAYER_DEPTH_BIAS = 0.6;
 const ENEMY_DEPTH_BIAS = 0;
 const HUD_DEPTH = 140;
+const TOUCH_CONTROL_DEPTH = HUD_DEPTH + 40;
+const TOUCH_CONTROL_ACTION_BOTTOM_INSET = 74;
+const TOUCH_CONTROL_EDGE_ACTION_LIFT = 44;
+const TOUCH_CONTROL_ACTION_SIZE = 76;
+const TOUCH_CONTROL_MENU_Y = 142;
+const TOUCH_CONTROL_RADIUS = 18;
+const TOUCH_CONTROL_FILL_ALPHA = 0.16;
+const TOUCH_CONTROL_STROKE_ALPHA = 0.36;
+const TOUCH_CONTROL_PRESSED_FILL_ALPHA = 0.32;
+const TOUCH_CONTROL_PRESSED_STROKE_ALPHA = 0.72;
+const VIRTUAL_JOYSTICK_ZONE_RATIO = 0.5;
+const VIRTUAL_JOYSTICK_RADIUS = 56;
+const VIRTUAL_JOYSTICK_KNOB_RADIUS = 22;
+const VIRTUAL_JOYSTICK_DEAD_ZONE = 14;
+const VIRTUAL_JOYSTICK_LANE_THRESHOLD = 34;
+const VIRTUAL_JOYSTICK_LANE_RESET = 18;
 const NINJA_SPRITE_SCALE = 2.1;
 const INPUT_SEND_INTERVAL_MS = 50;
 const HEALTH_BAR_WIDTH = 292;
@@ -152,6 +188,19 @@ export class MultiplayerScene extends BaseScene {
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
   private juice: SceneJuice | null = null;
+  private touchControlsContainer: Phaser.GameObjects.Container | null = null;
+  private readonly touchControlPointers = new Map<TouchControlId, number>();
+  private readonly touchControlBackgrounds = new Map<TouchControlId, TouchControlBackground>();
+  private joystickPointerId: number | null = null;
+  private joystickLaneDirection: JoystickLaneDirection | null = null;
+  private readonly joystickOrigin = new Phaser.Math.Vector2();
+  private readonly joystickCurrent = new Phaser.Math.Vector2();
+  private joystickBaseGraphic: Phaser.GameObjects.Graphics | null = null;
+  private joystickKnobGraphic: Phaser.GameObjects.Graphics | null = null;
+  private readonly touchMovement = {
+    left: false,
+    right: false
+  };
 
   constructor() {
     super(SceneKeys.Multiplayer);
@@ -196,6 +245,7 @@ export class MultiplayerScene extends BaseScene {
     this.createHud();
     this.juice = new SceneJuice(this);
     this.registerKeyboard();
+    this.createTouchControls();
     void this.joinRoom();
 
     this.trackCleanup(() => {
@@ -331,6 +381,338 @@ export class MultiplayerScene extends BaseScene {
     });
   }
 
+  private createTouchControls(): void {
+    if (!this.isTouchPrimaryInput()) {
+      return;
+    }
+
+    const { width, height } = this.profile;
+    const actionSize = TOUCH_CONTROL_ACTION_SIZE;
+    const actionY = height - TOUCH_CONTROL_ACTION_BOTTOM_INSET;
+
+    this.touchControlsContainer = this.add
+      .container(0, 0)
+      .setScrollFactor(0)
+      .setDepth(TOUCH_CONTROL_DEPTH);
+    this.createFloatingJoystick();
+
+    const controls: readonly TouchControlButtonConfig[] = [
+      {
+        id: 'menu',
+        x: this.centerX,
+        y: TOUCH_CONTROL_MENU_Y,
+        width: 128,
+        height: 60,
+        label: 'Menu',
+        fontSize: 20,
+        onPress: () => {
+          this.goTo(SceneKeys.MainMenu);
+        }
+      },
+      {
+        id: 'attack',
+        x: width - 176,
+        y: actionY,
+        width: actionSize,
+        height: actionSize,
+        label: '斬',
+        fontSize: 27,
+        onPress: () => {
+          this.sendAttackInput();
+        }
+      },
+      {
+        id: 'jump',
+        x: width - 86,
+        y: actionY - TOUCH_CONTROL_EDGE_ACTION_LIFT,
+        width: actionSize,
+        height: actionSize,
+        label: '跳',
+        fontSize: 27,
+        onPress: () => {
+          this.sendJumpInput();
+        }
+      }
+    ];
+
+    controls.forEach((control) => this.createTouchControlButton(control));
+
+    const releasePointer = (pointer: Phaser.Input.Pointer): void => {
+      for (const [id, pointerId] of this.touchControlPointers) {
+        if (pointerId === pointer.id) {
+          this.releaseTouchControl(id);
+        }
+      }
+    };
+
+    this.input.on('pointerup', releasePointer);
+    this.input.on('pointerupoutside', releasePointer);
+    this.input.on('pointercancel', releasePointer);
+
+    this.trackCleanup(() => {
+      this.input.off('pointerup', releasePointer);
+      this.input.off('pointerupoutside', releasePointer);
+      this.input.off('pointercancel', releasePointer);
+      this.touchControlPointers.clear();
+      this.touchControlBackgrounds.clear();
+      this.endFloatingJoystick();
+      this.touchMovement.left = false;
+      this.touchMovement.right = false;
+    });
+  }
+
+  private createFloatingJoystick(): void {
+    this.joystickBaseGraphic = this.add
+      .graphics()
+      .setScrollFactor(0)
+      .setVisible(false);
+    this.joystickKnobGraphic = this.add
+      .graphics()
+      .setScrollFactor(0)
+      .setVisible(false);
+    this.touchControlsContainer?.add([
+      this.joystickBaseGraphic,
+      this.joystickKnobGraphic
+    ]);
+
+    const startJoystick = (pointer: Phaser.Input.Pointer): void => {
+      if (
+        this.touchControlsContainer?.visible === false ||
+        this.joystickPointerId !== null ||
+        pointer.x >= this.profile.width * VIRTUAL_JOYSTICK_ZONE_RATIO
+      ) {
+        return;
+      }
+
+      this.joystickPointerId = pointer.id;
+      this.joystickOrigin.set(pointer.x, pointer.y);
+      this.joystickCurrent.copy(this.joystickOrigin);
+      this.joystickLaneDirection = null;
+      this.updateFloatingJoystick(pointer);
+    };
+    const moveJoystick = (pointer: Phaser.Input.Pointer): void => {
+      if (this.joystickPointerId !== pointer.id) {
+        return;
+      }
+
+      this.updateFloatingJoystick(pointer);
+    };
+    const stopJoystick = (pointer: Phaser.Input.Pointer): void => {
+      if (this.joystickPointerId === pointer.id) {
+        this.endFloatingJoystick();
+      }
+    };
+
+    this.input.on('pointerdown', startJoystick);
+    this.input.on('pointermove', moveJoystick);
+    this.input.on('pointerup', stopJoystick);
+    this.input.on('pointerupoutside', stopJoystick);
+    this.input.on('pointercancel', stopJoystick);
+
+    this.trackCleanup(() => {
+      this.input.off('pointerdown', startJoystick);
+      this.input.off('pointermove', moveJoystick);
+      this.input.off('pointerup', stopJoystick);
+      this.input.off('pointerupoutside', stopJoystick);
+      this.input.off('pointercancel', stopJoystick);
+    });
+  }
+
+  private updateFloatingJoystick(pointer: Phaser.Input.Pointer): void {
+    this.joystickCurrent.set(pointer.x, pointer.y);
+
+    const deltaX = this.joystickCurrent.x - this.joystickOrigin.x;
+    const deltaY = this.joystickCurrent.y - this.joystickOrigin.y;
+    const distance = Math.hypot(deltaX, deltaY);
+    const active = distance >= VIRTUAL_JOYSTICK_DEAD_ZONE;
+
+    this.touchMovement.left = active && deltaX < -VIRTUAL_JOYSTICK_DEAD_ZONE;
+    this.touchMovement.right = active && deltaX > VIRTUAL_JOYSTICK_DEAD_ZONE;
+
+    if (active && deltaY < -VIRTUAL_JOYSTICK_LANE_THRESHOLD) {
+      if (this.joystickLaneDirection !== 'up') {
+        this.sendLaneInput('up');
+        this.joystickLaneDirection = 'up';
+      }
+    } else if (active && deltaY > VIRTUAL_JOYSTICK_LANE_THRESHOLD) {
+      if (this.joystickLaneDirection !== 'down') {
+        this.sendLaneInput('down');
+        this.joystickLaneDirection = 'down';
+      }
+    } else if (Math.abs(deltaY) < VIRTUAL_JOYSTICK_LANE_RESET) {
+      this.joystickLaneDirection = null;
+    }
+
+    this.renderFloatingJoystick(deltaX, deltaY, distance);
+  }
+
+  private endFloatingJoystick(): void {
+    this.joystickPointerId = null;
+    this.joystickLaneDirection = null;
+    this.touchMovement.left = false;
+    this.touchMovement.right = false;
+    this.joystickBaseGraphic?.setVisible(false);
+    this.joystickKnobGraphic?.setVisible(false);
+  }
+
+  private renderFloatingJoystick(
+    deltaX: number,
+    deltaY: number,
+    distance: number
+  ): void {
+    const base = this.joystickBaseGraphic;
+    const knob = this.joystickKnobGraphic;
+
+    if (base === null || knob === null) {
+      return;
+    }
+
+    const clampedDistance = Math.min(distance, VIRTUAL_JOYSTICK_RADIUS);
+    const angle = Math.atan2(deltaY, deltaX);
+    const knobX =
+      distance === 0
+        ? this.joystickOrigin.x
+        : this.joystickOrigin.x + Math.cos(angle) * clampedDistance;
+    const knobY =
+      distance === 0
+        ? this.joystickOrigin.y
+        : this.joystickOrigin.y + Math.sin(angle) * clampedDistance;
+
+    base.clear();
+    base.lineStyle(2, 0xd6b76f, 0.42);
+    base.fillStyle(0x080d14, 0.12);
+    base.fillCircle(this.joystickOrigin.x, this.joystickOrigin.y, VIRTUAL_JOYSTICK_RADIUS);
+    base.strokeCircle(this.joystickOrigin.x, this.joystickOrigin.y, VIRTUAL_JOYSTICK_RADIUS);
+    base.lineStyle(1, 0xffffff, 0.16);
+    base.strokeCircle(
+      this.joystickOrigin.x,
+      this.joystickOrigin.y,
+      VIRTUAL_JOYSTICK_DEAD_ZONE
+    );
+    base.setVisible(true);
+
+    knob.clear();
+    knob.fillStyle(0xffe8a8, 0.28);
+    knob.fillCircle(knobX, knobY, VIRTUAL_JOYSTICK_KNOB_RADIUS);
+    knob.lineStyle(2, 0xffe8a8, 0.5);
+    knob.strokeCircle(knobX, knobY, VIRTUAL_JOYSTICK_KNOB_RADIUS);
+    knob.setVisible(true);
+  }
+
+  private createTouchControlButton(config: TouchControlButtonConfig): void {
+    const background = this.add
+      .graphics({ x: config.x, y: config.y })
+      .setScrollFactor(0)
+      .setInteractive(
+        new Phaser.Geom.Rectangle(
+          -config.width / 2,
+          -config.height / 2,
+          config.width,
+          config.height
+        ),
+        Phaser.Geom.Rectangle.Contains
+      );
+
+    this.drawTouchControlBackground(
+      background,
+      config.width,
+      config.height,
+      false
+    );
+
+    const label = this.add
+      .text(config.x, config.y, config.label, {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: `${config.fontSize ?? 28}px`,
+        fontStyle: '700',
+        color: '#fff7df',
+        stroke: '#05080d',
+        strokeThickness: 3,
+        shadow: {
+          offsetX: 0,
+          offsetY: 2,
+          color: '#000000',
+          blur: 4,
+          fill: true
+        }
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    this.touchControlsContainer?.add([background, label]);
+    this.touchControlBackgrounds.set(config.id, {
+      graphic: background,
+      width: config.width,
+      height: config.height
+    });
+
+    const press = (pointer: Phaser.Input.Pointer): void => {
+      this.touchControlPointers.set(config.id, pointer.id);
+      this.drawTouchControlBackground(
+        background,
+        config.width,
+        config.height,
+        true
+      );
+      config.onPress();
+    };
+    const release = (pointer: Phaser.Input.Pointer): void => {
+      if (this.touchControlPointers.get(config.id) !== pointer.id) {
+        return;
+      }
+
+      this.releaseTouchControl(config.id);
+    };
+
+    background.on('pointerdown', press);
+    background.on('pointerup', release);
+    background.on('pointerupoutside', release);
+
+    this.trackCleanup(() => {
+      background.off('pointerdown', press);
+      background.off('pointerup', release);
+      background.off('pointerupoutside', release);
+    });
+  }
+
+  private drawTouchControlBackground(
+    graphic: Phaser.GameObjects.Graphics,
+    width: number,
+    height: number,
+    pressed: boolean
+  ): void {
+    const radius = Math.min(TOUCH_CONTROL_RADIUS, width / 2, height / 2);
+
+    graphic.clear();
+    graphic.fillStyle(
+      pressed ? 0x20314d : 0x080d14,
+      pressed ? TOUCH_CONTROL_PRESSED_FILL_ALPHA : TOUCH_CONTROL_FILL_ALPHA
+    );
+    graphic.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+    graphic.lineStyle(
+      2,
+      pressed ? 0x7ed7ff : 0xd6b76f,
+      pressed ? TOUCH_CONTROL_PRESSED_STROKE_ALPHA : TOUCH_CONTROL_STROKE_ALPHA
+    );
+    graphic.strokeRoundedRect(-width / 2, -height / 2, width, height, radius);
+  }
+
+  private releaseTouchControl(id: TouchControlId): void {
+    if (!this.touchControlPointers.delete(id)) {
+      return;
+    }
+
+    const background = this.touchControlBackgrounds.get(id);
+    if (background !== undefined) {
+      this.drawTouchControlBackground(
+        background.graphic,
+        background.width,
+        background.height,
+        false
+      );
+    }
+  }
+
   private async joinRoom(): Promise<void> {
     try {
       this.logMultiplayer('join-room:start');
@@ -344,11 +726,13 @@ export class MultiplayerScene extends BaseScene {
         sessionId: room.sessionId,
         reconnectionToken: room.reconnectionToken
       });
-    } catch {
+    } catch (error) {
       this.hasConnectionError = true;
       this.statusText?.setText('Connection failed');
       this.detailText?.setText('Start the Colyseus server and try again');
-      this.logMultiplayer('join-room:error');
+      this.logMultiplayer('join-room:error', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       this.createTextButton({
         x: this.centerX,
         y: this.centerY + 86,
@@ -684,12 +1068,11 @@ export class MultiplayerScene extends BaseScene {
   }
 
   private sendMovementInput(time: number): void {
-    if (this.room === null || this.moveKeys === null) {
+    if (this.room === null) {
       return;
     }
 
-    const left = this.moveKeys.left.isDown;
-    const right = this.moveKeys.right.isDown;
+    const { left, right } = this.readMovementInput();
     const signature = `${Number(left)}:${Number(right)}`;
 
     if (
@@ -703,6 +1086,13 @@ export class MultiplayerScene extends BaseScene {
     this.lastInputSentAt = time;
     this.room.send('input', { left, right });
     this.debug.setInput({ left, right, up: false, down: false });
+  }
+
+  private readMovementInput(): { readonly left: boolean; readonly right: boolean } {
+    return {
+      left: (this.moveKeys?.left.isDown ?? false) || this.touchMovement.left,
+      right: (this.moveKeys?.right.isDown ?? false) || this.touchMovement.right
+    };
   }
 
   private sendLaneInput(direction: 'up' | 'down'): void {

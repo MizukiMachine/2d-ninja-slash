@@ -8,7 +8,7 @@ import {
   type BattleLaneId
 } from './BattleState.js';
 
-interface MovementInput {
+export interface MovementInput {
   readonly left?: boolean;
   readonly right?: boolean;
 }
@@ -17,9 +17,11 @@ interface LaneInput {
   readonly direction?: 'up' | 'down';
 }
 
-interface PlayerIntent {
-  left: boolean;
-  right: boolean;
+export interface PlayerIntent {
+  readonly left: boolean;
+  readonly right: boolean;
+  readonly lastNonZeroDirection: -1 | 0 | 1;
+  readonly activeUntilMs: number;
 }
 
 interface PendingAttack {
@@ -41,6 +43,7 @@ const HURT_ACTION_MS = 680;
 const JUMP_ACTION_MS = 760;
 const COUNTDOWN_MS = 1800;
 const RECONNECT_SECONDS = 20;
+export const MOVEMENT_INPUT_GRACE_MS = 120;
 
 const LANES: Readonly<Record<BattleLaneId, number>> = {
   upper: 372,
@@ -62,6 +65,58 @@ function sanitizePlayerName(name: unknown, fallback: string): string {
   const trimmed = name.trim();
 
   return trimmed.length > 0 ? trimmed.slice(0, 16) : fallback;
+}
+
+export function createIdleMovementIntent(): PlayerIntent {
+  return {
+    left: false,
+    right: false,
+    lastNonZeroDirection: 0,
+    activeUntilMs: Number.NEGATIVE_INFINITY
+  };
+}
+
+export function createMovementIntent(
+  input: MovementInput,
+  previous: PlayerIntent | undefined,
+  clockMs: number
+): PlayerIntent {
+  const left = input.left === true;
+  const right = input.right === true;
+  const rawDirection = Number(right) - Number(left) as -1 | 0 | 1;
+
+  if (rawDirection !== 0) {
+    return {
+      left,
+      right,
+      lastNonZeroDirection: rawDirection,
+      activeUntilMs: clockMs + MOVEMENT_INPUT_GRACE_MS
+    };
+  }
+
+  return {
+    left,
+    right,
+    lastNonZeroDirection: previous?.lastNonZeroDirection ?? 0,
+    activeUntilMs: previous?.activeUntilMs ?? Number.NEGATIVE_INFINITY
+  };
+}
+
+export function getBufferedMovementDirection(
+  intent: PlayerIntent,
+  clockMs: number
+): -1 | 0 | 1 {
+  const rawDirection = Number(intent.right) - Number(intent.left) as -1 | 0 | 1;
+
+  if (rawDirection !== 0) {
+    return rawDirection;
+  }
+
+  if (!intent.left && !intent.right && clockMs <= intent.activeUntilMs) {
+    return intent.lastNonZeroDirection;
+  }
+
+  return 0;
 }
 
 function getLaneIndex(lane: BattleLaneId): number {
@@ -120,7 +175,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     player.lane = 'middle';
     player.facing = spawn.facing;
     this.state.players.set(client.sessionId, player);
-    this.inputsBySessionId.set(client.sessionId, { left: false, right: false });
+    this.inputsBySessionId.set(client.sessionId, createIdleMovementIntent());
     this.logRoom('join', {
       sessionId: client.sessionId,
       slot,
@@ -169,7 +224,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
 
     if (player !== undefined) {
       player.connected = true;
-      this.inputsBySessionId.set(client.sessionId, { left: false, right: false });
+      this.inputsBySessionId.set(client.sessionId, createIdleMovementIntent());
       this.logRoom('reconnect', {
         sessionId: client.sessionId,
         phase: this.state.phase,
@@ -224,10 +279,14 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       return;
     }
 
-    this.inputsBySessionId.set(client.sessionId, {
-      left: message.left === true,
-      right: message.right === true
-    });
+    this.inputsBySessionId.set(
+      client.sessionId,
+      createMovementIntent(
+        message,
+        this.inputsBySessionId.get(client.sessionId),
+        this.clockMs
+      )
+    );
   }
 
   private handleLaneInput(client: Client, message: LaneInput): void {
@@ -331,11 +390,8 @@ export class BattleRoom extends Room<{ state: BattleState }> {
         continue;
       }
 
-      const input = this.inputsBySessionId.get(player.id) ?? {
-        left: false,
-        right: false
-      };
-      const direction = Number(input.right) - Number(input.left);
+      const input = this.inputsBySessionId.get(player.id) ?? createIdleMovementIntent();
+      const direction = getBufferedMovementDirection(input, this.clockMs);
 
       if (direction !== 0) {
         player.x = clamp(
@@ -375,7 +431,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       player.jumpSeq = 0;
       player.hurtSeq = 0;
       player.readyForRematch = false;
-      this.inputsBySessionId.set(player.id, { left: false, right: false });
+      this.inputsBySessionId.set(player.id, createIdleMovementIntent());
     }
   }
 
