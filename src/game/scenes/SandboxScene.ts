@@ -60,6 +60,14 @@ import {
 import { GAME_OVER_BGM_TRACK_ID } from '../assets/audioAssetCatalog';
 import { GAME_DISPLAY_FONT_FAMILY, GAME_UI_FONT_FAMILY } from '../gameFonts';
 import { SceneJuice } from '../effects/sceneJuice';
+import {
+  PLAYER_DAMAGE_FLASH_ALPHA,
+  PLAYER_DAMAGE_FLASH_COLOR,
+  PLAYER_DAMAGE_FLASH_MS,
+  PLAYER_DAMAGE_KNOCKBACK_DISTANCE,
+  PLAYER_INVULNERABILITY_BLINK_MS,
+  PLAYER_INVULNERABILITY_MS
+} from '../playerDamageFeedback';
 
 type FacingDirection = 'left' | 'right';
 type MainNinjaAction = 'idle' | 'run' | 'jump' | 'slash' | 'impact' | 'death';
@@ -182,7 +190,6 @@ const PLAYER_DEATH_OVERLAY_RECHECK_MS = 120;
 const ENEMY_CORPSE_HOLD_MS = 1300;
 const ENEMY_CORPSE_BLINK_DURATION_MS = 90;
 const ENEMY_CORPSE_BLINK_REPEAT = 8;
-const PLAYER_DAMAGE_KNOCKBACK_DISTANCE = 160;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_X = 24;
 const ENEMY_ATTACK_REQUIRED_OVERLAP_Y = 9;
 // Enemies spawn scattered across the field (centre-out bisection) rather than
@@ -207,14 +214,6 @@ const PLAYER_HIT_HITSTOP_MS = 70;
 // A defeat keeps the world shake gentle but jolts the HUD, so the kill stays
 // noticeable without making the playfield queasy.
 const DEFEAT_HUD_SHAKE_TRAUMA = 0.7;
-// When the player is struck the screen flashes white and a brief invulnerability
-// window (with a blink) prevents being stun-locked by overlapping enemies.
-const PLAYER_DAMAGE_FLASH_COLOR = 0xffffff;
-const PLAYER_DAMAGE_FLASH_ALPHA = 0.55;
-const PLAYER_DAMAGE_FLASH_MS = 70;
-const PLAYER_INVULNERABILITY_MS = 1000;
-const PLAYER_INVULNERABILITY_BLINK_MS = 110;
-
 const getMainNinjaTextureKey = (
   action: MainNinjaAction,
   direction: FacingDirection

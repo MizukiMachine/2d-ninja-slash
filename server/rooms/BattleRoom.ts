@@ -35,6 +35,7 @@ const PLAYER_MAX_X = WORLD_WIDTH - PLAYER_MIN_X;
 const PLAYER_SPEED = 260;
 const ATTACK_RANGE = 180;
 const ATTACK_BACK_REACH = 18;
+export const BATTLE_DAMAGE_KNOCKBACK_DISTANCE = 160;
 const ATTACK_COOLDOWN_MS = 920;
 const ATTACK_ACTION_MS = 900;
 const MAIN_NINJA_ATTACK_HIT_DELAY_MS = 360;
@@ -119,6 +120,32 @@ export function getBufferedMovementDirection(
   return 0;
 }
 
+export function resolveBattleDamageKnockbackX({
+  attackerX,
+  targetX,
+  attackerFacing,
+  minX = PLAYER_MIN_X,
+  maxX = PLAYER_MAX_X
+}: {
+  readonly attackerX: number;
+  readonly targetX: number;
+  readonly attackerFacing: BattleFacing;
+  readonly minX?: number;
+  readonly maxX?: number;
+}): number {
+  const deltaX = targetX - attackerX;
+  const directionX =
+    Math.abs(deltaX) > 0.001
+      ? deltaX < 0 ? -1 : 1
+      : attackerFacing === 'left' ? -1 : 1;
+
+  return clamp(
+    targetX + directionX * BATTLE_DAMAGE_KNOCKBACK_DISTANCE,
+    minX,
+    maxX
+  );
+}
+
 function getLaneIndex(lane: BattleLaneId): number {
   return Math.max(0, LANE_ORDER.indexOf(lane));
 }
@@ -155,9 +182,6 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     });
     this.onMessage('jump', (client) => {
       this.handleJumpInput(client);
-    });
-    this.onMessage('rematch', (client) => {
-      this.handleRematchInput(client);
     });
   }
 
@@ -359,27 +383,6 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     });
   }
 
-  private handleRematchInput(client: Client): void {
-    if (this.state.phase !== 'finished') {
-      return;
-    }
-
-    const player = this.state.players.get(client.sessionId);
-
-    if (player === undefined) {
-      return;
-    }
-
-    player.readyForRematch = true;
-
-    if (this.state.players.size < 2 || !this.getPlayers().every((next) => next.readyForRematch)) {
-      this.state.status = 'Waiting for rematch';
-      return;
-    }
-
-    this.startCountdown();
-  }
-
   private applyMovement(deltaSeconds: number): void {
     for (const player of this.getPlayers()) {
       if (player.action === 'dead') {
@@ -430,7 +433,6 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       player.attackSeq = 0;
       player.jumpSeq = 0;
       player.hurtSeq = 0;
-      player.readyForRematch = false;
       this.inputsBySessionId.set(player.id, createIdleMovementIntent());
     }
   }
@@ -446,6 +448,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     this.state.phase = 'finished';
     this.state.winnerId = winnerId;
     this.state.status = 'Match finished';
+    this.lock();
     this.logRoom('finish-match', {
       winnerId,
       players: this.getPlayers().map((player) => ({
@@ -488,6 +491,12 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       (this.state.phase === 'fighting' || this.state.phase === 'countdown')
     ) {
       this.finishMatch(opponent.id);
+      return;
+    }
+
+    if (this.state.phase === 'finished') {
+      this.state.countdownMs = 0;
+      this.state.status = 'Match finished';
       return;
     }
 
@@ -576,6 +585,21 @@ export class BattleRoom extends Room<{ state: BattleState }> {
 
     target.hp = Math.max(0, target.hp - 1);
     target.hurtSeq += 1;
+
+    if (target.hp > 0) {
+      target.x = resolveBattleDamageKnockbackX({
+        attackerX: attacker.x,
+        targetX: target.x,
+        attackerFacing: attacker.facing as BattleFacing
+      });
+      target.facing =
+        attacker.x < target.x
+          ? 'left'
+          : attacker.x > target.x
+            ? 'right'
+            : attacker.facing === 'left' ? 'right' : 'left';
+    }
+
     this.broadcast('hit', {
       attackerId: attacker.id,
       targetId: target.id,
@@ -585,6 +609,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       attackerId: attacker.id,
       targetId: target.id,
       targetHp: target.hp,
+      targetX: target.x,
       phase: this.state.phase
     });
 

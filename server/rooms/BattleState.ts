@@ -23,8 +23,7 @@ export const BattlePlayerState = schema(
     attackSeq: { type: 'number', default: 0 },
     jumpSeq: { type: 'number', default: 0 },
     hurtSeq: { type: 'number', default: 0 },
-    wins: { type: 'number', default: 0 },
-    readyForRematch: { type: 'boolean', default: false }
+    wins: { type: 'number', default: 0 }
   },
   'BattlePlayerState'
 );

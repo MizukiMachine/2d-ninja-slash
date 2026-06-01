@@ -23,7 +23,6 @@ export interface MultiplayerPlayerState {
   readonly jumpSeq: number;
   readonly hurtSeq: number;
   readonly wins: number;
-  readonly readyForRematch: boolean;
 }
 
 export interface MultiplayerPlayerCollection {

@@ -39,6 +39,10 @@ import {
   type MultiplayerRoom,
   type SwingMessage
 } from '../../net/multiplayerTypes';
+import {
+  PLAYER_INVULNERABILITY_BLINK_MS,
+  PLAYER_INVULNERABILITY_MS
+} from '../playerDamageFeedback';
 
 type Unsubscribe = () => void;
 
@@ -51,7 +55,6 @@ interface MultiplayerKeys {
   readonly s: Phaser.Input.Keyboard.Key;
   readonly a: Phaser.Input.Keyboard.Key;
   readonly space: Phaser.Input.Keyboard.Key;
-  readonly r: Phaser.Input.Keyboard.Key;
   readonly esc: Phaser.Input.Keyboard.Key;
 }
 
@@ -86,11 +89,14 @@ interface PlayerVisual {
   lastAttackSeq: number;
   lastJumpSeq: number;
   lastHurtSeq: number;
+  damageBlinkUntil: number;
+  damageBlinkTween: Phaser.Tweens.Tween | null;
   readonly unsubscribers: Unsubscribe[];
 }
 
 type TouchControlId = 'attack' | 'jump' | 'menu';
 type JoystickLaneDirection = 'up' | 'down';
+type HudMessageLayout = 'top' | 'countdown';
 
 interface TouchControlButtonConfig {
   readonly id: TouchControlId;
@@ -135,7 +141,20 @@ const NINJA_SPRITE_SCALE = 2.1;
 const INPUT_SEND_INTERVAL_MS = 50;
 const HEALTH_BAR_WIDTH = 292;
 const HEALTH_BAR_HEIGHT = 24;
+const HUD_STATUS_TOP_Y = 34;
+const HUD_DETAIL_TOP_Y = 72;
+const HUD_STATUS_TOP_FONT_SIZE = 30;
+const HUD_DETAIL_TOP_FONT_SIZE = 18;
+const HUD_COUNTDOWN_STATUS_FONT_SIZE = 96;
+const HUD_COUNTDOWN_DETAIL_FONT_SIZE = 24;
+const HUD_COUNTDOWN_DETAIL_OFFSET_Y = 86;
 const HUD_DETAIL_WRAP_INSET = 96;
+const FINISHED_MENU_BUTTON_WIDTH = 260;
+const FINISHED_MENU_BUTTON_HEIGHT = 58;
+const FINISHED_MENU_BUTTON_OFFSET_Y = 82;
+const FINISHED_MENU_BUTTON_DELAY_MS = 1400;
+const FINISHED_RESULT_OFFSET_Y = -52;
+const FINISHED_RESULT_FONT_SIZE = 54;
 const WAITING_STATUS_TEXT = 'マッチング待ち';
 const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
 
@@ -186,8 +205,12 @@ export class MultiplayerScene extends BaseScene {
   private hudGraphic: Phaser.GameObjects.Graphics | null = null;
   private statusText: Phaser.GameObjects.Text | null = null;
   private detailText: Phaser.GameObjects.Text | null = null;
+  private finishedMenuButton: Phaser.GameObjects.Container | null = null;
   private roomText: Phaser.GameObjects.Text | null = null;
   private slotLabels: Phaser.GameObjects.Text[] = [];
+  private finishedResultKey: string | null = null;
+  private finishedMenuButtonTimer: Phaser.Time.TimerEvent | null = null;
+  private finishedResultTween: Phaser.Tweens.Tween | null = null;
   private lastInputSignature = '';
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
@@ -253,6 +276,7 @@ export class MultiplayerScene extends BaseScene {
     void this.joinRoom();
 
     this.trackCleanup(() => {
+      this.resetFinishedResultPresentation();
       this.disconnectRoom();
       this.destroyVisuals();
       this.juice?.destroy();
@@ -263,7 +287,7 @@ export class MultiplayerScene extends BaseScene {
   update(time: number, delta: number): void {
     this.juice?.update(delta);
     this.sendMovementInput(time);
-    this.updatePlayerVisuals(delta);
+    this.updatePlayerVisuals(time, delta);
     this.renderHud();
   }
 
@@ -284,9 +308,9 @@ export class MultiplayerScene extends BaseScene {
   private createHud(): void {
     this.hudGraphic = this.add.graphics().setDepth(HUD_DEPTH);
     this.statusText = this.add
-      .text(this.centerX, 34, 'Connecting', {
+      .text(this.centerX, HUD_STATUS_TOP_Y, 'Connecting', {
         fontFamily: GAME_DISPLAY_FONT_FAMILY,
-        fontSize: '30px',
+        fontSize: `${HUD_STATUS_TOP_FONT_SIZE}px`,
         color: '#fff7df',
         stroke: '#07090d',
         strokeThickness: 5
@@ -294,9 +318,9 @@ export class MultiplayerScene extends BaseScene {
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
     this.detailText = this.add
-      .text(this.centerX, 72, '', {
+      .text(this.centerX, HUD_DETAIL_TOP_Y, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
-        fontSize: '18px',
+        fontSize: `${HUD_DETAIL_TOP_FONT_SIZE}px`,
         color: '#d6b76f',
         align: 'center',
         lineSpacing: 4,
@@ -307,6 +331,15 @@ export class MultiplayerScene extends BaseScene {
       })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
+    this.finishedMenuButton = this.createTextButton({
+      x: this.centerX,
+      y: this.centerY + FINISHED_MENU_BUTTON_OFFSET_Y,
+      label: 'メニューへ戻る',
+      onClick: () => this.goTo(SceneKeys.MainMenu),
+      width: FINISHED_MENU_BUTTON_WIDTH,
+      height: FINISHED_MENU_BUTTON_HEIGHT
+    }).setDepth(HUD_DEPTH + 2);
+    this.setFinishedMenuButtonVisible(false);
     this.roomText = this.add
       .text(24, this.profile.height - 24, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
@@ -348,7 +381,6 @@ export class MultiplayerScene extends BaseScene {
       s: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       a: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       space: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
-      r: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
       esc: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     };
 
@@ -356,7 +388,6 @@ export class MultiplayerScene extends BaseScene {
     const laneDown = (): void => this.sendLaneInput('down');
     const attack = (): void => this.sendAttackInput();
     const jump = (): void => this.sendJumpInput();
-    const rematch = (): void => this.room?.send('rematch');
     const goBack = (): void => this.goTo(SceneKeys.MainMenu);
     const syncLastKey = (event: KeyboardEvent): void => {
       this.debug.setInput({ lastKey: event.code });
@@ -369,7 +400,6 @@ export class MultiplayerScene extends BaseScene {
     this.moveKeys.s.on('down', laneDown);
     this.moveKeys.a.on('down', attack);
     this.moveKeys.space.on('down', jump);
-    this.moveKeys.r.on('down', rematch);
     this.moveKeys.esc.on('down', goBack);
 
     this.trackCleanup(() => {
@@ -380,7 +410,6 @@ export class MultiplayerScene extends BaseScene {
       this.moveKeys?.s.off('down', laneDown);
       this.moveKeys?.a.off('down', attack);
       this.moveKeys?.space.off('down', jump);
-      this.moveKeys?.r.off('down', rematch);
       this.moveKeys?.esc.off('down', goBack);
     });
   }
@@ -732,6 +761,7 @@ export class MultiplayerScene extends BaseScene {
       });
     } catch (error) {
       this.hasConnectionError = true;
+      this.applyHudMessageLayout('top');
       this.statusText?.setText('Connection failed');
       this.detailText?.setText('Start the Colyseus server and try again');
       this.logMultiplayer('join-room:error', {
@@ -805,6 +835,7 @@ export class MultiplayerScene extends BaseScene {
 
     const handleRoomError = (code: number, message?: string): void => {
       this.logMultiplayer('room:error', { code, message });
+      this.applyHudMessageLayout('top');
       this.statusText?.setText(`Room error ${code}`);
       this.detailText?.setText(message ?? '');
     };
@@ -820,6 +851,7 @@ export class MultiplayerScene extends BaseScene {
         this.statusText !== null &&
         this.statusText.active
       ) {
+        this.applyHudMessageLayout('top');
         this.statusText.setText('Disconnected');
       }
     };
@@ -879,6 +911,8 @@ export class MultiplayerScene extends BaseScene {
       lastAttackSeq: player.attackSeq,
       lastJumpSeq: player.jumpSeq,
       lastHurtSeq: player.hurtSeq,
+      damageBlinkUntil: Number.NEGATIVE_INFINITY,
+      damageBlinkTween: null,
       unsubscribers: []
     };
 
@@ -901,7 +935,7 @@ export class MultiplayerScene extends BaseScene {
     visual.state = player;
     visual.targetX = player.x;
     visual.targetY = player.y;
-    visual.sprite.setAlpha(player.connected ? 1 : 0.45);
+    this.applyPlayerVisualBaseAlpha(visual);
     visual.nameLabel.setAlpha(player.connected ? 1 : 0.55);
 
     const action = getRenderableAction(visual.actorId, player.action);
@@ -944,15 +978,20 @@ export class MultiplayerScene extends BaseScene {
       unsubscribe();
     }
 
+    this.clearPlayerVisualDamageFeedback(visual);
     visual.sprite.destroy();
     visual.nameLabel.destroy();
     this.visualsBySessionId.delete(sessionId);
   }
 
-  private updatePlayerVisuals(deltaMs: number): void {
+  private updatePlayerVisuals(time: number, deltaMs: number): void {
     const alpha = Math.min(1, (deltaMs / 1000) * 12);
 
     for (const visual of this.visualsBySessionId.values()) {
+      if (visual.damageBlinkTween !== null && time >= visual.damageBlinkUntil) {
+        this.endPlayerVisualDamageBlink(visual);
+      }
+
       const action = getRenderableAction(visual.actorId, visual.state.action);
       const frame = this.getInterpolatedVisualFrame(visual, action, alpha);
 
@@ -1017,10 +1056,15 @@ export class MultiplayerScene extends BaseScene {
     const state = this.room?.state;
 
     this.hudGraphic?.clear();
-    this.renderHealthBars();
 
     if (state === undefined) {
       if (!this.hasConnectionError) {
+        this.resetFinishedResultPresentation();
+        this.applyHudMessageLayout('top');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText('Connecting');
         this.detailText?.setText('');
       }
@@ -1029,22 +1073,157 @@ export class MultiplayerScene extends BaseScene {
 
     switch (state.phase) {
       case 'waiting':
+        this.resetFinishedResultPresentation();
+        this.applyHudMessageLayout('top');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText(WAITING_STATUS_TEXT);
         this.detailText?.setText(WAITING_DETAIL_TEXT);
         break;
       case 'countdown':
+        this.resetFinishedResultPresentation();
+        this.applyHudMessageLayout('countdown');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText(String(Math.max(1, Math.ceil(state.countdownMs / 1000))));
         this.detailText?.setText('Get ready');
         break;
       case 'fighting':
+        this.resetFinishedResultPresentation();
+        this.applyHudMessageLayout('top');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText('Fight');
         this.detailText?.setText('');
         break;
       case 'finished':
-        this.statusText?.setText(state.winnerId === this.room?.sessionId ? 'You win' : 'You lose');
-        this.detailText?.setText('Press R for rematch');
+        this.showFinishedResult(state.winnerId);
         break;
     }
+  }
+
+  private showFinishedResult(winnerId: string): void {
+    const resultKey = `${this.room?.sessionId ?? ''}:${winnerId}`;
+
+    this.setMatchHudChromeVisible(false);
+    this.statusText?.setVisible(true);
+    this.detailText?.setVisible(false);
+
+    if (this.finishedResultKey === resultKey) {
+      return;
+    }
+
+    this.finishedResultKey = resultKey;
+    this.finishedMenuButtonTimer?.remove(false);
+    this.finishedMenuButtonTimer = null;
+    this.finishedResultTween?.stop();
+    this.finishedResultTween = null;
+    this.setFinishedMenuButtonVisible(false);
+
+    const resultText = winnerId === this.room?.sessionId ? 'You win' : 'You lose';
+
+    this.statusText
+      ?.setText(resultText)
+      .setPosition(this.centerX, this.centerY + FINISHED_RESULT_OFFSET_Y)
+      .setFontSize(FINISHED_RESULT_FONT_SIZE)
+      .setAlpha(0)
+      .setScale(0.86);
+
+    if (this.statusText !== null) {
+      this.finishedResultTween = this.tweens.add({
+        targets: this.statusText,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 420,
+        ease: 'Back.Out'
+      });
+    }
+
+    this.finishedMenuButtonTimer = this.time.delayedCall(
+      FINISHED_MENU_BUTTON_DELAY_MS,
+      () => {
+        if (this.room?.state.phase === 'finished' && this.finishedResultKey === resultKey) {
+          this.setFinishedMenuButtonVisible(true);
+        }
+      }
+    );
+  }
+
+  private resetFinishedResultPresentation(): void {
+    if (this.finishedResultKey === null) {
+      return;
+    }
+
+    this.finishedResultKey = null;
+    this.finishedMenuButtonTimer?.remove(false);
+    this.finishedMenuButtonTimer = null;
+    this.finishedResultTween?.stop();
+    this.finishedResultTween = null;
+    this.statusText?.setAlpha(1).setScale(1);
+  }
+
+  private setHudMessageVisible(visible: boolean): void {
+    this.statusText?.setVisible(visible);
+    this.detailText?.setVisible(visible);
+  }
+
+  private setMatchHudChromeVisible(visible: boolean): void {
+    this.roomText?.setVisible(visible);
+    this.slotLabels.forEach((label) => label.setVisible(visible));
+    this.visualsBySessionId.forEach((visual) => {
+      visual.nameLabel.setVisible(visible);
+    });
+    this.touchControlsContainer?.setVisible(visible);
+    this.touchControlBackgrounds.forEach(({ graphic }) => {
+      if (graphic.input !== null && graphic.input !== undefined) {
+        graphic.input.enabled = visible;
+      }
+    });
+
+    if (!visible) {
+      [...this.touchControlPointers.keys()].forEach((id) => this.releaseTouchControl(id));
+      this.endFloatingJoystick();
+    }
+  }
+
+  private setFinishedMenuButtonVisible(visible: boolean): void {
+    const button = this.finishedMenuButton;
+
+    if (button === null) {
+      return;
+    }
+
+    button.setVisible(visible);
+
+    if (button.input !== null && button.input !== undefined) {
+      button.input.enabled = visible;
+    }
+  }
+
+  private applyHudMessageLayout(layout: HudMessageLayout): void {
+    if (layout === 'countdown') {
+      this.statusText
+        ?.setPosition(this.centerX, this.centerY)
+        .setFontSize(HUD_COUNTDOWN_STATUS_FONT_SIZE);
+      this.detailText
+        ?.setPosition(this.centerX, this.centerY + HUD_COUNTDOWN_DETAIL_OFFSET_Y)
+        .setFontSize(HUD_COUNTDOWN_DETAIL_FONT_SIZE);
+      return;
+    }
+
+    this.statusText
+      ?.setPosition(this.centerX, HUD_STATUS_TOP_Y)
+      .setFontSize(HUD_STATUS_TOP_FONT_SIZE);
+    this.detailText
+      ?.setPosition(this.centerX, HUD_DETAIL_TOP_Y)
+      .setFontSize(HUD_DETAIL_TOP_FONT_SIZE);
   }
 
   private playRoundStartSfxForPhase(
@@ -1235,9 +1414,19 @@ export class MultiplayerScene extends BaseScene {
       return;
     }
 
+    if (message.hp <= 0) {
+      this.clearPlayerVisualDamageFeedback(visual);
+      this.playPlayerDefeatFeedback(visual);
+      return;
+    }
+
+    this.startPlayerVisualDamageBlink(visual);
+  }
+
+  private playPlayerDefeatFeedback(visual: PlayerVisual): void {
     const center = this.getVisualCenter(visual);
 
-    this.juice?.burstBladeGlint(center.x, center.y, this.getVisualScale(visual));
+    this.juice?.burstEnemyDefeat(center.x, center.y, this.getVisualScale(visual));
   }
 
   private getVisualCenter(visual: PlayerVisual): { readonly x: number; readonly y: number } {
@@ -1251,6 +1440,47 @@ export class MultiplayerScene extends BaseScene {
     const scale = Math.abs(visual.sprite.scaleX);
 
     return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
+  }
+
+  private startPlayerVisualDamageBlink(visual: PlayerVisual): void {
+    visual.damageBlinkUntil = this.time.now + PLAYER_INVULNERABILITY_MS;
+    visual.damageBlinkTween?.stop();
+
+    const baseAlpha = this.getPlayerVisualBaseAlpha(visual);
+    visual.sprite.setAlpha(baseAlpha);
+    visual.damageBlinkTween = this.tweens.add({
+      targets: visual.sprite,
+      alpha: { from: baseAlpha, to: baseAlpha * 0.25 },
+      duration: PLAYER_INVULNERABILITY_BLINK_MS,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  private endPlayerVisualDamageBlink(visual: PlayerVisual): void {
+    visual.damageBlinkTween?.stop();
+    visual.damageBlinkTween = null;
+    visual.damageBlinkUntil = Number.NEGATIVE_INFINITY;
+    this.applyPlayerVisualBaseAlpha(visual);
+  }
+
+  private applyPlayerVisualBaseAlpha(visual: PlayerVisual): void {
+    if (visual.damageBlinkTween !== null) {
+      return;
+    }
+
+    visual.sprite.setAlpha(this.getPlayerVisualBaseAlpha(visual));
+  }
+
+  private getPlayerVisualBaseAlpha(visual: PlayerVisual): number {
+    return visual.state.connected ? 1 : 0.45;
+  }
+
+  private clearPlayerVisualDamageFeedback(visual: PlayerVisual): void {
+    visual.damageBlinkTween?.stop();
+    visual.damageBlinkTween = null;
+    visual.damageBlinkUntil = Number.NEGATIVE_INFINITY;
+    this.applyPlayerVisualBaseAlpha(visual);
   }
 
   private getActorScaleForLaneY(laneY: number): number {
@@ -1372,8 +1602,7 @@ export class MultiplayerScene extends BaseScene {
       slot: player.slot,
       connected: player.connected,
       hp: player.hp,
-      action: player.action,
-      readyForRematch: player.readyForRematch
+      action: player.action
     };
   }
 
