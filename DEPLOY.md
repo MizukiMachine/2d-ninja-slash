@@ -6,6 +6,22 @@
 - Webフロントエンド: Render または Vercel
 - Androidフロントエンド: CapacitorでビルドしてAndroidエミュレーターへインストール
 
+## 現在の本番構成
+
+```text
+Webフロントエンド:
+https://2d-ninja-slash.vercel.app/
+
+Colyseus Cloud:
+https://jp-nrt-04e84785.colyseus.cloud
+
+Web/Androidビルド時の接続先:
+VITE_COLYSEUS_URL=https://jp-nrt-04e84785.colyseus.cloud
+
+Colyseus Cloud側の許可origin:
+CLIENT_ORIGIN=https://2d-ninja-slash.vercel.app
+```
+
 重要なのは、WebとAndroidのフロントエンドはどちらもビルド時に
 `VITE_COLYSEUS_URL=https://<colyseus-cloud-host>` を埋め込むこと。
 Colyseus Cloud側で `wss://` の接続URLが表示される場合は、それを使ってもよい。
@@ -150,10 +166,26 @@ CLIENT_ORIGIN=https://<vercel-project>.vercel.app
 
 ## 3. Androidエミュレーター（Cloudサーバ接続）
 
+このリポジトリはWSL2上にある。Android Studio / Emulator がWindows側にある場合、
+`npx cap run android` や `npx cap open android` をWSLから直接使うのは避ける。
+WSL側のAndroid Studio/ADBを起動してしまい、Windowsネイティブのエミュレーターと噛み合わないことがある。
+
+標準手順は次の通り。
+
+```text
+WSL:
+  Webゲームをビルド
+  Capacitorで android/ に同期
+  GradleでAPKを作る
+
+Windows:
+  Windowsネイティブの emulator / adb.exe でAPKをインストールして起動
+```
+
 Colyseus Cloudへ接続するAndroidビルドは、このコマンドを使う。
 
 ```bash
-VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:run
+VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:install:windows
 ```
 
 このコマンドは以下を順番に実行する。
@@ -166,23 +198,29 @@ npm run build:android:cloud
 npx cap sync android
   -> dist/ のWebゲームを Androidプロジェクトへ同期
 
-npx cap run android
+cd android && ./gradlew assembleDebug
   -> GradleでAPKを作成
-  -> adbでエミュレーターへインストール
+
+Windows adb.exe
+  -> APKをWindows側エミュレーターへインストール
   -> アプリを起動
 ```
 
-対象エミュレーターを確認する。
+Windows ADBに複数の端末/エミュレーターが見えている場合は、対象を明示する。
 
 ```bash
-npx cap run android --list
+VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:install:windows -- --target emulator-5554
 ```
 
-対象を明示して起動する。
+Android Studioを開く必要がある場合は、WSL側の `npx cap open android` ではなく
+WindowsネイティブのAndroid Studioを明示して開く。
 
 ```bash
-VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:run -- --target <device-id>
+npm run android:studio:windows
 ```
+
+ただし、通常の動作確認だけならAndroid Studioを開く必要はない。
+`android:cloud:install:windows` でAPKを入れて起動する方が安全。
 
 ## 4. Androidエミュレーター（ローカルサーバ接続）
 
@@ -197,11 +235,12 @@ npm run dev:server
 ターミナル2:
 
 ```bash
-npm run android:debug:run
+npm run android:debug:install:windows
 ```
 
-`android:debug:run` はAndroidエミュレーターからホストPCを指す
-`http://10.0.2.2:2567` を自動で `VITE_COLYSEUS_URL` に入れる。
+`android:debug:install:windows` はAndroidエミュレーターからホストPCを指す
+`http://10.0.2.2:2567` を自動で `VITE_COLYSEUS_URL` に入れたうえで、
+WSLでAPKを作り、Windowsの `adb.exe` でインストール/起動する。
 
 ## 5. WSL2でエミュレーターが見えない場合
 
@@ -215,20 +254,10 @@ adb devices
 ```
 
 何も出ない場合は、Windowsの `adb.exe` を使ってインストールする。
+この手順は `android:cloud:install:windows` にまとめてある。
 
 ```bash
-VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:sync
-cd android
-./gradlew assembleDebug
-cd ..
-
-ADB_WIN=$(powershell.exe -NoProfile -Command '$env:LOCALAPPDATA + "\Android\Sdk\platform-tools\adb.exe"' | tr -d '\r')
-ADB=$(wslpath -u "$ADB_WIN")
-APK_WIN=$(wslpath -w "$PWD/android/app/build/outputs/apk/debug/app-debug.apk")
-
-"$ADB" devices -l
-"$ADB" install -r "$APK_WIN"
-"$ADB" shell am start -n com.mizuki2.ninjaslash/.MainActivity
+VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:install:windows
 ```
 
 ## 6. 接続先の早見表
@@ -238,8 +267,8 @@ APK_WIN=$(wslpath -w "$PWD/android/app/build/outputs/apk/debug/app-debug.apk")
 | ローカルWeb開発 | `npm run dev` + `npm run dev:server` | `http://localhost:2567` |
 | Render Web本番 | `render.yaml` | `VITE_COLYSEUS_URL=https://<colyseus-cloud-host>` |
 | Vercel Web本番 | `vercel.json` | `VITE_COLYSEUS_URL=https://<colyseus-cloud-host>` |
-| Android + ローカルサーバ | `npm run android:debug:run` | `http://10.0.2.2:2567` |
-| Android + Colyseus Cloud | `VITE_COLYSEUS_URL=... npm run android:cloud:run` | `https://<colyseus-cloud-host>` |
+| Android + ローカルサーバ | `npm run android:debug:install:windows` | `http://10.0.2.2:2567` |
+| Android + Colyseus Cloud | `VITE_COLYSEUS_URL=... npm run android:cloud:install:windows` | `https://<colyseus-cloud-host>` |
 
 ## 7. よくあるミス
 
