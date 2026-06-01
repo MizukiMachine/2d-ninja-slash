@@ -2,7 +2,6 @@ import { Callbacks } from '@colyseus/sdk';
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
-import { SceneJuice } from '../effects/sceneJuice';
 import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
   getDebugBackgroundUrl,
@@ -39,6 +38,10 @@ import {
   type MultiplayerRoom,
   type SwingMessage
 } from '../../net/multiplayerTypes';
+import {
+  PLAYER_INVULNERABILITY_BLINK_MS,
+  PLAYER_INVULNERABILITY_MS
+} from '../playerDamageFeedback';
 
 type Unsubscribe = () => void;
 
@@ -86,6 +89,8 @@ interface PlayerVisual {
   lastAttackSeq: number;
   lastJumpSeq: number;
   lastHurtSeq: number;
+  damageBlinkUntil: number;
+  damageBlinkTween: Phaser.Tweens.Tween | null;
   readonly unsubscribers: Unsubscribe[];
 }
 
@@ -191,7 +196,6 @@ export class MultiplayerScene extends BaseScene {
   private lastInputSignature = '';
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
-  private juice: SceneJuice | null = null;
   private touchControlsContainer: Phaser.GameObjects.Container | null = null;
   private readonly touchControlPointers = new Map<TouchControlId, number>();
   private readonly touchControlBackgrounds = new Map<TouchControlId, TouchControlBackground>();
@@ -247,7 +251,6 @@ export class MultiplayerScene extends BaseScene {
     );
     this.createBackground();
     this.createHud();
-    this.juice = new SceneJuice(this);
     this.registerKeyboard();
     this.createTouchControls();
     void this.joinRoom();
@@ -255,15 +258,12 @@ export class MultiplayerScene extends BaseScene {
     this.trackCleanup(() => {
       this.disconnectRoom();
       this.destroyVisuals();
-      this.juice?.destroy();
-      this.juice = null;
     });
   }
 
   update(time: number, delta: number): void {
-    this.juice?.update(delta);
     this.sendMovementInput(time);
-    this.updatePlayerVisuals(delta);
+    this.updatePlayerVisuals(time, delta);
     this.renderHud();
   }
 
@@ -879,6 +879,8 @@ export class MultiplayerScene extends BaseScene {
       lastAttackSeq: player.attackSeq,
       lastJumpSeq: player.jumpSeq,
       lastHurtSeq: player.hurtSeq,
+      damageBlinkUntil: Number.NEGATIVE_INFINITY,
+      damageBlinkTween: null,
       unsubscribers: []
     };
 
@@ -901,7 +903,7 @@ export class MultiplayerScene extends BaseScene {
     visual.state = player;
     visual.targetX = player.x;
     visual.targetY = player.y;
-    visual.sprite.setAlpha(player.connected ? 1 : 0.45);
+    this.applyPlayerVisualBaseAlpha(visual);
     visual.nameLabel.setAlpha(player.connected ? 1 : 0.55);
 
     const action = getRenderableAction(visual.actorId, player.action);
@@ -944,15 +946,20 @@ export class MultiplayerScene extends BaseScene {
       unsubscribe();
     }
 
+    this.clearPlayerVisualDamageFeedback(visual);
     visual.sprite.destroy();
     visual.nameLabel.destroy();
     this.visualsBySessionId.delete(sessionId);
   }
 
-  private updatePlayerVisuals(deltaMs: number): void {
+  private updatePlayerVisuals(time: number, deltaMs: number): void {
     const alpha = Math.min(1, (deltaMs / 1000) * 12);
 
     for (const visual of this.visualsBySessionId.values()) {
+      if (visual.damageBlinkTween !== null && time >= visual.damageBlinkUntil) {
+        this.endPlayerVisualDamageBlink(visual);
+      }
+
       const action = getRenderableAction(visual.actorId, visual.state.action);
       const frame = this.getInterpolatedVisualFrame(visual, action, alpha);
 
@@ -1225,6 +1232,14 @@ export class MultiplayerScene extends BaseScene {
       return;
     }
 
+    if (message.hp <= 0) {
+      this.logMultiplayer('fx:hit-skip', {
+        reason: 'target-defeated',
+        message
+      });
+      return;
+    }
+
     const visual = this.visualsBySessionId.get(message.targetId);
 
     if (visual === undefined || !visual.sprite.active) {
@@ -1235,22 +1250,48 @@ export class MultiplayerScene extends BaseScene {
       return;
     }
 
-    const center = this.getVisualCenter(visual);
-
-    this.juice?.burstBladeGlint(center.x, center.y, this.getVisualScale(visual));
+    this.startPlayerVisualDamageBlink(visual);
   }
 
-  private getVisualCenter(visual: PlayerVisual): { readonly x: number; readonly y: number } {
-    return {
-      x: visual.sprite.x,
-      y: visual.sprite.y - visual.sprite.displayHeight * 0.5
-    };
+  private startPlayerVisualDamageBlink(visual: PlayerVisual): void {
+    visual.damageBlinkUntil = this.time.now + PLAYER_INVULNERABILITY_MS;
+    visual.damageBlinkTween?.stop();
+
+    const baseAlpha = this.getPlayerVisualBaseAlpha(visual);
+    visual.sprite.setAlpha(baseAlpha);
+    visual.damageBlinkTween = this.tweens.add({
+      targets: visual.sprite,
+      alpha: { from: baseAlpha, to: baseAlpha * 0.25 },
+      duration: PLAYER_INVULNERABILITY_BLINK_MS,
+      yoyo: true,
+      repeat: -1
+    });
   }
 
-  private getVisualScale(visual: PlayerVisual): number {
-    const scale = Math.abs(visual.sprite.scaleX);
+  private endPlayerVisualDamageBlink(visual: PlayerVisual): void {
+    visual.damageBlinkTween?.stop();
+    visual.damageBlinkTween = null;
+    visual.damageBlinkUntil = Number.NEGATIVE_INFINITY;
+    this.applyPlayerVisualBaseAlpha(visual);
+  }
 
-    return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
+  private applyPlayerVisualBaseAlpha(visual: PlayerVisual): void {
+    if (visual.damageBlinkTween !== null) {
+      return;
+    }
+
+    visual.sprite.setAlpha(this.getPlayerVisualBaseAlpha(visual));
+  }
+
+  private getPlayerVisualBaseAlpha(visual: PlayerVisual): number {
+    return visual.state.connected ? 1 : 0.45;
+  }
+
+  private clearPlayerVisualDamageFeedback(visual: PlayerVisual): void {
+    visual.damageBlinkTween?.stop();
+    visual.damageBlinkTween = null;
+    visual.damageBlinkUntil = Number.NEGATIVE_INFINITY;
+    this.applyPlayerVisualBaseAlpha(visual);
   }
 
   private getActorScaleForLaneY(laneY: number): number {

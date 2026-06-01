@@ -35,6 +35,7 @@ const PLAYER_MAX_X = WORLD_WIDTH - PLAYER_MIN_X;
 const PLAYER_SPEED = 260;
 const ATTACK_RANGE = 180;
 const ATTACK_BACK_REACH = 18;
+export const BATTLE_DAMAGE_KNOCKBACK_DISTANCE = 160;
 const ATTACK_COOLDOWN_MS = 920;
 const ATTACK_ACTION_MS = 900;
 const MAIN_NINJA_ATTACK_HIT_DELAY_MS = 360;
@@ -117,6 +118,32 @@ export function getBufferedMovementDirection(
   }
 
   return 0;
+}
+
+export function resolveBattleDamageKnockbackX({
+  attackerX,
+  targetX,
+  attackerFacing,
+  minX = PLAYER_MIN_X,
+  maxX = PLAYER_MAX_X
+}: {
+  readonly attackerX: number;
+  readonly targetX: number;
+  readonly attackerFacing: BattleFacing;
+  readonly minX?: number;
+  readonly maxX?: number;
+}): number {
+  const deltaX = targetX - attackerX;
+  const directionX =
+    Math.abs(deltaX) > 0.001
+      ? deltaX < 0 ? -1 : 1
+      : attackerFacing === 'left' ? -1 : 1;
+
+  return clamp(
+    targetX + directionX * BATTLE_DAMAGE_KNOCKBACK_DISTANCE,
+    minX,
+    maxX
+  );
 }
 
 function getLaneIndex(lane: BattleLaneId): number {
@@ -576,6 +603,21 @@ export class BattleRoom extends Room<{ state: BattleState }> {
 
     target.hp = Math.max(0, target.hp - 1);
     target.hurtSeq += 1;
+
+    if (target.hp > 0) {
+      target.x = resolveBattleDamageKnockbackX({
+        attackerX: attacker.x,
+        targetX: target.x,
+        attackerFacing: attacker.facing as BattleFacing
+      });
+      target.facing =
+        attacker.x < target.x
+          ? 'left'
+          : attacker.x > target.x
+            ? 'right'
+            : attacker.facing === 'left' ? 'right' : 'left';
+    }
+
     this.broadcast('hit', {
       attackerId: attacker.id,
       targetId: target.id,
@@ -585,6 +627,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       attackerId: attacker.id,
       targetId: target.id,
       targetHp: target.hp,
+      targetX: target.x,
       phase: this.state.phase
     });
 
