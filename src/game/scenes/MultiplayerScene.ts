@@ -96,6 +96,7 @@ interface PlayerVisual {
 
 type TouchControlId = 'attack' | 'jump' | 'menu';
 type JoystickLaneDirection = 'up' | 'down';
+type HudMessageLayout = 'top' | 'countdown';
 
 interface TouchControlButtonConfig {
   readonly id: TouchControlId;
@@ -140,6 +141,13 @@ const NINJA_SPRITE_SCALE = 2.1;
 const INPUT_SEND_INTERVAL_MS = 50;
 const HEALTH_BAR_WIDTH = 292;
 const HEALTH_BAR_HEIGHT = 24;
+const HUD_STATUS_TOP_Y = 34;
+const HUD_DETAIL_TOP_Y = 72;
+const HUD_STATUS_TOP_FONT_SIZE = 30;
+const HUD_DETAIL_TOP_FONT_SIZE = 18;
+const HUD_COUNTDOWN_STATUS_FONT_SIZE = 96;
+const HUD_COUNTDOWN_DETAIL_FONT_SIZE = 24;
+const HUD_COUNTDOWN_DETAIL_OFFSET_Y = 86;
 const HUD_DETAIL_WRAP_INSET = 96;
 const WAITING_STATUS_TEXT = 'マッチング待ち';
 const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
@@ -284,9 +292,9 @@ export class MultiplayerScene extends BaseScene {
   private createHud(): void {
     this.hudGraphic = this.add.graphics().setDepth(HUD_DEPTH);
     this.statusText = this.add
-      .text(this.centerX, 34, 'Connecting', {
+      .text(this.centerX, HUD_STATUS_TOP_Y, 'Connecting', {
         fontFamily: GAME_DISPLAY_FONT_FAMILY,
-        fontSize: '30px',
+        fontSize: `${HUD_STATUS_TOP_FONT_SIZE}px`,
         color: '#fff7df',
         stroke: '#07090d',
         strokeThickness: 5
@@ -294,9 +302,9 @@ export class MultiplayerScene extends BaseScene {
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
     this.detailText = this.add
-      .text(this.centerX, 72, '', {
+      .text(this.centerX, HUD_DETAIL_TOP_Y, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
-        fontSize: '18px',
+        fontSize: `${HUD_DETAIL_TOP_FONT_SIZE}px`,
         color: '#d6b76f',
         align: 'center',
         lineSpacing: 4,
@@ -732,6 +740,7 @@ export class MultiplayerScene extends BaseScene {
       });
     } catch (error) {
       this.hasConnectionError = true;
+      this.applyHudMessageLayout('top');
       this.statusText?.setText('Connection failed');
       this.detailText?.setText('Start the Colyseus server and try again');
       this.logMultiplayer('join-room:error', {
@@ -805,6 +814,7 @@ export class MultiplayerScene extends BaseScene {
 
     const handleRoomError = (code: number, message?: string): void => {
       this.logMultiplayer('room:error', { code, message });
+      this.applyHudMessageLayout('top');
       this.statusText?.setText(`Room error ${code}`);
       this.detailText?.setText(message ?? '');
     };
@@ -820,6 +830,7 @@ export class MultiplayerScene extends BaseScene {
         this.statusText !== null &&
         this.statusText.active
       ) {
+        this.applyHudMessageLayout('top');
         this.statusText.setText('Disconnected');
       }
     };
@@ -1028,6 +1039,7 @@ export class MultiplayerScene extends BaseScene {
 
     if (state === undefined) {
       if (!this.hasConnectionError) {
+        this.applyHudMessageLayout('top');
         this.statusText?.setText('Connecting');
         this.detailText?.setText('');
       }
@@ -1036,22 +1048,45 @@ export class MultiplayerScene extends BaseScene {
 
     switch (state.phase) {
       case 'waiting':
+        this.applyHudMessageLayout('top');
         this.statusText?.setText(WAITING_STATUS_TEXT);
         this.detailText?.setText(WAITING_DETAIL_TEXT);
         break;
       case 'countdown':
+        this.applyHudMessageLayout('countdown');
         this.statusText?.setText(String(Math.max(1, Math.ceil(state.countdownMs / 1000))));
         this.detailText?.setText('Get ready');
         break;
       case 'fighting':
+        this.applyHudMessageLayout('top');
         this.statusText?.setText('Fight');
         this.detailText?.setText('');
         break;
       case 'finished':
+        this.applyHudMessageLayout('top');
         this.statusText?.setText(state.winnerId === this.room?.sessionId ? 'You win' : 'You lose');
         this.detailText?.setText('Press R for rematch');
         break;
     }
+  }
+
+  private applyHudMessageLayout(layout: HudMessageLayout): void {
+    if (layout === 'countdown') {
+      this.statusText
+        ?.setPosition(this.centerX, this.centerY)
+        .setFontSize(HUD_COUNTDOWN_STATUS_FONT_SIZE);
+      this.detailText
+        ?.setPosition(this.centerX, this.centerY + HUD_COUNTDOWN_DETAIL_OFFSET_Y)
+        .setFontSize(HUD_COUNTDOWN_DETAIL_FONT_SIZE);
+      return;
+    }
+
+    this.statusText
+      ?.setPosition(this.centerX, HUD_STATUS_TOP_Y)
+      .setFontSize(HUD_STATUS_TOP_FONT_SIZE);
+    this.detailText
+      ?.setPosition(this.centerX, HUD_DETAIL_TOP_Y)
+      .setFontSize(HUD_DETAIL_TOP_FONT_SIZE);
   }
 
   private playRoundStartSfxForPhase(
