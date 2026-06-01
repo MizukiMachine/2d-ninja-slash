@@ -79,9 +79,29 @@ export interface NinjaLanePointFromSpriteInput extends NinjaLanePresentationInpu
   readonly spriteY: number;
 }
 
+export interface InterpolatedNinjaLanePresentationFrameInput
+  extends Omit<NinjaLanePresentationInput, 'scale'> {
+  readonly layout: ThreeLaneLayout;
+  readonly baseScale: number;
+  readonly currentLaneX: number;
+  readonly currentLaneY: number;
+  readonly targetLaneX: number;
+  readonly targetLaneY: number;
+  readonly alpha: number;
+  readonly scaleMultipliers?: NinjaLaneScaleMultipliers;
+}
+
 export interface NinjaWorldPoint {
   readonly x: number;
   readonly y: number;
+}
+
+export interface NinjaLanePresentationFrame {
+  readonly laneX: number;
+  readonly laneY: number;
+  readonly scale: number;
+  readonly spriteX: number;
+  readonly spriteY: number;
 }
 
 export function getNinjaLaneAnchorOffsetX({
@@ -223,8 +243,52 @@ export function getNinjaLanePointFromSprite({
   };
 }
 
+export function getInterpolatedNinjaLanePresentationFrame({
+  layout,
+  baseScale,
+  currentLaneX,
+  currentLaneY,
+  targetLaneX,
+  targetLaneY,
+  alpha,
+  scaleMultipliers,
+  ...input
+}: InterpolatedNinjaLanePresentationFrameInput): NinjaLanePresentationFrame {
+  const progress = clampUnit(alpha);
+  const laneX = interpolateNumber(currentLaneX, targetLaneX, progress);
+  const laneY = interpolateNumber(currentLaneY, targetLaneY, progress);
+  const scale = getNinjaLanePerspectiveScaleForY({
+    layout,
+    laneY,
+    baseScale,
+    scaleMultipliers
+  });
+  const spritePosition = getNinjaSpritePositionForLane({
+    ...input,
+    scale,
+    laneX,
+    laneY
+  });
+
+  return {
+    laneX,
+    laneY,
+    scale,
+    spriteX: spritePosition.x,
+    spriteY: spritePosition.y
+  };
+}
+
 function getSafeBaseScale(baseScale: number): number {
   return Number.isFinite(baseScale) ? baseScale : 1;
+}
+
+function clampUnit(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, value));
 }
 
 function getSegmentProgress(start: number, end: number, value: number): number {

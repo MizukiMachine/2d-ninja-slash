@@ -4,6 +4,7 @@ import {
   setNinjaLaneAnchor
 } from '../src/game/ninjaBounds';
 import {
+  getInterpolatedNinjaLanePresentationFrame,
   getNinjaLaneAnchorOffsetX,
   getNinjaLaneAnchorOffset,
   getNinjaLanePerspectiveScaleForLane,
@@ -200,5 +201,72 @@ describe('ninja lane presentation', () => {
         spriteY
       })
     ).toEqual({ x: 500, y: 530 });
+  });
+
+  it('keeps lane x stable when lane depth scale and action anchor change', () => {
+    const layout = createThreeLaneLayout({ middleY: 200, spacing: 50 });
+    const config = setNinjaLaneAnchor(
+      setNinjaLaneAnchor(
+        DEFAULT_NINJA_BOUNDS_CONFIG,
+        'mainNinja',
+        'right',
+        'idle',
+        { x: 73, y: 110 }
+      ),
+      'mainNinja',
+      'right',
+      'jump',
+      { x: 61, y: 112 }
+    );
+    const laneX = 320;
+    const middleScale = getNinjaLanePerspectiveScaleForY({
+      layout,
+      laneY: 200,
+      baseScale: 2
+    });
+    const staleSpritePosition = getNinjaSpritePositionForLane({
+      boundsConfig: config,
+      actorId: 'mainNinja',
+      direction: 'right',
+      actionId: 'idle',
+      scale: middleScale,
+      laneX,
+      laneY: 200
+    });
+    const frame = getInterpolatedNinjaLanePresentationFrame({
+      boundsConfig: config,
+      actorId: 'mainNinja',
+      direction: 'right',
+      actionId: 'jump',
+      layout,
+      baseScale: 2,
+      currentLaneX: laneX,
+      currentLaneY: 200,
+      targetLaneX: laneX,
+      targetLaneY: 250,
+      alpha: 1
+    });
+
+    expect(
+      getNinjaLaneXFromSprite({
+        boundsConfig: config,
+        actorId: 'mainNinja',
+        direction: 'right',
+        actionId: 'jump',
+        scale: frame.scale,
+        spriteX: staleSpritePosition.x
+      })
+    ).not.toBeCloseTo(laneX, 5);
+    expect(frame.laneX).toBe(laneX);
+    expect(
+      getNinjaLaneXFromSprite({
+        boundsConfig: config,
+        actorId: 'mainNinja',
+        direction: 'right',
+        actionId: 'jump',
+        scale: frame.scale,
+        spriteX: frame.spriteX
+      })
+    ).toBeCloseTo(laneX, 5);
   });
 });

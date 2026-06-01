@@ -16,8 +16,10 @@ import {
   type ThreeLaneLayout
 } from '../playerLaneMovement';
 import {
+  getInterpolatedNinjaLanePresentationFrame,
   getNinjaLanePerspectiveScaleForY,
-  getNinjaSpritePositionForLane
+  getNinjaSpritePositionForLane,
+  type NinjaLanePresentationFrame
 } from '../ninjaLanePresentation';
 import {
   getNinjaAnimationKey,
@@ -75,6 +77,8 @@ interface PlayerVisual {
   readonly actorId: NinjaActorId;
   readonly sprite: Phaser.GameObjects.Sprite;
   readonly nameLabel: Phaser.GameObjects.Text;
+  renderedLaneX: number;
+  renderedLaneY: number;
   targetX: number;
   targetY: number;
   state: MultiplayerPlayerState;
@@ -866,6 +870,8 @@ export class MultiplayerScene extends BaseScene {
       actorId,
       sprite,
       nameLabel,
+      renderedLaneX: player.x,
+      renderedLaneY: player.y,
       targetX: player.x,
       targetY: player.y,
       state: player,
@@ -947,26 +953,64 @@ export class MultiplayerScene extends BaseScene {
     const alpha = Math.min(1, (deltaMs / 1000) * 12);
 
     for (const visual of this.visualsBySessionId.values()) {
-      const scale = this.getActorScaleForLaneY(visual.targetY);
       const action = getRenderableAction(visual.actorId, visual.state.action);
-      const spriteTarget = this.getSpritePositionForLane(
-        visual.state,
-        visual.actorId,
-        action,
-        scale
-      );
+      const frame = this.getInterpolatedVisualFrame(visual, action, alpha);
 
-      visual.sprite.x = Phaser.Math.Linear(visual.sprite.x, spriteTarget.x, alpha);
-      visual.sprite.y = Phaser.Math.Linear(visual.sprite.y, spriteTarget.y, alpha);
-      visual.sprite.setScale(scale);
-      visual.sprite.setDepth(this.getActorDepthForLaneY(visual.targetY, visual.state.slot));
-      visual.nameLabel.setPosition(visual.sprite.x, visual.sprite.y - 148 * scale);
+      visual.renderedLaneX = frame.laneX;
+      visual.renderedLaneY = frame.laneY;
+      visual.sprite.setPosition(frame.spriteX, frame.spriteY);
+      visual.sprite.setScale(frame.scale);
+      visual.sprite.setDepth(this.getActorDepthForLaneY(frame.laneY, visual.state.slot));
+      visual.nameLabel.setPosition(frame.spriteX, frame.spriteY - 148 * frame.scale);
       visual.nameLabel.setText(
         visual.state.id === this.room?.sessionId
           ? `${visual.state.name} You`
           : visual.state.name
       );
     }
+  }
+
+  private getInterpolatedVisualFrame(
+    visual: PlayerVisual,
+    actionId: string,
+    alpha: number
+  ): NinjaLanePresentationFrame {
+    if (this.laneLayout !== null) {
+      return getInterpolatedNinjaLanePresentationFrame({
+        boundsConfig: this.app.getNinjaBoundsConfig(),
+        actorId: visual.actorId,
+        direction: visual.state.facing,
+        actionId,
+        layout: this.laneLayout,
+        baseScale: NINJA_SPRITE_SCALE,
+        currentLaneX: visual.renderedLaneX,
+        currentLaneY: visual.renderedLaneY,
+        targetLaneX: visual.targetX,
+        targetLaneY: visual.targetY,
+        alpha
+      });
+    }
+
+    const laneX = Phaser.Math.Linear(visual.renderedLaneX, visual.targetX, alpha);
+    const laneY = Phaser.Math.Linear(visual.renderedLaneY, visual.targetY, alpha);
+    const scale = NINJA_SPRITE_SCALE;
+    const spritePosition = getNinjaSpritePositionForLane({
+      boundsConfig: this.app.getNinjaBoundsConfig(),
+      actorId: visual.actorId,
+      direction: visual.state.facing,
+      actionId,
+      scale,
+      laneX,
+      laneY
+    });
+
+    return {
+      laneX,
+      laneY,
+      scale,
+      spriteX: spritePosition.x,
+      spriteY: spritePosition.y
+    };
   }
 
   private renderHud(): void {
