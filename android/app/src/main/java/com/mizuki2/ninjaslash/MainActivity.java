@@ -1,17 +1,20 @@
 package com.mizuki2.ninjaslash;
 
+import android.content.pm.ApplicationInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.webkit.WebSettings;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        enableDebugCleartextMultiplayer();
         enableImmersiveFullscreen();
     }
 
@@ -50,5 +53,20 @@ public class MainActivity extends BridgeActivity {
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             );
+    }
+
+    private void enableDebugCleartextMultiplayer() {
+        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
+            return;
+        }
+
+        if (getBridge() == null) {
+            return;
+        }
+
+        getBridge()
+            .getWebView()
+            .getSettings()
+            .setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
     }
 }
