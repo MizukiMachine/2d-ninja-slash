@@ -2,6 +2,7 @@ import { Callbacks } from '@colyseus/sdk';
 import Phaser from 'phaser';
 import { BaseScene } from './BaseScene';
 import { SceneKeys } from '../sceneKeys';
+import { SceneJuice } from '../effects/sceneJuice';
 import {
   DEFAULT_DEBUG_BACKGROUND_FILE_NAME,
   getDebugBackgroundUrl,
@@ -204,6 +205,7 @@ export class MultiplayerScene extends BaseScene {
   private lastInputSignature = '';
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
+  private juice: SceneJuice | null = null;
   private touchControlsContainer: Phaser.GameObjects.Container | null = null;
   private readonly touchControlPointers = new Map<TouchControlId, number>();
   private readonly touchControlBackgrounds = new Map<TouchControlId, TouchControlBackground>();
@@ -259,6 +261,7 @@ export class MultiplayerScene extends BaseScene {
     );
     this.createBackground();
     this.createHud();
+    this.juice = new SceneJuice(this);
     this.registerKeyboard();
     this.createTouchControls();
     void this.joinRoom();
@@ -266,10 +269,13 @@ export class MultiplayerScene extends BaseScene {
     this.trackCleanup(() => {
       this.disconnectRoom();
       this.destroyVisuals();
+      this.juice?.destroy();
+      this.juice = null;
     });
   }
 
   update(time: number, delta: number): void {
+    this.juice?.update(delta);
     this.sendMovementInput(time);
     this.updatePlayerVisuals(time, delta);
     this.renderHud();
@@ -1267,14 +1273,6 @@ export class MultiplayerScene extends BaseScene {
       return;
     }
 
-    if (message.hp <= 0) {
-      this.logMultiplayer('fx:hit-skip', {
-        reason: 'target-defeated',
-        message
-      });
-      return;
-    }
-
     const visual = this.visualsBySessionId.get(message.targetId);
 
     if (visual === undefined || !visual.sprite.active) {
@@ -1285,7 +1283,32 @@ export class MultiplayerScene extends BaseScene {
       return;
     }
 
+    if (message.hp <= 0) {
+      this.clearPlayerVisualDamageFeedback(visual);
+      this.playPlayerDefeatFeedback(visual);
+      return;
+    }
+
     this.startPlayerVisualDamageBlink(visual);
+  }
+
+  private playPlayerDefeatFeedback(visual: PlayerVisual): void {
+    const center = this.getVisualCenter(visual);
+
+    this.juice?.burstEnemyDefeat(center.x, center.y, this.getVisualScale(visual));
+  }
+
+  private getVisualCenter(visual: PlayerVisual): { readonly x: number; readonly y: number } {
+    return {
+      x: visual.sprite.x,
+      y: visual.sprite.y - visual.sprite.displayHeight * 0.5
+    };
+  }
+
+  private getVisualScale(visual: PlayerVisual): number {
+    const scale = Math.abs(visual.sprite.scaleX);
+
+    return Number.isFinite(scale) && scale > 0 ? scale : NINJA_SPRITE_SCALE;
   }
 
   private startPlayerVisualDamageBlink(visual: PlayerVisual): void {
