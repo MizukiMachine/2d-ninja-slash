@@ -55,7 +55,6 @@ interface MultiplayerKeys {
   readonly s: Phaser.Input.Keyboard.Key;
   readonly a: Phaser.Input.Keyboard.Key;
   readonly space: Phaser.Input.Keyboard.Key;
-  readonly r: Phaser.Input.Keyboard.Key;
   readonly esc: Phaser.Input.Keyboard.Key;
 }
 
@@ -150,6 +149,12 @@ const HUD_COUNTDOWN_STATUS_FONT_SIZE = 96;
 const HUD_COUNTDOWN_DETAIL_FONT_SIZE = 24;
 const HUD_COUNTDOWN_DETAIL_OFFSET_Y = 86;
 const HUD_DETAIL_WRAP_INSET = 96;
+const FINISHED_MENU_BUTTON_WIDTH = 260;
+const FINISHED_MENU_BUTTON_HEIGHT = 58;
+const FINISHED_MENU_BUTTON_OFFSET_Y = 82;
+const FINISHED_MENU_BUTTON_DELAY_MS = 1400;
+const FINISHED_RESULT_OFFSET_Y = -52;
+const FINISHED_RESULT_FONT_SIZE = 54;
 const WAITING_STATUS_TEXT = 'マッチング待ち';
 const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
 
@@ -200,8 +205,12 @@ export class MultiplayerScene extends BaseScene {
   private hudGraphic: Phaser.GameObjects.Graphics | null = null;
   private statusText: Phaser.GameObjects.Text | null = null;
   private detailText: Phaser.GameObjects.Text | null = null;
+  private finishedMenuButton: Phaser.GameObjects.Container | null = null;
   private roomText: Phaser.GameObjects.Text | null = null;
   private slotLabels: Phaser.GameObjects.Text[] = [];
+  private finishedResultKey: string | null = null;
+  private finishedMenuButtonTimer: Phaser.Time.TimerEvent | null = null;
+  private finishedResultTween: Phaser.Tweens.Tween | null = null;
   private lastInputSignature = '';
   private lastInputSentAt = Number.NEGATIVE_INFINITY;
   private hasConnectionError = false;
@@ -267,6 +276,7 @@ export class MultiplayerScene extends BaseScene {
     void this.joinRoom();
 
     this.trackCleanup(() => {
+      this.resetFinishedResultPresentation();
       this.disconnectRoom();
       this.destroyVisuals();
       this.juice?.destroy();
@@ -321,6 +331,15 @@ export class MultiplayerScene extends BaseScene {
       })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH + 1);
+    this.finishedMenuButton = this.createTextButton({
+      x: this.centerX,
+      y: this.centerY + FINISHED_MENU_BUTTON_OFFSET_Y,
+      label: 'メニューへ戻る',
+      onClick: () => this.goTo(SceneKeys.MainMenu),
+      width: FINISHED_MENU_BUTTON_WIDTH,
+      height: FINISHED_MENU_BUTTON_HEIGHT
+    }).setDepth(HUD_DEPTH + 2);
+    this.setFinishedMenuButtonVisible(false);
     this.roomText = this.add
       .text(24, this.profile.height - 24, '', {
         fontFamily: GAME_UI_FONT_FAMILY,
@@ -362,7 +381,6 @@ export class MultiplayerScene extends BaseScene {
       s: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
       a: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       space: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
-      r: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R),
       esc: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC)
     };
 
@@ -370,7 +388,6 @@ export class MultiplayerScene extends BaseScene {
     const laneDown = (): void => this.sendLaneInput('down');
     const attack = (): void => this.sendAttackInput();
     const jump = (): void => this.sendJumpInput();
-    const rematch = (): void => this.room?.send('rematch');
     const goBack = (): void => this.goTo(SceneKeys.MainMenu);
     const syncLastKey = (event: KeyboardEvent): void => {
       this.debug.setInput({ lastKey: event.code });
@@ -383,7 +400,6 @@ export class MultiplayerScene extends BaseScene {
     this.moveKeys.s.on('down', laneDown);
     this.moveKeys.a.on('down', attack);
     this.moveKeys.space.on('down', jump);
-    this.moveKeys.r.on('down', rematch);
     this.moveKeys.esc.on('down', goBack);
 
     this.trackCleanup(() => {
@@ -394,7 +410,6 @@ export class MultiplayerScene extends BaseScene {
       this.moveKeys?.s.off('down', laneDown);
       this.moveKeys?.a.off('down', attack);
       this.moveKeys?.space.off('down', jump);
-      this.moveKeys?.r.off('down', rematch);
       this.moveKeys?.esc.off('down', goBack);
     });
   }
@@ -1041,11 +1056,15 @@ export class MultiplayerScene extends BaseScene {
     const state = this.room?.state;
 
     this.hudGraphic?.clear();
-    this.renderHealthBars();
 
     if (state === undefined) {
       if (!this.hasConnectionError) {
+        this.resetFinishedResultPresentation();
         this.applyHudMessageLayout('top');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText('Connecting');
         this.detailText?.setText('');
       }
@@ -1054,25 +1073,137 @@ export class MultiplayerScene extends BaseScene {
 
     switch (state.phase) {
       case 'waiting':
+        this.resetFinishedResultPresentation();
         this.applyHudMessageLayout('top');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText(WAITING_STATUS_TEXT);
         this.detailText?.setText(WAITING_DETAIL_TEXT);
         break;
       case 'countdown':
+        this.resetFinishedResultPresentation();
         this.applyHudMessageLayout('countdown');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText(String(Math.max(1, Math.ceil(state.countdownMs / 1000))));
         this.detailText?.setText('Get ready');
         break;
       case 'fighting':
+        this.resetFinishedResultPresentation();
         this.applyHudMessageLayout('top');
+        this.setHudMessageVisible(true);
+        this.setMatchHudChromeVisible(true);
+        this.setFinishedMenuButtonVisible(false);
+        this.renderHealthBars();
         this.statusText?.setText('Fight');
         this.detailText?.setText('');
         break;
       case 'finished':
-        this.applyHudMessageLayout('top');
-        this.statusText?.setText(state.winnerId === this.room?.sessionId ? 'You win' : 'You lose');
-        this.detailText?.setText('Press R for rematch');
+        this.showFinishedResult(state.winnerId);
         break;
+    }
+  }
+
+  private showFinishedResult(winnerId: string): void {
+    const resultKey = `${this.room?.sessionId ?? ''}:${winnerId}`;
+
+    this.setMatchHudChromeVisible(false);
+    this.statusText?.setVisible(true);
+    this.detailText?.setVisible(false);
+
+    if (this.finishedResultKey === resultKey) {
+      return;
+    }
+
+    this.finishedResultKey = resultKey;
+    this.finishedMenuButtonTimer?.remove(false);
+    this.finishedMenuButtonTimer = null;
+    this.finishedResultTween?.stop();
+    this.finishedResultTween = null;
+    this.setFinishedMenuButtonVisible(false);
+
+    const resultText = winnerId === this.room?.sessionId ? 'You win' : 'You lose';
+
+    this.statusText
+      ?.setText(resultText)
+      .setPosition(this.centerX, this.centerY + FINISHED_RESULT_OFFSET_Y)
+      .setFontSize(FINISHED_RESULT_FONT_SIZE)
+      .setAlpha(0)
+      .setScale(0.86);
+
+    if (this.statusText !== null) {
+      this.finishedResultTween = this.tweens.add({
+        targets: this.statusText,
+        alpha: 1,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 420,
+        ease: 'Back.Out'
+      });
+    }
+
+    this.finishedMenuButtonTimer = this.time.delayedCall(
+      FINISHED_MENU_BUTTON_DELAY_MS,
+      () => {
+        if (this.room?.state.phase === 'finished' && this.finishedResultKey === resultKey) {
+          this.setFinishedMenuButtonVisible(true);
+        }
+      }
+    );
+  }
+
+  private resetFinishedResultPresentation(): void {
+    if (this.finishedResultKey === null) {
+      return;
+    }
+
+    this.finishedResultKey = null;
+    this.finishedMenuButtonTimer?.remove(false);
+    this.finishedMenuButtonTimer = null;
+    this.finishedResultTween?.stop();
+    this.finishedResultTween = null;
+    this.statusText?.setAlpha(1).setScale(1);
+  }
+
+  private setHudMessageVisible(visible: boolean): void {
+    this.statusText?.setVisible(visible);
+    this.detailText?.setVisible(visible);
+  }
+
+  private setMatchHudChromeVisible(visible: boolean): void {
+    this.roomText?.setVisible(visible);
+    this.slotLabels.forEach((label) => label.setVisible(visible));
+    this.visualsBySessionId.forEach((visual) => {
+      visual.nameLabel.setVisible(visible);
+    });
+    this.touchControlsContainer?.setVisible(visible);
+    this.touchControlBackgrounds.forEach(({ graphic }) => {
+      if (graphic.input !== null && graphic.input !== undefined) {
+        graphic.input.enabled = visible;
+      }
+    });
+
+    if (!visible) {
+      [...this.touchControlPointers.keys()].forEach((id) => this.releaseTouchControl(id));
+      this.endFloatingJoystick();
+    }
+  }
+
+  private setFinishedMenuButtonVisible(visible: boolean): void {
+    const button = this.finishedMenuButton;
+
+    if (button === null) {
+      return;
+    }
+
+    button.setVisible(visible);
+
+    if (button.input !== null && button.input !== undefined) {
+      button.input.enabled = visible;
     }
   }
 
@@ -1471,8 +1602,7 @@ export class MultiplayerScene extends BaseScene {
       slot: player.slot,
       connected: player.connected,
       hp: player.hp,
-      action: player.action,
-      readyForRematch: player.readyForRematch
+      action: player.action
     };
   }
 

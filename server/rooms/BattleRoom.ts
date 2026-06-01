@@ -183,9 +183,6 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     this.onMessage('jump', (client) => {
       this.handleJumpInput(client);
     });
-    this.onMessage('rematch', (client) => {
-      this.handleRematchInput(client);
-    });
   }
 
   onJoin(client: Client, options?: { readonly name?: string }): void {
@@ -386,27 +383,6 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     });
   }
 
-  private handleRematchInput(client: Client): void {
-    if (this.state.phase !== 'finished') {
-      return;
-    }
-
-    const player = this.state.players.get(client.sessionId);
-
-    if (player === undefined) {
-      return;
-    }
-
-    player.readyForRematch = true;
-
-    if (this.state.players.size < 2 || !this.getPlayers().every((next) => next.readyForRematch)) {
-      this.state.status = 'Waiting for rematch';
-      return;
-    }
-
-    this.startCountdown();
-  }
-
   private applyMovement(deltaSeconds: number): void {
     for (const player of this.getPlayers()) {
       if (player.action === 'dead') {
@@ -457,7 +433,6 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       player.attackSeq = 0;
       player.jumpSeq = 0;
       player.hurtSeq = 0;
-      player.readyForRematch = false;
       this.inputsBySessionId.set(player.id, createIdleMovementIntent());
     }
   }
@@ -473,6 +448,7 @@ export class BattleRoom extends Room<{ state: BattleState }> {
     this.state.phase = 'finished';
     this.state.winnerId = winnerId;
     this.state.status = 'Match finished';
+    this.lock();
     this.logRoom('finish-match', {
       winnerId,
       players: this.getPlayers().map((player) => ({
@@ -515,6 +491,12 @@ export class BattleRoom extends Room<{ state: BattleState }> {
       (this.state.phase === 'fighting' || this.state.phase === 'countdown')
     ) {
       this.finishMatch(opponent.id);
+      return;
+    }
+
+    if (this.state.phase === 'finished') {
+      this.state.countdownMs = 0;
+      this.state.status = 'Match finished';
       return;
     }
 
