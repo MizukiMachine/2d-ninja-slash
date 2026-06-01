@@ -15,6 +15,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.19.0
+      # Build-time client endpoint for the Colyseus Cloud server.
+      # Set this in Render when creating/updating the Blueprint.
+      - key: VITE_COLYSEUS_URL
+        sync: false
     headers:
       # 静的アセット（ハッシュ付きJS / 画像 / 音声）は長期キャッシュ
       - path: /assets/*
