@@ -151,6 +151,12 @@ interface EnemySpawnPoint {
   readonly laneId: PlayerLaneId;
 }
 
+interface ReturnToMenuPauseState {
+  readonly physicsPaused: boolean;
+  readonly timePaused: boolean;
+  readonly tweensPaused: boolean;
+}
+
 const NINJA_ACTOR_ROOT_URL = '/assets/actors';
 const NINJA_FRAME_COUNT = 32;
 const NINJA_IDLE_ANCHOR_FRAME = 0;
@@ -179,6 +185,7 @@ const TOUCH_CONTROL_FILL_ALPHA = 0.16;
 const TOUCH_CONTROL_STROKE_ALPHA = 0.36;
 const TOUCH_CONTROL_PRESSED_FILL_ALPHA = 0.32;
 const TOUCH_CONTROL_PRESSED_STROKE_ALPHA = 0.72;
+const MENU_CONFIRM_DEPTH = GAME_OVER_DEPTH + 40;
 const VIRTUAL_JOYSTICK_ZONE_RATIO = 0.5;
 const VIRTUAL_JOYSTICK_RADIUS = 56;
 const VIRTUAL_JOYSTICK_KNOB_RADIUS = 22;
@@ -500,6 +507,8 @@ export class SandboxScene extends BaseScene {
   private totalDefeatedCount = 0;
   private elapsedMs = 0;
   private roundTransitionRemainingMs = 0;
+  private returnToMenuPaused = false;
+  private returnToMenuPauseState: ReturnToMenuPauseState | null = null;
   private attackHitCount = 0;
   private forwardVector = new Phaser.Math.Vector2(1, 0);
   private damageKnockbackVector = new Phaser.Math.Vector2(0, 0);
@@ -1117,6 +1126,8 @@ export class SandboxScene extends BaseScene {
     this.totalDefeatedCount = 0;
     this.elapsedMs = 0;
     this.roundTransitionRemainingMs = 0;
+    this.returnToMenuPaused = false;
+    this.returnToMenuPauseState = null;
     this.attackHitCount = 0;
     this.forwardVector.set(1, 0);
     this.damageKnockbackVector.set(0, 0);
@@ -1129,6 +1140,13 @@ export class SandboxScene extends BaseScene {
   }
 
   update(time: number, delta: number): void {
+    if (this.returnToMenuPaused) {
+      this.player?.setVelocity(0, 0);
+      this.stopAllEnemyMovement();
+      this.finishDebugFrame(time);
+      return;
+    }
+
     // Drive juice first so shake/hitstop resolve on real (unscaled) time even
     // when gameplay is otherwise short-circuited below.
     this.juice?.update(delta);
@@ -1345,7 +1363,7 @@ export class SandboxScene extends BaseScene {
         label: 'Menu',
         fontSize: 20,
         onPress: () => {
-          this.goTo(SceneKeys.MainMenu);
+          this.requestReturnToMenu();
         }
       },
       {
@@ -1416,6 +1434,7 @@ export class SandboxScene extends BaseScene {
 
     const startJoystick = (pointer: Phaser.Input.Pointer): void => {
       if (
+        this.returnToMenuPaused ||
         this.touchControlsContainer?.visible === false ||
         this.joystickPointerId !== null ||
         pointer.x >= this.profile.width * VIRTUAL_JOYSTICK_ZONE_RATIO
@@ -1612,6 +1631,74 @@ export class SandboxScene extends BaseScene {
       background.off('pointerup', release);
       background.off('pointerupoutside', release);
     });
+  }
+
+  private requestReturnToMenu(): void {
+    this.confirmReturnToMenu({
+      depth: MENU_CONFIRM_DEPTH,
+      beforeOpen: () => {
+        [...this.touchControlPointers.keys()].forEach((id) => this.releaseTouchControl(id));
+        this.endFloatingJoystick();
+        this.setReturnToMenuPaused(true);
+      },
+      onClose: () => this.setReturnToMenuPaused(false)
+    });
+  }
+
+  private setReturnToMenuPaused(paused: boolean): void {
+    if (this.returnToMenuPaused === paused) {
+      return;
+    }
+
+    this.returnToMenuPaused = paused;
+
+    if (paused) {
+      this.returnToMenuPauseState = {
+        physicsPaused: this.physics.world.isPaused,
+        timePaused: this.time.paused,
+        tweensPaused: this.tweens.paused
+      };
+      this.player?.setVelocity(0, 0);
+      this.stopAllEnemyMovement();
+      this.pauseActorAnimations();
+      this.physics.world.pause();
+      this.time.paused = true;
+      this.tweens.pauseAll();
+      return;
+    }
+
+    const pauseState = this.returnToMenuPauseState;
+    this.returnToMenuPauseState = null;
+
+    if (pauseState?.physicsPaused === false) {
+      this.physics.world.resume();
+    }
+
+    if (pauseState?.timePaused === false) {
+      this.time.paused = false;
+    }
+
+    if (pauseState?.tweensPaused === false) {
+      this.tweens.resumeAll();
+    }
+
+    this.resumeActorAnimations();
+  }
+
+  private pauseActorAnimations(): void {
+    this.player?.anims.pause();
+
+    for (const enemy of this.enemies) {
+      enemy.sprite.anims.pause();
+    }
+  }
+
+  private resumeActorAnimations(): void {
+    this.player?.anims.resume();
+
+    for (const enemy of this.enemies) {
+      enemy.sprite.anims.resume();
+    }
   }
 
   private drawTouchControlBackground(
@@ -2122,7 +2209,7 @@ export class SandboxScene extends BaseScene {
 
     const escKey = this.moveKeys.esc;
     const goBackToMenu = (): void => {
-      this.goTo(SceneKeys.MainMenu);
+      this.requestReturnToMenu();
     };
     const startAttack = (): void => {
       this.startAttack('slash');
@@ -2212,6 +2299,16 @@ export class SandboxScene extends BaseScene {
   }
 
   private readMovementInput(): MovementInput {
+    if (this.returnToMenuPaused) {
+      return {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        x: 0
+      };
+    }
+
     if (this.moveKeys === null) {
       return {
         left: this.touchMovement.left,
@@ -2260,6 +2357,7 @@ export class SandboxScene extends BaseScene {
     if (
       this.player === null ||
       this.playerLaneMovement === null ||
+      this.returnToMenuPaused ||
       this.gameOver ||
       this.currentAction === 'dead' ||
       this.isPlayerBusy()
@@ -2396,6 +2494,7 @@ export class SandboxScene extends BaseScene {
   private startAttack(action: PlayerAttackAction): void {
     if (
       this.player === null ||
+      this.returnToMenuPaused ||
       this.gameOver ||
       this.currentAction === 'dead' ||
       this.isPlayerBusy()
@@ -2415,6 +2514,7 @@ export class SandboxScene extends BaseScene {
   private startJump(): void {
     if (
       this.player === null ||
+      this.returnToMenuPaused ||
       this.gameOver ||
       this.currentAction === 'dead' ||
       this.isPlayerBusy()

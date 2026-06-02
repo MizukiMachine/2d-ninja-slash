@@ -157,6 +157,7 @@ const FINISHED_RESULT_OFFSET_Y = -52;
 const FINISHED_RESULT_FONT_SIZE = 54;
 const WAITING_STATUS_TEXT = 'マッチング待ち';
 const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
+const MENU_CONFIRM_DEPTH = TOUCH_CONTROL_DEPTH + 40;
 
 function getBackgroundTextureKey(backgroundFileName: DebugBackgroundFileName): string {
   return `multiplayer.background.${backgroundFileName}`;
@@ -276,6 +277,7 @@ export class MultiplayerScene extends BaseScene {
     void this.joinRoom();
 
     this.trackCleanup(() => {
+      this.hideReturnToMenuConfirm();
       this.resetFinishedResultPresentation();
       this.disconnectRoom();
       this.destroyVisuals();
@@ -388,7 +390,7 @@ export class MultiplayerScene extends BaseScene {
     const laneDown = (): void => this.sendLaneInput('down');
     const attack = (): void => this.sendAttackInput();
     const jump = (): void => this.sendJumpInput();
-    const goBack = (): void => this.goTo(SceneKeys.MainMenu);
+    const goBack = (): void => this.requestReturnToMenu();
     const syncLastKey = (event: KeyboardEvent): void => {
       this.debug.setInput({ lastKey: event.code });
     };
@@ -439,7 +441,7 @@ export class MultiplayerScene extends BaseScene {
         label: 'Menu',
         fontSize: 20,
         onPress: () => {
-          this.goTo(SceneKeys.MainMenu);
+          this.requestReturnToMenu();
         }
       },
       {
@@ -705,6 +707,16 @@ export class MultiplayerScene extends BaseScene {
       background.off('pointerdown', press);
       background.off('pointerup', release);
       background.off('pointerupoutside', release);
+    });
+  }
+
+  private requestReturnToMenu(): void {
+    this.confirmReturnToMenu({
+      depth: MENU_CONFIRM_DEPTH,
+      beforeOpen: () => {
+        [...this.touchControlPointers.keys()].forEach((id) => this.releaseTouchControl(id));
+        this.endFloatingJoystick();
+      }
     });
   }
 

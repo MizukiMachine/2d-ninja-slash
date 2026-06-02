@@ -47,7 +47,7 @@ export class SettingsScene extends BaseScene {
     this.createTextButton({
       x: this.centerX + 86,
       y: this.centerY + 82,
-      label: 'BGM On/Off',
+      label: 'Toggle BGM',
       width: 152,
       onClick: () => this.settings.toggleBgm()
     });
@@ -75,7 +75,6 @@ export class SettingsScene extends BaseScene {
     const volumePercent = Math.round(settings.volume * 100);
     this.volumeText?.setText(`Volume ${volumePercent}%`);
     this.mutedText?.setText(settings.muted ? 'Muted On' : 'Muted Off');
-    // 「押した後の状態」を表示: 再生中は 'BGM Off'、停止中は 'BGM On'
-    this.bgmText?.setText(settings.bgmEnabled ? 'BGM Off' : 'BGM On');
+    this.bgmText?.setText(settings.bgmEnabled ? 'BGM: ON' : 'BGM: OFF');
   }
 }
