@@ -15,6 +15,23 @@ type VolumeAdjustableSound = Phaser.Sound.BaseSound & {
   volume?: number;
 };
 
+type ResumableAudioContext = {
+  readonly state?: string;
+  resume?: () => Promise<void>;
+};
+
+type UnlockableSoundManager = Phaser.Sound.BaseSoundManager & {
+  unlock?: () => void;
+  unlocked?: boolean;
+  context?: ResumableAudioContext | null;
+};
+
+interface PendingSfxRequest {
+  readonly scene: Phaser.Scene;
+  readonly cueId: SfxCueId;
+  readonly volumeOverride?: number;
+}
+
 interface SfxPlaybackEvent {
   readonly type: 'sfx';
   readonly cueId: SfxCueId;
@@ -56,6 +73,7 @@ function formatDebugDetails(details: object): string {
 export interface GameAudio {
   queueAudioAssets(scene: Phaser.Scene): void;
   syncSettings(scene: Phaser.Scene, settings: SettingsState): void;
+  requestUnlock(scene: Phaser.Scene): void;
   playBgm(scene: Phaser.Scene, trackId: BgmTrackId): void;
   playSfx(scene: Phaser.Scene, cueId: SfxCueId, volumeOverride?: number): void;
   stopBgm(): void;
@@ -70,6 +88,9 @@ class PhaserGameAudio implements GameAudio {
   private desiredBgmTrackId: BgmTrackId | null = null;
   private bgmEnabled = true;
   private waitingForUnlock = false;
+  private unlockRequested = false;
+  private unlockScene: Phaser.Scene | null = null;
+  private pendingSfxRequest: PendingSfxRequest | null = null;
   private readonly bgmKeys = new Set(ALL_BGM_TRACKS.map((track) => track.key));
 
   queueAudioAssets(scene: Phaser.Scene): void {
@@ -92,6 +113,46 @@ class PhaserGameAudio implements GameAudio {
     this.setBgmEnabled(scene, settings.bgmEnabled);
   }
 
+  requestUnlock(scene: Phaser.Scene): void {
+    if (!scene.sound.locked) {
+      this.flushPendingAudio(scene);
+      return;
+    }
+
+    this.waitForUnlock(scene);
+
+    const soundManager = scene.sound as UnlockableSoundManager;
+
+    if (!this.unlockRequested) {
+      this.unlockRequested = true;
+      soundManager.unlock?.();
+    }
+
+    const context = soundManager.context;
+
+    if (context === null || context === undefined || typeof context.resume !== 'function') {
+      return;
+    }
+
+    if (context.state === 'running') {
+      this.markSoundManagerUnlocked(soundManager);
+      return;
+    }
+
+    if (context.state !== 'suspended' && context.state !== 'interrupted') {
+      return;
+    }
+
+    void context.resume().then(
+      () => {
+        this.markSoundManagerUnlocked(soundManager);
+      },
+      () => {
+        this.unlockRequested = false;
+      }
+    );
+  }
+
   private setBgmEnabled(scene: Phaser.Scene, enabled: boolean): void {
     if (this.bgmEnabled === enabled) {
       return;
@@ -101,6 +162,7 @@ class PhaserGameAudio implements GameAudio {
 
     if (!enabled) {
       // Silence BGM but remember the desired track so it can resume on re-enable.
+      this.pendingBgmTrackId = null;
       this.stopBgm();
       return;
     }
@@ -215,11 +277,27 @@ class PhaserGameAudio implements GameAudio {
       return;
     }
 
-    if (scene.sound.locked || !scene.cache.audio.exists(cue.key)) {
+    const cached = scene.cache.audio.exists(cue.key);
+
+    if (scene.sound.locked) {
+      if (cached) {
+        this.pendingSfxRequest = { scene, cueId, volumeOverride };
+      }
+
+      this.recordSfxSkipped(scene, cueId, cue.key, {
+        reason: cached ? 'audio-locked-pending' : 'audio-unavailable',
+        locked: true,
+        cached
+      });
+      this.requestUnlock(scene);
+      return;
+    }
+
+    if (!cached) {
       this.recordSfxSkipped(scene, cueId, cue.key, {
         reason: 'audio-unavailable',
-        locked: scene.sound.locked,
-        cached: scene.cache.audio.exists(cue.key)
+        locked: false,
+        cached
       });
       return;
     }
@@ -387,6 +465,8 @@ class PhaserGameAudio implements GameAudio {
   }
 
   private waitForUnlock(scene: Phaser.Scene): void {
+    this.unlockScene = scene;
+
     if (this.waitingForUnlock) {
       return;
     }
@@ -394,12 +474,37 @@ class PhaserGameAudio implements GameAudio {
     this.waitingForUnlock = true;
     scene.sound.once(Phaser.Sound.Events.UNLOCKED, () => {
       this.waitingForUnlock = false;
-      const nextTrackId = this.pendingBgmTrackId;
+      this.unlockRequested = false;
 
-      if (nextTrackId !== null) {
-        this.playBgm(scene, nextTrackId);
-      }
+      const unlockedScene = this.unlockScene ?? scene;
+      this.unlockScene = null;
+      this.flushPendingAudio(unlockedScene);
     });
+  }
+
+  private markSoundManagerUnlocked(soundManager: UnlockableSoundManager): void {
+    if (soundManager.locked) {
+      soundManager.unlocked = true;
+    }
+  }
+
+  private flushPendingAudio(scene: Phaser.Scene): void {
+    const pendingSfxRequest = this.pendingSfxRequest;
+    this.pendingSfxRequest = null;
+
+    if (pendingSfxRequest !== null) {
+      this.playSfx(
+        pendingSfxRequest.scene,
+        pendingSfxRequest.cueId,
+        pendingSfxRequest.volumeOverride
+      );
+    }
+
+    const nextTrackId = this.pendingBgmTrackId;
+
+    if (nextTrackId !== null) {
+      this.playBgm(scene, nextTrackId);
+    }
   }
 }
 
