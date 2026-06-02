@@ -55,6 +55,7 @@ export class MainMenuScene extends BaseScene {
     this.createStartButton();
     this.createMultiplayerButton();
     this.createBgmToggleButton();
+    this.createSoundUnlockPrompt();
     this.createControlsGuide();
     this.createStartKeyboardInput();
   }
@@ -243,6 +244,51 @@ export class MainMenuScene extends BaseScene {
       // ラベルは「押した後に変化する状態」を表示する: 再生中なら次は止まるので 'BGM Off'
       label.setText(settings.bgmEnabled ? 'BGM Off' : 'BGM On');
       refreshColor(settings.bgmEnabled);
+    });
+  }
+
+  private createSoundUnlockPrompt(): void {
+    if (!this.isTouchPrimaryInput() || !this.sound.locked) {
+      return;
+    }
+
+    const { width, height } = this.profile;
+    const startButtonY = height * 0.61;
+    const promptY = Math.min(
+      height - (height > width ? 58 : 38),
+      startButtonY + (height > width ? 260 : 244)
+    );
+    const prompt = this.add
+      .text(this.centerX, promptY, 'Tap to Enable Sound', {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: height > width ? '20px' : '18px',
+        color: '#d6b76f',
+        stroke: '#080909',
+        strokeThickness: 3
+      })
+      .setOrigin(0.5)
+      .setDepth(TITLE_CONTENT_DEPTH + 1)
+      .setAlpha(0.76);
+    const hidePrompt = (): void => {
+      this.tweens.killTweensOf(prompt);
+      prompt.destroy();
+    };
+
+    this.tweens.add({
+      targets: prompt,
+      alpha: { from: 0.52, to: 0.9 },
+      duration: 850,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.sound.once(Phaser.Sound.Events.UNLOCKED, hidePrompt);
+    this.trackCleanup(() => {
+      this.sound.off(Phaser.Sound.Events.UNLOCKED, hidePrompt);
+
+      if (prompt.active) {
+        hidePrompt();
+      }
     });
   }
 

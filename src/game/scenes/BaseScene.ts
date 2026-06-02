@@ -37,6 +37,7 @@ export abstract class BaseScene extends Phaser.Scene {
     this.onStore(this.settings, (settings) => {
       this.app.audio.syncSettings(this, settings);
     });
+    this.armAudioUnlockGesture();
 
     if (this.scene.key !== 'Boot') {
       let syncedBgmTrackId: string | null = null;
@@ -190,6 +191,20 @@ export abstract class BaseScene extends Phaser.Scene {
 
   protected onStore<T>(store: ReadableStore<T>, listener: StoreListener<T>, immediate = true): void {
     this.trackCleanup(store.subscribe(listener, { immediate }));
+  }
+
+  private armAudioUnlockGesture(): void {
+    const requestUnlock = (): void => {
+      this.app.audio.requestUnlock(this);
+    };
+    const keyboard = this.input.keyboard;
+
+    this.input.once(Phaser.Input.Events.POINTER_DOWN, requestUnlock);
+    keyboard?.once(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, requestUnlock);
+    this.trackCleanup(() => {
+      this.input.off(Phaser.Input.Events.POINTER_DOWN, requestUnlock);
+      keyboard?.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, requestUnlock);
+    });
   }
 
   /**

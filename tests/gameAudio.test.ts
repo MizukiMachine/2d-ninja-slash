@@ -14,6 +14,11 @@ interface MockSound {
   readonly destroy: () => void;
 }
 
+interface AudioSceneOptions {
+  readonly locked?: boolean;
+  readonly cacheExists?: boolean;
+}
+
 async function createTestGameAudio() {
   vi.resetModules();
   vi.doMock('phaser', () => ({
@@ -25,7 +30,8 @@ async function createTestGameAudio() {
       },
       Sound: {
         Events: {
-          COMPLETE: 'complete'
+          COMPLETE: 'complete',
+          UNLOCKED: 'unlocked'
         }
       }
     }
@@ -57,8 +63,12 @@ function createMockSound(key: string, isPlaying = false): MockSound {
   return sound;
 }
 
-function createAudioScene(initialSounds: MockSound[] = []) {
+function createAudioScene(
+  initialSounds: MockSound[] = [],
+  options: AudioSceneOptions = {}
+) {
   const sounds = [...initialSounds];
+  const unlockCallbacks: Array<() => void> = [];
   const add = vi.fn((key: string) => {
     const sound = createMockSound(key);
 
@@ -84,26 +94,46 @@ function createAudioScene(initialSounds: MockSound[] = []) {
 
     return index !== -1;
   });
+  const soundManager = {
+    locked: options.locked ?? false,
+    add,
+    getAll,
+    remove,
+    once: vi.fn((event: string, callback: () => void) => {
+      if (event === 'unlocked') {
+        unlockCallbacks.push(callback);
+      }
+
+      return soundManager;
+    }),
+    unlock: vi.fn()
+  };
   const scene = {
+    scene: { key: 'TestScene' },
     cache: {
       audio: {
-        exists: vi.fn(() => true)
+        exists: vi.fn(() => options.cacheExists ?? true)
       }
     },
-    sound: {
-      locked: false,
-      add,
-      getAll,
-      remove
-    }
+    sound: soundManager
   } as unknown as Phaser.Scene;
 
   return {
     add,
     getAll,
     remove,
+    once: soundManager.once,
     scene,
-    sounds
+    sounds,
+    unlock: soundManager.unlock,
+    unlockSound: () => {
+      soundManager.locked = false;
+      const callbacks = unlockCallbacks.splice(0);
+
+      callbacks.forEach((callback) => {
+        callback();
+      });
+    }
   };
 }
 
@@ -174,6 +204,35 @@ describe('gameAudio', () => {
     expect(sounds.map((sound) => sound.key)).toEqual(['bgm.gameOverLament']);
   });
 
+  it('plays a pending BGM request after the sound manager unlocks', async () => {
+    const { add, once, scene, sounds, unlock, unlockSound } = createAudioScene([], {
+      locked: true
+    });
+    const audio = await createTestGameAudio();
+
+    audio.playBgm(scene, 'boss-duel');
+
+    expect(add).not.toHaveBeenCalled();
+    expect(once).toHaveBeenCalledWith('unlocked', expect.any(Function));
+
+    audio.requestUnlock(scene);
+
+    expect(unlock).toHaveBeenCalledTimes(1);
+
+    unlockSound();
+
+    const bgmSound = sounds[0]!;
+
+    expect(add).toHaveBeenCalledWith('bgm.bossDuel', {
+      loop: true,
+      volume: COMBAT_BGM_VOLUME
+    });
+    expect(bgmSound.play).toHaveBeenCalledWith({
+      loop: true,
+      volume: COMBAT_BGM_VOLUME
+    });
+  });
+
   it('plays SFX through an explicit sound instance with the cue volume', async () => {
     const sound = {
       once: vi.fn(),
@@ -210,6 +269,52 @@ describe('gameAudio', () => {
       volume: 0.211
     });
     expect(sound.destroy).not.toHaveBeenCalled();
+  });
+
+  it('retries the first cached SFX after the sound manager unlocks', async () => {
+    const sound = {
+      once: vi.fn(),
+      play: vi.fn(() => true),
+      destroy: vi.fn()
+    };
+    const unlockCallbacks: Array<() => void> = [];
+    const soundManager = {
+      locked: true,
+      add: vi.fn(() => sound),
+      once: vi.fn((event: string, callback: () => void) => {
+        if (event === 'unlocked') {
+          unlockCallbacks.push(callback);
+        }
+
+        return soundManager;
+      }),
+      unlock: vi.fn()
+    };
+    const scene = {
+      scene: { key: 'MainMenu' },
+      cache: { audio: { exists: vi.fn(() => true) } },
+      sound: soundManager
+    } as unknown as Phaser.Scene;
+    const audio = await createTestGameAudio();
+
+    audio.playSfx(scene, 'ui-select', 0.2);
+
+    expect(soundManager.add).not.toHaveBeenCalled();
+    expect(soundManager.unlock).toHaveBeenCalledTimes(1);
+
+    soundManager.locked = false;
+    unlockCallbacks.splice(0).forEach((callback) => {
+      callback();
+    });
+
+    expect(soundManager.add).toHaveBeenCalledWith('sfx.uiSelect', {
+      loop: false,
+      volume: 0.2
+    });
+    expect(sound.play).toHaveBeenCalledWith({
+      loop: false,
+      volume: 0.2
+    });
   });
 
   it('caps a one-shot SFX with a loud finite volume override', async () => {
