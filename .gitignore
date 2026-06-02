@@ -27,3 +27,4 @@ build/
 .claude/
 dist/
 npm-debug.log*
+.vercel

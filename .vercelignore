@@ -1,0 +1,17 @@
+node_modules/
+old/
+.git/
+android/
+build/
+dist/
+generated/
+.vite/
+.tsbuildinfo/
+.mcpheadlessbrowser/
+.browser-observer/
+.local-logs/
+.claude/
+.colyseus-cloud.json
+.env
+.env.*
+npm-debug.log*
