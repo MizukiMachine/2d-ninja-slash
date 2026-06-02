@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { getAppContext, type AppContext } from '../../app/context';
 import type { SfxTriggerId } from '../audio/sfxBindings';
 import type { GameProfile } from '../profiles';
-import type { SceneKey } from '../sceneKeys';
+import { SceneKeys, type SceneKey } from '../sceneKeys';
 import type { ReadableStore, StoreListener, Unsubscribe } from '../../stores/store';
 import { GAME_DISPLAY_FONT_FAMILY, GAME_UI_FONT_FAMILY } from '../gameFonts';
 
@@ -15,8 +15,19 @@ interface TextButtonConfig {
   readonly height?: number;
 }
 
+interface ReturnToMenuConfirmConfig {
+  readonly depth: number;
+  readonly beforeOpen?: () => void;
+  readonly onClose?: () => void;
+}
+
 const LOADING_TEXT = '読み込み中…';
 const LOAD_ERROR_TEXT = '読み込みに失敗しました\n画面をタップして再読み込み';
+const RETURN_MENU_CONFIRM_SCRIM_ALPHA = 0.72;
+const RETURN_MENU_CONFIRM_PANEL_HEIGHT = 230;
+const RETURN_MENU_CONFIRM_PANEL_MAX_WIDTH = 500;
+const RETURN_MENU_CONFIRM_BUTTON_WIDTH = 142;
+const RETURN_MENU_CONFIRM_BUTTON_HEIGHT = 54;
 
 export abstract class BaseScene extends Phaser.Scene {
   private cleanupCallbacks: Unsubscribe[] = [];
@@ -24,6 +35,8 @@ export abstract class BaseScene extends Phaser.Scene {
   private loadingOverlay: Phaser.GameObjects.Text | null = null;
   /** Set when any file errors during the current load batch. */
   private loadHadError = false;
+  private returnToMenuConfirmOverlay: Phaser.GameObjects.Container | null = null;
+  private returnToMenuConfirmOnClose: (() => void) | null = null;
 
   protected constructor(sceneKey: SceneKey) {
     super(sceneKey);
@@ -185,6 +198,31 @@ export abstract class BaseScene extends Phaser.Scene {
     this.scene.start(sceneKey);
   }
 
+  protected confirmReturnToMenu(config: ReturnToMenuConfirmConfig): void {
+    if (this.returnToMenuConfirmOverlay !== null) {
+      return;
+    }
+
+    config.beforeOpen?.();
+    this.returnToMenuConfirmOnClose = config.onClose ?? null;
+    this.showReturnToMenuConfirm(config.depth);
+  }
+
+  protected hideReturnToMenuConfirm(): void {
+    const overlay = this.returnToMenuConfirmOverlay;
+    const onClose = this.returnToMenuConfirmOnClose;
+
+    this.returnToMenuConfirmOverlay = null;
+    this.returnToMenuConfirmOnClose = null;
+
+    if (overlay === null) {
+      return;
+    }
+
+    overlay.destroy(true);
+    onClose?.();
+  }
+
   protected trackCleanup(cleanup: Unsubscribe): void {
     this.cleanupCallbacks.push(cleanup);
   }
@@ -282,11 +320,122 @@ export abstract class BaseScene extends Phaser.Scene {
     });
   }
 
+  private showReturnToMenuConfirm(depth: number): void {
+    const { width, height } = this.profile;
+    const panelWidth = Math.min(width * 0.78, RETURN_MENU_CONFIRM_PANEL_MAX_WIDTH);
+    const panelHeight = RETURN_MENU_CONFIRM_PANEL_HEIGHT;
+    const panelY = this.centerY;
+    const buttonY = panelY + 54;
+    const buttonGap = 18;
+    const overlay = this.add
+      .container(0, 0)
+      .setScrollFactor(0)
+      .setDepth(depth);
+    const scrim = this.add
+      .rectangle(
+        this.centerX,
+        this.centerY,
+        width,
+        height,
+        0x02050a,
+        RETURN_MENU_CONFIRM_SCRIM_ALPHA
+      )
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: false });
+    const panel = this.add
+      .rectangle(this.centerX, panelY, panelWidth, panelHeight, 0x101722, 0.98)
+      .setScrollFactor(0)
+      .setStrokeStyle(2, 0xd6b76f, 0.9);
+    const title = this.add
+      .text(this.centerX, panelY - 48, 'メニュー画面に戻りますか?', {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: height > width ? '28px' : '30px',
+        color: '#fff7df',
+        stroke: '#05080d',
+        strokeThickness: 4,
+        align: 'center',
+        wordWrap: {
+          width: panelWidth - 48,
+          useAdvancedWrap: true
+        }
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    const noButton = this.createReturnToMenuConfirmButton(
+      this.centerX - RETURN_MENU_CONFIRM_BUTTON_WIDTH / 2 - buttonGap / 2,
+      buttonY,
+      'No',
+      () => this.hideReturnToMenuConfirm(),
+      0x7ed7ff
+    );
+    const yesButton = this.createReturnToMenuConfirmButton(
+      this.centerX + RETURN_MENU_CONFIRM_BUTTON_WIDTH / 2 + buttonGap / 2,
+      buttonY,
+      'Yes',
+      () => {
+        this.hideReturnToMenuConfirm();
+        this.goTo(SceneKeys.MainMenu);
+      },
+      0xd6b76f
+    );
+
+    overlay.add([scrim, panel, title, noButton, yesButton]);
+    this.returnToMenuConfirmOverlay = overlay;
+  }
+
+  private createReturnToMenuConfirmButton(
+    x: number,
+    y: number,
+    label: string,
+    onClick: () => void,
+    strokeColor: number
+  ): Phaser.GameObjects.Container {
+    const button = this.add.container(x, y).setScrollFactor(0);
+    const background = this.add
+      .rectangle(
+        0,
+        0,
+        RETURN_MENU_CONFIRM_BUTTON_WIDTH,
+        RETURN_MENU_CONFIRM_BUTTON_HEIGHT,
+        0x182235,
+        1
+      )
+      .setStrokeStyle(2, strokeColor, 0.92)
+      .setInteractive({ useHandCursor: true });
+    const text = this.add
+      .text(0, 0, label, {
+        fontFamily: GAME_UI_FONT_FAMILY,
+        fontSize: '22px',
+        color: '#fff7df'
+      })
+      .setOrigin(0.5);
+
+    button.add([background, text]);
+    background.on('pointerover', () => {
+      background.setFillStyle(0x223150, 1);
+    });
+    background.on('pointerout', () => {
+      background.setFillStyle(0x182235, 1);
+    });
+    background.on('pointerdown', () => {
+      background.setFillStyle(0x2d5f91, 1);
+    });
+    background.on('pointerup', () => {
+      background.setFillStyle(0x223150, 1);
+      this.playSfx('ui-select');
+      onClick();
+    });
+
+    return button;
+  }
+
   private disposeScene(): void {
     const callbacks = this.cleanupCallbacks.splice(0);
 
     for (const cleanup of callbacks) {
       cleanup();
     }
+
+    this.hideReturnToMenuConfirm();
   }
 }

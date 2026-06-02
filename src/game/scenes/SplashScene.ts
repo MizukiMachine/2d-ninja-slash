@@ -7,6 +7,10 @@ export class SplashScene extends BaseScene {
     super(SceneKeys.Splash);
   }
 
+  protected override shouldSyncDebugBgm(): boolean {
+    return false;
+  }
+
   create(): void {
     this.cameras.main.setBackgroundColor('#101520');
     this.addTitle(GAME_TITLE, this.centerY - 28);

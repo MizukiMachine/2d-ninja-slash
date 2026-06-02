@@ -14,6 +14,11 @@ const TITLE_BACKGROUND_FALLBACK_FILE_NAME = 'stage-candidate-moonlit-temple-yard
 const BACKGROUND_DEPTH = -30;
 const OVERLAY_DEPTH = -20;
 const TITLE_CONTENT_DEPTH = 10;
+const START_GATE_DEPTH = 100;
+const START_GATE_FADE_MS = 220;
+const START_GATE_SCRIM_ALPHA = 0.94;
+
+let hasAcceptedStartGate = false;
 
 function getTitleBackgroundFileName(): DebugBackgroundFileName {
   return isDebugBackgroundFileName(TITLE_BACKGROUND_FILE_NAME)
@@ -36,6 +41,8 @@ function getTitleBackgroundUrl(): string {
 }
 
 export class MainMenuScene extends BaseScene {
+  private startGateOverlay: Phaser.GameObjects.Container | null = null;
+
   constructor() {
     super(SceneKeys.MainMenu);
   }
@@ -55,9 +62,13 @@ export class MainMenuScene extends BaseScene {
     this.createStartButton();
     this.createMultiplayerButton();
     this.createBgmToggleButton();
-    this.createSoundUnlockPrompt();
     this.createControlsGuide();
     this.createStartKeyboardInput();
+    this.createStartGateOverlay();
+  }
+
+  protected override shouldSyncDebugBgm(): boolean {
+    return hasAcceptedStartGate;
   }
 
   private createBackground(): void {
@@ -241,53 +252,108 @@ export class MainMenuScene extends BaseScene {
     });
 
     this.onStore(this.settings, (settings) => {
-      // ラベルは「押した後に変化する状態」を表示する: 再生中なら次は止まるので 'BGM Off'
-      label.setText(settings.bgmEnabled ? 'BGM Off' : 'BGM On');
+      // ラベルは現在のBGM状態を表示する。
+      label.setText(settings.bgmEnabled ? 'BGM: ON' : 'BGM: OFF');
       refreshColor(settings.bgmEnabled);
     });
   }
 
-  private createSoundUnlockPrompt(): void {
-    if (!this.isTouchPrimaryInput() || !this.sound.locked) {
+  private createStartGateOverlay(): void {
+    if (hasAcceptedStartGate) {
       return;
     }
 
     const { width, height } = this.profile;
-    const startButtonY = height * 0.61;
-    const promptY = Math.min(
-      height - (height > width ? 58 : 38),
-      startButtonY + (height > width ? 260 : 244)
-    );
-    const prompt = this.add
-      .text(this.centerX, promptY, 'Tap to Enable Sound', {
+    const startLabel = this.isTouchPrimaryInput() ? 'TAP TO START' : 'CLICK TO START';
+    const gateY = height > width ? height * 0.55 : height * 0.54;
+    const labelSize = height > width ? 34 : 38;
+    const overlay = this.add.container(0, 0).setDepth(START_GATE_DEPTH);
+    const scrim = this.add
+      .rectangle(this.centerX, this.centerY, width, height, 0x02050a, START_GATE_SCRIM_ALPHA)
+      .setInteractive({ useHandCursor: true });
+    const label = this.add
+      .text(this.centerX, gateY, startLabel, {
         fontFamily: GAME_UI_FONT_FAMILY,
-        fontSize: height > width ? '20px' : '18px',
-        color: '#d6b76f',
+        fontSize: `${labelSize}px`,
+        color: '#fff7df',
         stroke: '#080909',
-        strokeThickness: 3
+        strokeThickness: 5
       })
-      .setOrigin(0.5)
-      .setDepth(TITLE_CONTENT_DEPTH + 1)
-      .setAlpha(0.76);
-    const hidePrompt = (): void => {
-      this.tweens.killTweensOf(prompt);
-      prompt.destroy();
+      .setOrigin(0.5);
+    const line = this.add.graphics();
+    const lineWidth = Math.min(width * 0.44, 360);
+    line.lineStyle(2, 0xd6b76f, 0.78);
+    line.lineBetween(
+      this.centerX - lineWidth / 2,
+      gateY + 48,
+      this.centerX + lineWidth / 2,
+      gateY + 48
+    );
+
+    const stopPointerPropagation = (
+      _pointer: Phaser.Input.Pointer,
+      _localX: number,
+      _localY: number,
+      event: Phaser.Types.Input.EventData
+    ): void => {
+      event.stopPropagation();
+    };
+    const acceptGate = (
+      _pointer: Phaser.Input.Pointer,
+      _localX: number,
+      _localY: number,
+      event: Phaser.Types.Input.EventData
+    ): void => {
+      event.stopPropagation();
+      this.acceptStartGate();
     };
 
+    overlay.add([scrim, label, line]);
+    this.startGateOverlay = overlay;
+    scrim.on('pointerdown', stopPointerPropagation);
+    scrim.on('pointerup', acceptGate);
     this.tweens.add({
-      targets: prompt,
-      alpha: { from: 0.52, to: 0.9 },
-      duration: 850,
+      targets: label,
+      alpha: { from: 0.68, to: 1 },
+      duration: 920,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut'
     });
-    this.sound.once(Phaser.Sound.Events.UNLOCKED, hidePrompt);
     this.trackCleanup(() => {
-      this.sound.off(Phaser.Sound.Events.UNLOCKED, hidePrompt);
+      scrim.off('pointerdown', stopPointerPropagation);
+      scrim.off('pointerup', acceptGate);
+      this.tweens.killTweensOf(label);
 
-      if (prompt.active) {
-        hidePrompt();
+      if (overlay.active) {
+        overlay.destroy(true);
+      }
+    });
+  }
+
+  private acceptStartGate(): void {
+    if (hasAcceptedStartGate) {
+      return;
+    }
+
+    hasAcceptedStartGate = true;
+    this.app.audio.playBgm(this, this.debug.get().bgmTrackId);
+    this.app.audio.requestUnlock(this);
+
+    const overlay = this.startGateOverlay;
+    this.startGateOverlay = null;
+
+    if (overlay === null) {
+      return;
+    }
+
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0,
+      duration: START_GATE_FADE_MS,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        overlay.destroy(true);
       }
     });
   }
@@ -419,22 +485,39 @@ export class MainMenuScene extends BaseScene {
     const keyboard = this.input.keyboard;
     const enter = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     const space = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    const startGame = (): void => this.startGame();
+    const openMenuOrStartGame = (): void => {
+      if (!hasAcceptedStartGate) {
+        this.acceptStartGate();
+        return;
+      }
 
-    enter?.on('down', startGame);
-    space?.on('down', startGame);
+      this.startGame();
+    };
+
+    enter?.on('down', openMenuOrStartGame);
+    space?.on('down', openMenuOrStartGame);
     this.trackCleanup(() => {
-      enter?.off('down', startGame);
-      space?.off('down', startGame);
+      enter?.off('down', openMenuOrStartGame);
+      space?.off('down', openMenuOrStartGame);
     });
   }
 
   private startGame(): void {
+    if (!hasAcceptedStartGate) {
+      this.acceptStartGate();
+      return;
+    }
+
     this.playSfx('ui-select');
     this.goTo(SceneKeys.Sandbox);
   }
 
   private startMultiplayer(): void {
+    if (!hasAcceptedStartGate) {
+      this.acceptStartGate();
+      return;
+    }
+
     this.playSfx('ui-select');
     this.goTo(SceneKeys.Multiplayer);
   }
