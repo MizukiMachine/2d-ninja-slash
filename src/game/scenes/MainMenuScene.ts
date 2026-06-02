@@ -337,8 +337,9 @@ export class MainMenuScene extends BaseScene {
     }
 
     hasAcceptedStartGate = true;
-    this.app.audio.playBgm(this, this.debug.get().bgmTrackId);
     this.app.audio.requestUnlock(this);
+    this.app.audio.playBgm(this, this.debug.get().bgmTrackId);
+    this.playSfx('ui-select');
 
     const overlay = this.startGateOverlay;
     this.startGateOverlay = null;

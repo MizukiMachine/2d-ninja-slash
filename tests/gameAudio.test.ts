@@ -17,6 +17,10 @@ interface MockSound {
 interface AudioSceneOptions {
   readonly locked?: boolean;
   readonly cacheExists?: boolean;
+  readonly context?: {
+    readonly state?: string;
+    readonly resume?: () => Promise<void>;
+  };
 }
 
 async function createTestGameAudio() {
@@ -106,7 +110,8 @@ function createAudioScene(
 
       return soundManager;
     }),
-    unlock: vi.fn()
+    unlock: vi.fn(),
+    context: options.context ?? null
   };
   const scene = {
     scene: { key: 'TestScene' },
@@ -227,6 +232,77 @@ describe('gameAudio', () => {
       loop: true,
       volume: COMBAT_BGM_VOLUME
     });
+    expect(bgmSound.play).toHaveBeenCalledWith({
+      loop: true,
+      volume: COMBAT_BGM_VOLUME
+    });
+  });
+
+  it('primes pending BGM immediately while WebAudio resumes from a gesture', async () => {
+    const resume = vi.fn(() => Promise.resolve());
+    const { add, scene, sounds, unlock } = createAudioScene([], {
+      locked: true,
+      context: { state: 'suspended', resume }
+    });
+    const audio = await createTestGameAudio();
+
+    audio.playBgm(scene, 'boss-duel');
+
+    expect(add).not.toHaveBeenCalled();
+
+    audio.requestUnlock(scene);
+
+    const bgmSound = sounds[0]!;
+
+    expect(unlock).not.toHaveBeenCalled();
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(scene.sound.locked).toBe(false);
+    expect(add).toHaveBeenCalledWith('bgm.bossDuel', {
+      loop: true,
+      volume: COMBAT_BGM_VOLUME
+    });
+    expect(bgmSound.play).toHaveBeenCalledWith({
+      loop: true,
+      volume: COMBAT_BGM_VOLUME
+    });
+  });
+
+  it('requeues active BGM if WebAudio resume rejects after gesture playback', async () => {
+    let contextState = 'suspended';
+    const resume = vi.fn(() => Promise.reject(new Error('gesture rejected')));
+    const context = {
+      get state() {
+        return contextState;
+      },
+      resume
+    };
+    const { add, scene, sounds, unlock } = createAudioScene([], {
+      locked: true,
+      context
+    });
+    const audio = await createTestGameAudio();
+
+    audio.requestUnlock(scene);
+    audio.playBgm(scene, 'boss-duel');
+
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(sounds).toHaveLength(1);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(unlock).not.toHaveBeenCalled();
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(scene.sound.locked).toBe(true);
+    expect(sounds).toHaveLength(0);
+
+    contextState = 'running';
+    audio.requestUnlock(scene);
+
+    const bgmSound = sounds[0]!;
+
+    expect(scene.sound.locked).toBe(false);
+    expect(add).toHaveBeenCalledTimes(2);
     expect(bgmSound.play).toHaveBeenCalledWith({
       loop: true,
       volume: COMBAT_BGM_VOLUME
@@ -362,6 +438,46 @@ describe('gameAudio', () => {
 
     expect(scene.sound.add).not.toHaveBeenCalled();
     expect(sound.play).not.toHaveBeenCalled();
+  });
+
+  it('allows SFX while visible even if mobile focus reporting is false', async () => {
+    vi.stubGlobal('document', {
+      hidden: false,
+      hasFocus: vi.fn(() => false)
+    });
+    vi.stubGlobal('window', {
+      dispatchEvent: vi.fn()
+    });
+    vi.stubGlobal('CustomEvent', class {
+      constructor(
+        public readonly type: string,
+        public readonly init?: unknown
+      ) {}
+    });
+
+    const sound = {
+      once: vi.fn(),
+      play: vi.fn(() => true),
+      destroy: vi.fn()
+    };
+    const scene = {
+      scene: { key: 'MainMenu' },
+      cache: { audio: { exists: vi.fn(() => true) } },
+      sound: { locked: false, add: vi.fn(() => sound) }
+    } as unknown as Phaser.Scene;
+
+    const audio = await createTestGameAudio();
+
+    audio.playSfx(scene, 'ui-select', 0.2);
+
+    expect(scene.sound.add).toHaveBeenCalledWith('sfx.uiSelect', {
+      loop: false,
+      volume: 0.2
+    });
+    expect(sound.play).toHaveBeenCalledWith({
+      loop: false,
+      volume: 0.2
+    });
   });
 
   it('ignores a non-finite volume override and uses the catalog volume', async () => {
