@@ -20,7 +20,12 @@ type ResumableAudioContext = {
   resume?: () => Promise<void>;
 };
 
-type UnlockableSoundManager = Phaser.Sound.BaseSoundManager & {
+type ActiveAudioContext = ResumableAudioContext & {
+  resume: () => Promise<void>;
+};
+
+type UnlockableSoundManager = Omit<Phaser.Sound.BaseSoundManager, 'locked'> & {
+  locked: boolean;
   unlock?: () => void;
   unlocked?: boolean;
   context?: ResumableAudioContext | null;
@@ -68,6 +73,12 @@ function formatDebugDetails(details: object): string {
   } catch {
     return '[unserializable]';
   }
+}
+
+function canResumeAudioContext(
+  context: ResumableAudioContext | null | undefined
+): context is ActiveAudioContext {
+  return context !== null && context !== undefined && typeof context.resume === 'function';
 }
 
 export interface GameAudio {
@@ -119,36 +130,71 @@ class PhaserGameAudio implements GameAudio {
       return;
     }
 
-    this.waitForUnlock(scene);
-
     const soundManager = scene.sound as UnlockableSoundManager;
+    const context = soundManager.context;
+
+    if (canResumeAudioContext(context)) {
+      this.requestWebAudioUnlock(scene, soundManager, context);
+      return;
+    }
+
+    this.waitForUnlock(scene);
 
     if (!this.unlockRequested) {
       this.unlockRequested = true;
       soundManager.unlock?.();
     }
+  }
 
-    const context = soundManager.context;
-
-    if (context === null || context === undefined || typeof context.resume !== 'function') {
-      return;
-    }
-
+  private requestWebAudioUnlock(
+    scene: Phaser.Scene,
+    soundManager: UnlockableSoundManager,
+    context: ActiveAudioContext
+  ): void {
     if (context.state === 'running') {
-      this.markSoundManagerUnlocked(soundManager);
+      this.completeUnlock(scene, soundManager);
       return;
     }
 
-    if (context.state !== 'suspended' && context.state !== 'interrupted') {
+    if (
+      context.state !== undefined &&
+      context.state !== 'suspended' &&
+      context.state !== 'interrupted'
+    ) {
       return;
     }
 
-    void context.resume().then(
+    this.unlockRequested = true;
+
+    let resumePromise: Promise<void>;
+
+    try {
+      resumePromise = context.resume();
+    } catch {
+      this.unlockRequested = false;
+      return;
+    }
+
+    // Start pending WebAudio sources during the same user gesture. The context
+    // may still be resolving its resume promise, but scheduled sources will
+    // become audible once the context is running.
+    const flushedBgmTrackId = this.pendingBgmTrackId;
+    const flushedSfxRequest = this.pendingSfxRequest;
+
+    this.completeUnlock(scene, soundManager);
+
+    void resumePromise.then(
       () => {
-        this.markSoundManagerUnlocked(soundManager);
+        this.completeUnlock(scene, soundManager);
       },
       () => {
-        this.unlockRequested = false;
+        this.restoreFailedWebAudioUnlock(
+          scene,
+          soundManager,
+          context,
+          flushedBgmTrackId,
+          flushedSfxRequest
+        );
       }
     );
   }
@@ -342,7 +388,7 @@ class PhaserGameAudio implements GameAudio {
       typeof document.hasFocus === 'function' ? document.hasFocus() : true;
 
     return {
-      active: !hidden && focused,
+      active: !hidden,
       hidden,
       focused
     };
@@ -482,9 +528,59 @@ class PhaserGameAudio implements GameAudio {
     });
   }
 
-  private markSoundManagerUnlocked(soundManager: UnlockableSoundManager): void {
-    if (soundManager.locked) {
-      soundManager.unlocked = true;
+  private completeUnlock(scene: Phaser.Scene, soundManager: UnlockableSoundManager): void {
+    this.waitingForUnlock = false;
+    this.unlockRequested = false;
+    this.unlockScene = null;
+    soundManager.locked = false;
+    soundManager.unlocked = false;
+    this.flushPendingAudio(scene);
+  }
+
+  private restoreFailedWebAudioUnlock(
+    scene: Phaser.Scene,
+    soundManager: UnlockableSoundManager,
+    context: ActiveAudioContext,
+    flushedBgmTrackId: BgmTrackId | null,
+    flushedSfxRequest: PendingSfxRequest | null
+  ): void {
+    this.unlockRequested = false;
+
+    if (context.state === 'running') {
+      return;
+    }
+
+    soundManager.locked = true;
+
+    const bgmTrackIdToRetry = flushedBgmTrackId ?? this.activeBgmTrackId;
+
+    if (bgmTrackIdToRetry !== null) {
+      this.removeActiveBgmSound(scene);
+      this.pendingBgmTrackId = bgmTrackIdToRetry;
+    }
+
+    if (flushedSfxRequest !== null) {
+      this.removeSfxSoundInstances(flushedSfxRequest.scene, flushedSfxRequest.cueId);
+      this.pendingSfxRequest = flushedSfxRequest;
+    }
+  }
+
+  private removeActiveBgmSound(scene: Phaser.Scene): void {
+    if (this.activeBgmSound === null) {
+      return;
+    }
+
+    this.activeBgmSound.stop();
+    scene.sound.remove(this.activeBgmSound);
+    this.activeBgmSound = null;
+    this.activeBgmTrackId = null;
+  }
+
+  private removeSfxSoundInstances(scene: Phaser.Scene, cueId: SfxCueId): void {
+    const cue = getSfxCue(cueId);
+
+    for (const sound of scene.sound.getAll<Phaser.Sound.BaseSound>(cue.key)) {
+      scene.sound.remove(sound);
     }
   }
 
