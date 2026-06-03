@@ -187,7 +187,7 @@ export class MainMenuScene extends BaseScene {
       .setDepth(TITLE_CONTENT_DEPTH)
       .setInteractive({ useHandCursor: true });
     const label = this.add
-      .text(this.centerX, buttonY, '2P Duel', {
+      .text(this.centerX, buttonY, 'Multiplayer', {
         fontFamily: GAME_UI_FONT_FAMILY,
         fontSize: '24px',
         color: '#fff7df'

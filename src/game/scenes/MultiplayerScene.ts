@@ -96,7 +96,7 @@ interface PlayerVisual {
 
 type TouchControlId = 'attack' | 'jump' | 'menu';
 type JoystickLaneDirection = 'up' | 'down';
-type HudMessageLayout = 'top' | 'countdown';
+type HudMessageLayout = 'top' | 'waiting' | 'countdown';
 
 interface TouchControlButtonConfig {
   readonly id: TouchControlId;
@@ -145,6 +145,7 @@ const HUD_STATUS_TOP_Y = 34;
 const HUD_DETAIL_TOP_Y = 72;
 const HUD_STATUS_TOP_FONT_SIZE = 30;
 const HUD_DETAIL_TOP_FONT_SIZE = 18;
+const HUD_WAITING_DETAIL_TOP_Y = 96;
 const HUD_COUNTDOWN_STATUS_FONT_SIZE = 96;
 const HUD_COUNTDOWN_DETAIL_FONT_SIZE = 24;
 const HUD_COUNTDOWN_DETAIL_OFFSET_Y = 86;
@@ -156,7 +157,8 @@ const FINISHED_MENU_BUTTON_DELAY_MS = 1400;
 const FINISHED_RESULT_OFFSET_Y = -52;
 const FINISHED_RESULT_FONT_SIZE = 54;
 const WAITING_STATUS_TEXT = 'マッチング待ち';
-const WAITING_DETAIL_TEXT = '別のユーザーが同じルームに入ると\n対戦が開始します';
+const WAITING_DETAIL_TEXT =
+  '別のブラウザ、スマホなどから\nこのマルチプレイヤーのルームへ入室すると\nマッチングします';
 const MENU_CONFIRM_DEPTH = TOUCH_CONTROL_DEPTH + 40;
 
 function getBackgroundTextureKey(backgroundFileName: DebugBackgroundFileName): string {
@@ -1086,7 +1088,7 @@ export class MultiplayerScene extends BaseScene {
     switch (state.phase) {
       case 'waiting':
         this.resetFinishedResultPresentation();
-        this.applyHudMessageLayout('top');
+        this.applyHudMessageLayout('waiting');
         this.setHudMessageVisible(true);
         this.setMatchHudChromeVisible(true);
         this.setFinishedMenuButtonVisible(false);
@@ -1234,7 +1236,7 @@ export class MultiplayerScene extends BaseScene {
       ?.setPosition(this.centerX, HUD_STATUS_TOP_Y)
       .setFontSize(HUD_STATUS_TOP_FONT_SIZE);
     this.detailText
-      ?.setPosition(this.centerX, HUD_DETAIL_TOP_Y)
+      ?.setPosition(this.centerX, layout === 'waiting' ? HUD_WAITING_DETAIL_TOP_Y : HUD_DETAIL_TOP_Y)
       .setFontSize(HUD_DETAIL_TOP_FONT_SIZE);
   }
 
