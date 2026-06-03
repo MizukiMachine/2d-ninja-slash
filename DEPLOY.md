@@ -19,13 +19,18 @@ Web/Androidビルド時の接続先:
 VITE_COLYSEUS_URL=https://jp-nrt-04e84785.colyseus.cloud
 
 Colyseus Cloud側の許可origin:
-CLIENT_ORIGIN=https://2d-ninja-slash.vercel.app
+CLIENT_ORIGIN=https://<web-frontend-host>
 ```
 
 重要なのは、WebとAndroidのフロントエンドはどちらもビルド時に
 `VITE_COLYSEUS_URL=https://<colyseus-cloud-host>` を埋め込むこと。
 Colyseus Cloud側で `wss://` の接続URLが表示される場合は、それを使ってもよい。
 これを忘れると、フロントエンドが正しい対戦サーバへ接続できない。
+
+AndroidのCapacitor WebViewは `https://localhost` origin からアクセスする。
+サーバ側は `CLIENT_ORIGIN` / `CORS_ORIGIN` に指定したWeb originに加えて、
+Android用の `https://localhost` も自動で許可する。
+複数のWeb originを明示する場合はカンマ区切りで指定する。
 
 ## 全体の順番
 
@@ -85,6 +90,8 @@ CLIENT_ORIGIN=https://<web-frontend-host>
 
 初回はWebのURLが未確定なので、先に `CLIENT_ORIGIN` を未設定または一時値でデプロイし、
 Webデプロイ後に正しいURLへ更新して再デプロイする。
+AndroidエミュレーターからCloudへ接続する場合でも、`https://localhost` はサーバ側で
+自動許可されるため、Web用の `CLIENT_ORIGIN` を消す必要はない。
 
 デプロイ後の確認:
 
@@ -276,5 +283,6 @@ VITE_COLYSEUS_URL=https://<colyseus-cloud-host> npm run android:cloud:install:wi
 - Web/Androidのビルド時に `VITE_COLYSEUS_URL` を入れ忘れると、対戦サーバに接続できない。
 - Vercelで `npm run build` を使うと、このプロジェクトではサーバだけがビルドされる。
 - Androidで `npx cap sync android` を忘れると、エミュレーターに古いWebゲームが入る。
-- Colyseus Cloudの `CLIENT_ORIGIN` がWeb公開URLと違うと、CORSで接続に失敗する。
+- Colyseus Cloudの `CLIENT_ORIGIN` がWeb公開URLと違うと、Web版はCORSで接続に失敗する。
+- Android版はCapacitor WebViewのoriginが `https://localhost` になるため、サーバ側がこのoriginを許可している必要がある。
 - WSL2ではLinux `adb` とWindows `adb.exe` を混ぜると、デバイス一覧が食い違う。

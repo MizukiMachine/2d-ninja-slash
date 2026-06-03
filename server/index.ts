@@ -1,9 +1,12 @@
-import { defineRoom, defineServer } from 'colyseus';
+import { defineRoom, defineServer, matchMaker } from 'colyseus';
 import { BATTLE_ROOM_NAME } from './rooms/BattleState.js';
 import { BattleRoom } from './rooms/BattleRoom.js';
+import { createCorsOriginConfig, resolveCorsHeaderOrigin } from './cors.js';
 
 interface RouteRequest {
   readonly method?: string;
+  get?(name: string): string | undefined;
+  header?(name: string): string | undefined;
 }
 
 interface RouteResponse {
@@ -18,7 +21,22 @@ type NextFunction = () => void;
 const port = Number(process.env.PORT ?? 2567);
 const protocolVersion = 'duel-v1';
 const serviceName = '2d-ninja-slash-colyseus';
-const corsOrigin = process.env.CLIENT_ORIGIN ?? process.env.CORS_ORIGIN ?? '*';
+const corsConfig = createCorsOriginConfig({
+  clientOrigin: process.env.CLIENT_ORIGIN,
+  corsOrigin: process.env.CORS_ORIGIN
+});
+
+function getRequestOrigin(request: RouteRequest): string | undefined {
+  return request.get?.('origin') ?? request.header?.('origin');
+}
+
+matchMaker.controller.getCorsHeaders = (headers: Headers): Record<string, string> => ({
+  'Access-Control-Allow-Origin': resolveCorsHeaderOrigin(
+    corsConfig,
+    headers.get('origin') ?? undefined
+  ),
+  Vary: 'Origin'
+});
 
 export const gameServer = defineServer({
   rooms: {
@@ -26,7 +44,11 @@ export const gameServer = defineServer({
   },
   express: (app) => {
     app.use((request: RouteRequest, response: RouteResponse, next: NextFunction) => {
-      response.setHeader('Access-Control-Allow-Origin', corsOrigin);
+      response.setHeader(
+        'Access-Control-Allow-Origin',
+        resolveCorsHeaderOrigin(corsConfig, getRequestOrigin(request))
+      );
+      response.setHeader('Vary', 'Origin');
       response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
       response.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 
@@ -46,7 +68,10 @@ export const gameServer = defineServer({
         room: BATTLE_ROOM_NAME,
         nodeEnv: process.env.NODE_ENV ?? 'development',
         colyseusCloud: process.env.COLYSEUS_CLOUD !== undefined,
-        clientOriginConfigured: corsOrigin !== '*',
+        clientOriginConfigured: !corsConfig.allowAll,
+        androidOriginAllowed:
+          corsConfig.allowAll ||
+          corsConfig.allowedOrigins.has('https://localhost'),
         build: process.env.BUILD_SHA ?? process.env.RENDER_GIT_COMMIT ?? 'local',
         uptimeSeconds: Math.floor(process.uptime())
       });
