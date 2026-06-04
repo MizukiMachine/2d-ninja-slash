@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2D対戦忍者ゲーム ポートフォリオ解説</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="deck" aria-label="2D対戦忍者ゲーム ポートフォリオ解説">
+      <section class="page cover">
+        <div class="cover__media">
+          <img src="./assets/image6.jpg" alt="2D対戦忍者ゲームのプレイ画面" />
+        </div>
+        <div class="cover__content">
+          <p class="eyebrow">AI-Driven Game Development Portfolio</p>
+          <h1>2D対戦忍者ゲーム<br />月下の忍</h1>
+          <p class="lead">
+            アニメーション、音楽、ゲームプレイ、UI、モバイル対応、マルチプレイヤー化まで、
+            AIと独自開発スキルを使って制作したポートフォリオ作品です。
+          </p>
+          <div class="meta-grid">
+            <div>
+              <span>Core Engine</span>
+              <strong>Phaser 4</strong>
+            </div>
+            <div>
+              <span>Asset Flow</span>
+              <strong>Blender / Pixel Art</strong>
+            </div>
+            <div>
+              <span>Runtime</span>
+              <strong>Web / Android / Multiplayer</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page summary-page">
+        <header class="page-header">
+          <p class="eyebrow">Overview</p>
+          <h2>この作品で示したこと</h2>
+        </header>
+        <div class="summary-layout">
+          <div class="summary-copy">
+            <p class="statement">
+              単にゲームを作っただけではなく、ゲームを継続的に作れる
+              <strong>開発システム</strong>を設計したことが、このポートフォリオの中心です。
+            </p>
+            <div class="highlight-list">
+              <article>
+                <span>01</span>
+                <h3>AIだけで一連の制作を完遂</h3>
+                <p>画面に映るアニメーション、音楽、ゲームプレイ、UI要素までAI主導で制作。</p>
+              </article>
+              <article>
+                <span>02</span>
+                <h3>独自スキルで再現性を確保</h3>
+                <p>Phaser、Blenderレンダー、ピクセルアート、スプライトシート化などをスキル化。</p>
+              </article>
+              <article>
+                <span>03</span>
+                <h3>実行環境を拡張</h3>
+                <p>Webゲームからモバイル端末、さらにマルチプレイヤー対応まで構築。</p>
+              </article>
+            </div>
+          </div>
+          <figure class="framed-shot">
+            <img src="./assets/image4.png" alt="レーンエディターとデバッグコンソール" />
+            <figcaption>開発中に調整できるレーンエディターとデバッグコンソール</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="page process-page">
+        <header class="page-header">
+          <p class="eyebrow">Production Flow</p>
+          <h2>3D素材から2Dゲームアセットへ</h2>
+        </header>
+        <div class="process-grid">
+          <div class="process-card">
+            <img src="./assets/image7.png" alt="Mixamo由来の3Dキャラクターアクション" />
+            <h3>1. 3Dアクションを選ぶ</h3>
+            <p>Mixamoなどから3Dキャラクターとアニメーションを選び、ゲームに必要な動きを決めます。</p>
+          </div>
+          <div class="process-card">
+            <img src="./assets/image3.png" alt="Blenderスプライト撮影の指示例" />
+            <h3>2. Blenderで連番PNG化</h3>
+            <p>Blender MCPを使い、3Dキャラクターを横向きカメラで1フレームずつ撮影します。</p>
+          </div>
+          <div class="process-card">
+            <img src="./assets/image2.png" alt="ピクセルアート化された忍者スプライト" />
+            <h3>3. ピクセルアートへ変換</h3>
+            <p>生成画像をゲーム画面になじむ低解像度ドット絵の表現へ変換し、素材化します。</p>
+          </div>
+        </div>
+        <div class="note-box">
+          <h3>重要な工夫</h3>
+          <p>
+            正しい指示がないと、左右ビューの不一致、足元のズレ、フレームドリフトなどが発生します。
+            そこで、撮影ルール・解像度・フレーム数・アンカー確認・QAをまとめた
+            <strong>blender-mcp-sprite-renderer</strong>スキルを作りました。
+          </p>
+        </div>
+      </section>
+
+      <section class="page system-page">
+        <header class="page-header">
+          <p class="eyebrow">Development System</p>
+          <h2>ゲームを作るための仕組みを作る</h2>
+        </header>
+        <div class="system-layout">
+          <figure class="large-shot">
+            <img src="./assets/image1.png" alt="アニメーション当たり判定を調整するデバッグラボ" />
+            <figcaption>アニメーション、当たり判定、攻撃フレームを確認するDebug Lab</figcaption>
+          </figure>
+          <div class="system-copy">
+            <ol class="numbered">
+              <li>
+                <strong>ゲーム全体のモック画像を先に作る</strong>
+                <span>画像生成AIで候補を作り、以降の雰囲気とコンセプトの参照にします。</span>
+              </li>
+              <li>
+                <strong>全アセットにindex JSONを持たせる</strong>
+                <span>フレームサイズ、フレーム数、向き、攻撃アニメーションの有無を明示します。</span>
+              </li>
+              <li>
+                <strong>Debug Console / Editorを充実させる</strong>
+                <span>調整作業をAIと人間のどちらにも扱いやすいインターフェイスにします。</span>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="page closing-page">
+        <header class="page-header">
+          <p class="eyebrow">Extension</p>
+          <h2>モバイル対応とマルチプレイヤー化</h2>
+        </header>
+        <div class="closing-layout">
+          <div class="closing-copy">
+            <p class="statement">
+              アセットと開発システムが整うと、デモゲームの内容は素早く実装できます。
+              さらに、同じAI開発フローでAndroid対応とマルチプレイヤー化も行いました。
+            </p>
+            <div class="skill-table" role="table" aria-label="独自開発スキル">
+              <div role="row">
+                <span role="cell">phaser-gamedev</span>
+                <strong role="cell">Phaserゲーム制作の専門知識をCodexへ与える</strong>
+              </div>
+              <div role="row">
+                <span role="cell">blender-mcp-sprite-renderer</span>
+                <strong role="cell">3Dアニメーションを2D透明PNGスプライトへ変換</strong>
+              </div>
+              <div role="row">
+                <span role="cell">colyseus-multiplayer</span>
+                <strong role="cell">数個のプロンプトでマルチプレイヤー対応を進める</strong>
+              </div>
+              <div role="row">
+                <span role="cell">phaser-capacitor-android</span>
+                <strong role="cell">Phaser作品をAndroid端末で動かす</strong>
+              </div>
+            </div>
+          </div>
+          <figure class="code-shot">
+            <img src="./assets/image5.png" alt="ゲームアセットindex JSONの例" />
+            <figcaption>アセット情報を構造化し、AIが扱いやすい文脈に変換</figcaption>
+          </figure>
+        </div>
+        <footer class="links">
+          <a href="https://youtu.be/66ppeVs3hZQ">Gameplay: youtu.be/66ppeVs3hZQ</a>
+          <a href="https://youtu.be/onePxeTCLVQ">Multiplayer: youtu.be/onePxeTCLVQ</a>
+          <a href="https://github.com/MizukiMachine/codex-skills-public/tree/develop">Skills: github.com/MizukiMachine/codex-skills-public</a>
+        </footer>
+      </section>
+    </main>
+  </body>
+</html>
