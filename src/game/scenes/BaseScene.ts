@@ -232,16 +232,42 @@ export abstract class BaseScene extends Phaser.Scene {
   }
 
   private armAudioUnlockGesture(): void {
+    const keyboard = this.input.keyboard;
+    const nativeUnlockTargets: Array<{
+      readonly target: EventTarget;
+      readonly type: string;
+    }> = [];
+
     const requestUnlock = (): void => {
+      removeNativeUnlockListeners();
       this.app.audio.requestUnlock(this);
     };
-    const keyboard = this.input.keyboard;
+    function removeNativeUnlockListeners(): void {
+      while (nativeUnlockTargets.length > 0) {
+        const { target, type } = nativeUnlockTargets.pop()!;
 
+        target.removeEventListener(type, requestUnlock);
+      }
+    }
+    const addNativeUnlockListener = (target: EventTarget, type: string): void => {
+      target.addEventListener(type, requestUnlock, {
+        once: true,
+        passive: true
+      });
+      nativeUnlockTargets.push({ target, type });
+    };
+    const canvas = this.sys.game.canvas;
+
+    addNativeUnlockListener(canvas, 'pointerdown');
+    addNativeUnlockListener(canvas, 'touchstart');
+    addNativeUnlockListener(canvas, 'mousedown');
+    addNativeUnlockListener(window, 'keydown');
     this.input.once(Phaser.Input.Events.POINTER_DOWN, requestUnlock);
     keyboard?.once(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, requestUnlock);
     this.trackCleanup(() => {
       this.input.off(Phaser.Input.Events.POINTER_DOWN, requestUnlock);
       keyboard?.off(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, requestUnlock);
+      removeNativeUnlockListeners();
     });
   }
 

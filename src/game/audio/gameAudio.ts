@@ -529,11 +529,17 @@ class PhaserGameAudio implements GameAudio {
   }
 
   private completeUnlock(scene: Phaser.Scene, soundManager: UnlockableSoundManager): void {
+    const wasLocked = soundManager.locked;
+
     this.waitingForUnlock = false;
     this.unlockRequested = false;
     this.unlockScene = null;
     soundManager.locked = false;
-    soundManager.unlocked = false;
+
+    if (wasLocked) {
+      soundManager.unlocked = true;
+    }
+
     this.flushPendingAudio(scene);
   }
 
@@ -551,6 +557,7 @@ class PhaserGameAudio implements GameAudio {
     }
 
     soundManager.locked = true;
+    soundManager.unlocked = false;
 
     const bgmTrackIdToRetry = flushedBgmTrackId ?? this.activeBgmTrackId;
 

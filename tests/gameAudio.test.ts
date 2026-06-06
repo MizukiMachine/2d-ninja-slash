@@ -100,6 +100,7 @@ function createAudioScene(
   });
   const soundManager = {
     locked: options.locked ?? false,
+    unlocked: false,
     add,
     getAll,
     remove,
@@ -129,6 +130,7 @@ function createAudioScene(
     remove,
     once: soundManager.once,
     scene,
+    soundManager,
     sounds,
     unlock: soundManager.unlock,
     unlockSound: () => {
@@ -240,7 +242,7 @@ describe('gameAudio', () => {
 
   it('primes pending BGM immediately while WebAudio resumes from a gesture', async () => {
     const resume = vi.fn(() => Promise.resolve());
-    const { add, scene, sounds, unlock } = createAudioScene([], {
+    const { add, scene, soundManager, sounds, unlock } = createAudioScene([], {
       locked: true,
       context: { state: 'suspended', resume }
     });
@@ -257,6 +259,7 @@ describe('gameAudio', () => {
     expect(unlock).not.toHaveBeenCalled();
     expect(resume).toHaveBeenCalledTimes(1);
     expect(scene.sound.locked).toBe(false);
+    expect(soundManager.unlocked).toBe(true);
     expect(add).toHaveBeenCalledWith('bgm.bossDuel', {
       loop: true,
       volume: COMBAT_BGM_VOLUME
@@ -265,6 +268,35 @@ describe('gameAudio', () => {
       loop: true,
       volume: COMBAT_BGM_VOLUME
     });
+  });
+
+  it('does not re-arm Phaser unlock after the resume promise resolves', async () => {
+    let resolveResume!: () => void;
+    const resume = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveResume = resolve;
+        })
+    );
+    const { scene, soundManager } = createAudioScene([], {
+      locked: true,
+      context: { state: 'suspended', resume }
+    });
+    const audio = await createTestGameAudio();
+
+    audio.requestUnlock(scene);
+
+    expect(scene.sound.locked).toBe(false);
+    expect(soundManager.unlocked).toBe(true);
+
+    // Phaser's BaseSoundManager consumes this flag during its next update.
+    soundManager.unlocked = false;
+
+    resolveResume();
+    await Promise.resolve();
+
+    expect(scene.sound.locked).toBe(false);
+    expect(soundManager.unlocked).toBe(false);
   });
 
   it('requeues active BGM if WebAudio resume rejects after gesture playback', async () => {
@@ -276,7 +308,7 @@ describe('gameAudio', () => {
       },
       resume
     };
-    const { add, scene, sounds, unlock } = createAudioScene([], {
+    const { add, scene, soundManager, sounds, unlock } = createAudioScene([], {
       locked: true,
       context
     });
@@ -294,6 +326,7 @@ describe('gameAudio', () => {
     expect(unlock).not.toHaveBeenCalled();
     expect(resume).toHaveBeenCalledTimes(1);
     expect(scene.sound.locked).toBe(true);
+    expect(soundManager.unlocked).toBe(false);
     expect(sounds).toHaveLength(0);
 
     contextState = 'running';

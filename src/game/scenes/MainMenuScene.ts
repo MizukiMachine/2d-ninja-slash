@@ -310,8 +310,8 @@ export class MainMenuScene extends BaseScene {
 
     overlay.add([scrim, label, line]);
     this.startGateOverlay = overlay;
-    scrim.on('pointerdown', stopPointerPropagation);
-    scrim.on('pointerup', acceptGate);
+    scrim.on('pointerdown', acceptGate);
+    scrim.on('pointerup', stopPointerPropagation);
     this.tweens.add({
       targets: label,
       alpha: { from: 0.68, to: 1 },
@@ -321,8 +321,8 @@ export class MainMenuScene extends BaseScene {
       ease: 'Sine.easeInOut'
     });
     this.trackCleanup(() => {
-      scrim.off('pointerdown', stopPointerPropagation);
-      scrim.off('pointerup', acceptGate);
+      scrim.off('pointerdown', acceptGate);
+      scrim.off('pointerup', stopPointerPropagation);
       this.tweens.killTweensOf(label);
 
       if (overlay.active) {
