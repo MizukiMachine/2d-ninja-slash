@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultThreeLaneYSettings } from '../src/game/playerLaneMovement';
 import { createDebugStore } from '../src/stores/debugStore';
-import { createSettingsStore, DEFAULT_SETTINGS } from '../src/stores/settingsStore';
+import {
+  createSettingsStore,
+  DEFAULT_SETTINGS,
+  SETTINGS_STORAGE_KEY
+} from '../src/stores/settingsStore';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -47,6 +51,24 @@ describe('settingsStore', () => {
       muted: true,
       bgmEnabled: false
     });
+    expect(storage.getItem(SETTINGS_STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('ignores legacy starter settings that could leave production audio muted', () => {
+    const storage = new MemoryStorage();
+
+    storage.setItem(
+      'phaser-4-starter-settings',
+      JSON.stringify({
+        volume: 0,
+        muted: true,
+        bgmEnabled: false
+      })
+    );
+
+    const store = createSettingsStore(storage);
+
+    expect(store.get()).toEqual(DEFAULT_SETTINGS);
   });
 
   it('toggles BGM independently of mute', () => {

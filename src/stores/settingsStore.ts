@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   bgmEnabled: true
 };
 
-const SETTINGS_STORAGE_KEY = 'phaser-4-starter-settings';
+export const SETTINGS_STORAGE_KEY = 'gekka-no-shinobi-settings-v1';
 
 function clampVolume(volume: number): number {
   return Math.min(1, Math.max(0, Number(volume.toFixed(2))));
