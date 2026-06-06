@@ -175,13 +175,11 @@ class PhaserGameAudio implements GameAudio {
       return;
     }
 
-    // Start pending WebAudio sources during the same user gesture. The context
-    // may still be resolving its resume promise, but scheduled sources will
-    // become audible once the context is running.
+    // Keep pending sounds queued until the AudioContext is actually running.
+    // Some mobile browsers accept source.start() while suspended but never make
+    // that already-started source audible after resume.
     const flushedBgmTrackId = this.pendingBgmTrackId;
     const flushedSfxRequest = this.pendingSfxRequest;
-
-    this.completeUnlock(scene, soundManager);
 
     void resumePromise.then(
       () => {

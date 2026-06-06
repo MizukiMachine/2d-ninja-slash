@@ -240,8 +240,14 @@ describe('gameAudio', () => {
     });
   });
 
-  it('primes pending BGM immediately while WebAudio resumes from a gesture', async () => {
-    const resume = vi.fn(() => Promise.resolve());
+  it('plays pending BGM after WebAudio resume resolves', async () => {
+    let resolveResume!: () => void;
+    const resume = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveResume = resolve;
+        })
+    );
     const { add, scene, soundManager, sounds, unlock } = createAudioScene([], {
       locked: true,
       context: { state: 'suspended', resume }
@@ -254,10 +260,17 @@ describe('gameAudio', () => {
 
     audio.requestUnlock(scene);
 
-    const bgmSound = sounds[0]!;
-
     expect(unlock).not.toHaveBeenCalled();
     expect(resume).toHaveBeenCalledTimes(1);
+    expect(scene.sound.locked).toBe(true);
+    expect(soundManager.unlocked).toBe(false);
+    expect(add).not.toHaveBeenCalled();
+
+    resolveResume();
+    await Promise.resolve();
+
+    const bgmSound = sounds[0]!;
+
     expect(scene.sound.locked).toBe(false);
     expect(soundManager.unlocked).toBe(true);
     expect(add).toHaveBeenCalledWith('bgm.bossDuel', {
@@ -286,13 +299,18 @@ describe('gameAudio', () => {
 
     audio.requestUnlock(scene);
 
+    expect(scene.sound.locked).toBe(true);
+    expect(soundManager.unlocked).toBe(false);
+
+    resolveResume();
+    await Promise.resolve();
+
     expect(scene.sound.locked).toBe(false);
     expect(soundManager.unlocked).toBe(true);
 
     // Phaser's BaseSoundManager consumes this flag during its next update.
     soundManager.unlocked = false;
 
-    resolveResume();
     await Promise.resolve();
 
     expect(scene.sound.locked).toBe(false);
@@ -317,8 +335,8 @@ describe('gameAudio', () => {
     audio.requestUnlock(scene);
     audio.playBgm(scene, 'boss-duel');
 
-    expect(add).toHaveBeenCalledTimes(1);
-    expect(sounds).toHaveLength(1);
+    expect(add).not.toHaveBeenCalled();
+    expect(sounds).toHaveLength(0);
 
     await Promise.resolve();
     await Promise.resolve();
@@ -335,7 +353,7 @@ describe('gameAudio', () => {
     const bgmSound = sounds[0]!;
 
     expect(scene.sound.locked).toBe(false);
-    expect(add).toHaveBeenCalledTimes(2);
+    expect(add).toHaveBeenCalledTimes(1);
     expect(bgmSound.play).toHaveBeenCalledWith({
       loop: true,
       volume: COMBAT_BGM_VOLUME
